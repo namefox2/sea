@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Brand -->
+    <color name="ocean_blue">#0288D1</color>
+    <color name="ocean_dark">#01579B</color>
+    <color name="ocean_light">#81D4FA</color>
+    <color name="teal">#00ACC1</color>
+
+    <!-- Status colors -->
+    <color name="status_rising">#2196F3</color>
+    <color name="status_falling">#FF9800</color>
+    <color name="status_high">#1565C0</color>
+    <color name="status_low">#E65100</color>
+
+    <!-- Backgrounds -->
+    <color name="bg_surface">#FAFAFA</color>
+    <color name="bg_surface_dark">#121212</color>
+    <color name="bg_card">#FFFFFF</color>
+    <color name="bg_card_dark">#1E1E1E</color>
+
+    <!-- Text -->
+    <color name="text_primary">#212121</color>
+    <color name="text_secondary">#757575</color>
+    <color name="text_primary_dark">#FFFFFF</color>
+    <color name="text_secondary_dark">#B0BEC5</color>
+
+    <!-- Map -->
+    <color name="korea_land">#D4E8C2</color>
+    <color name="korea_border">#6A8F4A</color>
+    <color name="korea_sea">#B3E5FC</color>
+
+    <!-- Chart -->
+    <color name="chart_line">#0288D1</color>
+    <color name="chart_fill">#400288D1</color>
+
+    <!-- Theme accents -->
+    <color name="spring_accent">#66BB6A</color>
+    <color name="summer_accent">#039BE5</color>
+    <color name="autumn_accent">#FF7043</color>
+    <color name="winter_accent">#7986CB</color>
+</resources>

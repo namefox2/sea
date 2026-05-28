@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginHorizontal="@dimen/spacing_md"
+    android:layout_marginVertical="@dimen/spacing_xs"
+    app:cardElevation="@dimen/card_elevation"
+    app:cardCornerRadius="@dimen/card_radius">
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="@dimen/spacing_md">
+
+        <TextView
+            android:id="@+id/tvStationName"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:textColor="?android:textColorPrimary"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toStartOf="@id/tvTidePercent" />
+
+        <TextView
+            android:id="@+id/tvStationCode"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:textSize="11sp"
+            android:textColor="?android:textColorSecondary"
+            android:layout_marginTop="2dp"
+            app:layout_constraintTop_toBottomOf="@id/tvStationName"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toStartOf="@id/tvTidePercent" />
+
+        <TextView
+            android:id="@+id/tvRegion"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="12sp"
+            android:textColor="@color/ocean_blue"
+            android:layout_marginTop="4dp"
+            app:layout_constraintTop_toBottomOf="@id/tvStationCode"
+            app:layout_constraintStart_toStartOf="parent" />
+
+        <TextView
+            android:id="@+id/tvTideStatus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="12sp"
+            android:layout_marginStart="@dimen/spacing_sm"
+            app:layout_constraintTop_toBottomOf="@id/tvStationCode"
+            app:layout_constraintStart_toEndOf="@id/tvRegion"
+            app:layout_constraintBaseline_toBaselineOf="@id/tvRegion" />
+
+        <TextView
+            android:id="@+id/tvWind"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="12sp"
+            android:textColor="?android:textColorSecondary"
+            app:layout_constraintTop_toBottomOf="@id/tvStationCode"
+            app:layout_constraintEnd_toEndOf="@id/progressTide" />
+
+        <TextView
+            android:id="@+id/tvTidePercent"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="22sp"
+            android:textStyle="bold"
+            android:textColor="@color/ocean_blue"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintEnd_toEndOf="parent" />
+
+        <ProgressBar
+            android:id="@+id/progressTide"
+            style="@style/Widget.AppCompat.ProgressBar.Horizontal"
+            android:layout_width="80dp"
+            android:layout_height="6dp"
+            android:max="100"
+            android:progressTint="@color/ocean_blue"
+            app:layout_constraintTop_toBottomOf="@id/tvTidePercent"
+            app:layout_constraintEnd_toEndOf="parent" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+</com.google.android.material.card.MaterialCardView>

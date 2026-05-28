@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Korea Tide</string>
+
+    <!-- Bottom nav -->
+    <string name="nav_search">검색</string>
+    <string name="nav_map">지도</string>
+    <string name="nav_detail">조위</string>
+    <string name="nav_watch">물멍</string>
+
+    <!-- Search -->
+    <string name="hint_search">관측소 이름 또는 지역 검색</string>
+    <string name="filter_all">전체</string>
+    <string name="filter_west">서해안</string>
+    <string name="filter_south">남해안</string>
+    <string name="filter_east">동해안</string>
+    <string name="filter_jeju">제주</string>
+    <string name="no_stations">검색 결과가 없습니다</string>
+    <string name="loading">불러오는 중…</string>
+
+    <!-- Detail -->
+    <string name="no_station_selected">관측소를 선택하세요</string>
+    <string name="btn_view_watch">물멍 보기</string>
+    <string name="high_tide">만조</string>
+    <string name="low_tide">간조</string>
+    <string name="current_level">현재 수위</string>
+    <string name="tide_status">조수 상태</string>
+    <string name="wind_info">바람</string>
+
+    <!-- Watch -->
+    <string name="select_station_banner">상단 검색 또는 지도에서 관측소를 선택하면 물멍이 시작됩니다</string>
+    <string name="go_to_search">검색으로 이동</string>
+
+    <!-- Map -->
+    <string name="tooltip_view_detail">상세 보기</string>
+</resources>
