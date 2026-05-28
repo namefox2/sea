@@ -46,6 +46,19 @@
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 
+    <!-- Marine life settings button -->
+    <ImageButton
+        android:id="@+id/btnMarineSettings"
+        android:layout_width="44dp"
+        android:layout_height="44dp"
+        android:layout_margin="@dimen/spacing_md"
+        android:background="#AA000000"
+        android:padding="10dp"
+        android:src="@drawable/ic_settings"
+        android:contentDescription="해양생물 설정"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
     <!-- Station info overlay -->
     <com.google.android.material.card.MaterialCardView
         android:id="@+id/overlayCard"

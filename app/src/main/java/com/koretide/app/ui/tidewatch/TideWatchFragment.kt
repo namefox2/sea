@@ -39,6 +39,17 @@ class TideWatchFragment : Fragment() {
         val theme = seasonThemeManager.getThemeForContext(requireContext())
         binding.tideWatchView.themeConfig = theme
 
+        // Apply saved marine life settings
+        binding.tideWatchView.marineSettings = MarineLifePrefs.load(requireContext())
+
+        binding.btnMarineSettings.setOnClickListener {
+            val sheet = MarineSettingsSheet()
+            sheet.onSettingsChanged = { settings ->
+                binding.tideWatchView.marineSettings = settings
+            }
+            sheet.show(childFragmentManager, MarineSettingsSheet.TAG)
+        }
+
         observeState()
     }
 

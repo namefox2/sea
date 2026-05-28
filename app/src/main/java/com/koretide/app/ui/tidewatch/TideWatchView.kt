@@ -14,6 +14,8 @@ import android.view.SurfaceView
 import android.content.Context
 import android.util.AttributeSet
 import com.koretide.app.theme.ThemeConfig
+import com.koretide.app.ui.tidewatch.marine.MarineLifeSettings
+import com.koretide.app.ui.tidewatch.marine.MarineLifeSystem
 import com.koretide.app.util.BeaufortConverter
 import kotlin.math.PI
 import kotlin.math.abs
@@ -85,6 +87,18 @@ class TideWatchView @JvmOverloads constructor(
     private val rayPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(30, 255, 255, 200); style = Paint.Style.FILL
     }
+    private val ripplePath = Path()
+    private val tidalDetailPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val tidalPoolPaint   = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
+
+    // Marine life
+    private val marineLifeSystem = MarineLifeSystem()
+    var marineSettings: MarineLifeSettings
+        get() = marineLifeSystem.settings
+        set(value) { marineLifeSystem.settings = value }
+
+    private data class ShellPebble(val x: Float, val y: Float, val r: Float)
+    private val shellPebbles = Array(25) { ShellPebble(0f, 0f, 2f) }
 
     // Particle data
     private data class Particle(var x: Float, var y: Float, var vx: Float, var vy: Float,
@@ -118,6 +132,7 @@ class TideWatchView @JvmOverloads constructor(
         surfaceW = width.coerceAtLeast(1)
         surfaceH = height.coerceAtLeast(1)
         resetParticles()
+        marineLifeSystem.onSizeChanged(surfaceW.toFloat(), surfaceH.toFloat())
     }
 
     override fun surfaceDestroyed(holder: SurfaceHolder) {
@@ -162,12 +177,18 @@ class TideWatchView @JvmOverloads constructor(
         val wind = windBeaufort
         val seaY = h * (0.72f - tide * 0.3f)
 
+        marineLifeSystem.update(animT, seaY, tide)
+
         drawSky(canvas, w, h, wind, theme)
         drawClouds(canvas, w, h, wind, theme)
         if (wind <= 7) drawSun(canvas, w, h, tide, wind, theme)
         drawMountains(canvas, w, h, theme)
-        if (tide < 0.22f) drawTidalFlat(canvas, w, h, tide, theme)
+        if (tide < 0.25f) {
+            drawTidalFlat(canvas, w, h, seaY, tide, theme)
+            marineLifeSystem.drawTidalCreatures(canvas, tide)
+        }
         drawSea(canvas, w, h, seaY, wind, theme)
+        marineLifeSystem.drawWaterCreatures(canvas)
         drawWaves(canvas, w, h, seaY, tide, wind, theme)
         if (wind >= 4) drawWhitecaps(canvas, w, h, seaY, tide, wind)
         updateAndDrawFoam(canvas, w, h, seaY, wind)
@@ -239,16 +260,65 @@ class TideWatchView @JvmOverloads constructor(
         canvas.drawPath(mtnPath, mtnPaint)
     }
 
-    private fun drawTidalFlat(canvas: Canvas, w: Float, h: Float, tide: Float, theme: ThemeConfig) {
-        flatPaint.color = theme.tidalFlatColor
-        val flatH = h * (0.22f - tide) * 0.8f
-        flatPath.reset()
-        flatPath.moveTo(0f, h * 0.75f)
-        flatPath.lineTo(0f, h * 0.75f + flatH)
-        flatPath.lineTo(w, h * 0.75f + flatH)
-        flatPath.lineTo(w, h * 0.75f)
-        flatPath.close()
-        canvas.drawPath(flatPath, flatPaint)
+    private fun drawTidalFlat(canvas: Canvas, w: Float, h: Float, seaY: Float, tide: Float, theme: ThemeConfig) {
+        val flatTop = h * 0.655f
+        val flatBottom = seaY
+        if (flatBottom <= flatTop + 2f) return
+
+        // Sandy gradient — lighter at top (dry sand), darker/wetter near waterline
+        val base = theme.tidalFlatColor
+        val r = Color.red(base); val g = Color.green(base); val b = Color.blue(base)
+        val lightSand = Color.argb(220, (r + 35).coerceAtMost(255), (g + 30).coerceAtMost(255), (b + 20).coerceAtMost(255))
+        flatPaint.shader = LinearGradient(0f, flatTop, 0f, flatBottom, lightSand, base, Shader.TileMode.CLAMP)
+        canvas.drawRect(0f, flatTop, w, flatBottom, flatPaint)
+        flatPaint.shader = null
+
+        val flatH = flatBottom - flatTop
+
+        // Wet sand strip near waterline
+        tidalDetailPaint.style = Paint.Style.FILL
+        tidalDetailPaint.color = Color.argb(70, 60, 50, 35)
+        canvas.drawRect(0f, flatBottom - flatH * 0.22f, w, flatBottom, tidalDetailPaint)
+
+        // Ripple marks (tidal sand ripples)
+        tidalDetailPaint.style = Paint.Style.STROKE
+        tidalDetailPaint.strokeWidth = 1f
+        tidalDetailPaint.color = Color.argb(45, 80, 60, 40)
+        val rippleCount = ((flatH / 14f).toInt()).coerceIn(1, 7)
+        for (i in 0 until rippleCount) {
+            val ry = flatTop + (i + 1) * flatH / (rippleCount + 1)
+            ripplePath.reset()
+            ripplePath.moveTo(0f, ry)
+            var rx = 0f
+            while (rx <= w) {
+                val oy = sin((rx * 0.018f + i * 0.9f).toDouble()).toFloat() * 2.5f
+                ripplePath.lineTo(rx, ry + oy)
+                rx += 18f
+            }
+            canvas.drawPath(ripplePath, tidalDetailPaint)
+        }
+        tidalDetailPaint.style = Paint.Style.FILL
+
+        // Tidal pools (small reflective puddles)
+        val poolCount = 3
+        for (i in 0 until poolCount) {
+            val px = w * (0.12f + i * 0.32f)
+            val py = flatTop + flatH * (0.38f + i * 0.18f)
+            val pr = 14f + i * 7f
+            tidalPoolPaint.color = Color.argb(55, 70, 130, 175)
+            canvas.drawOval(px - pr, py - pr * 0.38f, px + pr, py + pr * 0.38f, tidalPoolPaint)
+            // Pool sky reflection shimmer
+            tidalPoolPaint.color = Color.argb(35, 200, 230, 255)
+            canvas.drawOval(px - pr * 0.45f, py - pr * 0.18f, px + pr * 0.2f, py + pr * 0.12f, tidalPoolPaint)
+        }
+
+        // Scattered shells and pebbles (pre-computed, static)
+        tidalDetailPaint.color = Color.argb(110, 190, 180, 160)
+        for (sp in shellPebbles) {
+            if (sp.y in flatTop..flatBottom) {
+                canvas.drawCircle(sp.x, sp.y, sp.r, tidalDetailPaint)
+            }
+        }
     }
 
     private fun drawSea(canvas: Canvas, w: Float, h: Float, seaY: Float, wind: Int, theme: ThemeConfig) {
@@ -437,13 +507,23 @@ class TideWatchView @JvmOverloads constructor(
 
     private fun resetParticles() {
         val w = surfaceW.toFloat()
-        val seaY = surfaceH * 0.55f
+        val h = surfaceH.toFloat()
+        val seaY = h * 0.55f
         for (i in foamParticles.indices)  foamParticles[i]  = randomFoam(w, seaY)
         for (i in sprayParticles.indices) sprayParticles[i] = randomSpray(w * Random.nextFloat(), seaY)
-        for (i in glitterPoints.indices)  glitterPoints[i]  = randomGlitter(w, surfaceH.toFloat())
+        for (i in glitterPoints.indices)  glitterPoints[i]  = randomGlitter(w, h)
         for ((i, g) in seagulls.withIndex()) {
             g.x = i * (w / 5f) + Random.nextFloat() * 100f
-            g.y = surfaceH * (0.2f + Random.nextFloat() * 0.15f)
+            g.y = h * (0.2f + Random.nextFloat() * 0.15f)
+        }
+        val flatTop = h * 0.655f
+        val flatZoneH = h * 0.07f
+        for (i in shellPebbles.indices) {
+            shellPebbles[i] = ShellPebble(
+                x = Random.nextFloat() * w,
+                y = flatTop + Random.nextFloat() * flatZoneH,
+                r = 1.5f + Random.nextFloat() * 3f
+            )
         }
     }
 
