@@ -50,4 +50,8 @@
     <!-- Map -->
     <string name="tooltip_view_detail">상세 보기</string>
     <string name="btn_go_watch">물멍하러가기</string>
+
+    <!-- AdMob — replace with real production IDs before release -->
+    <string name="admob_app_id" translatable="false">ca-app-pub-3940256099942544~3347511713</string>
+    <string name="admob_banner_map_unit_id" translatable="false">ca-app-pub-3940256099942544/6300978111</string>
 </resources>

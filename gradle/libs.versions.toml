@@ -15,6 +15,7 @@ okhttp = "4.12.0"
 moshi = "1.15.1"
 coroutines = "1.7.3"
 mpandroidchart = "v3.1.0"
+playServicesAds = "23.1.0"
 turbine = "1.0.0"
 mockk = "1.13.9"
 junitJupiter = "5.10.1"
@@ -61,6 +62,7 @@ coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-
 
 # Chart
 mpandroidchart = { group = "com.github.PhilJay", name = "MPAndroidChart", version.ref = "mpandroidchart" }
+play-services-ads = { group = "com.google.android.gms", name = "play-services-ads", version.ref = "playServicesAds" }
 
 # Test
 junit-jupiter = { group = "org.junit.jupiter", name = "junit-jupiter", version.ref = "junitJupiter" }

@@ -125,6 +125,9 @@ dependencies {
     // Chart
     implementation(libs.mpandroidchart)
 
+    // AdMob
+    implementation(libs.play.services.ads)
+
     // Test
     testImplementation(libs.junit.jupiter.api)
     testRuntimeOnly(libs.junit.jupiter.engine)

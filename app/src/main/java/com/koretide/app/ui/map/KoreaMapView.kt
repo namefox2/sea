@@ -118,6 +118,8 @@ class KoreaMapView @JvmOverloads constructor(
     private val geojeIslandPath = Path()
     private val jindo1Path = Path()
     private val ganghwaPath = Path()
+    private val dmzPath = Path()
+    private val provinceBorderPaths = mutableListOf<Path>()
     private var pathDirty = true
 
     private fun drawSquare(
@@ -395,10 +397,70 @@ class KoreaMapView @JvmOverloads constructor(
         val garx = scX * 0.12f; val gary = scY * 0.15f
         ganghwaPath.addOval(RectF(gacx - garx, gacy - gary, gacx + garx, gacy + gary), Path.Direction.CW)
 
+        // ── DMZ dashed line ──────────────────────────────────────────────────
+        val dmzPts = listOf(
+            126.02f to 38.27f, 126.45f to 38.32f, 126.85f to 38.38f,
+            127.28f to 38.42f, 127.68f to 38.45f, 128.05f to 38.38f,
+            128.35f to 38.3f,  128.62f to 38.26f
+        )
+        dmzPath.reset()
+        dmzPath.moveTo(lngToX(dmzPts[0].first), latToY(dmzPts[0].second))
+        for (i in 1 until dmzPts.size) dmzPath.lineTo(lngToX(dmzPts[i].first), latToY(dmzPts[i].second))
+
+        // ── Province border path cache ────────────────────────────────────────
+        provinceBorderPaths.clear()
+        for (border in provinceBorders) {
+            if (border.isEmpty()) continue
+            val p = Path()
+            p.moveTo(lngToX(border[0].first), latToY(border[0].second))
+            for (i in 1 until border.size) p.lineTo(lngToX(border[i].first), latToY(border[i].second))
+            provinceBorderPaths.add(p)
+        }
+
         pathDirty = false
     }
 
     override fun onDraw(canvas: Canvas) {
+        buildPaths()
+
+        // ── 1. 바다 배경 ──────────────────────────────────────────────────────
+        canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), seaPaint)
+
+        // ── 2. 북한 ───────────────────────────────────────────────────────────
+        canvas.drawPath(northKoreaPath, northKoreaPaint)
+        canvas.drawPath(northKoreaPath, northKoreaBorderPaint)
+
+        // ── 3. 한국 육지 + 섬 ────────────────────────────────────────────────
+        canvas.drawPath(peninsulaPath,    landPaint)
+        canvas.drawPath(jejuPath,         landPaint)
+        canvas.drawPath(geojeIslandPath,  landPaint)
+        canvas.drawPath(jindo1Path,       landPaint)
+        canvas.drawPath(ganghwaPath,      landPaint)
+
+        // ── 4. 도 경계선 ──────────────────────────────────────────────────────
+        for (path in provinceBorderPaths) canvas.drawPath(path, provincePaint)
+
+        // ── 5. 해안선 ─────────────────────────────────────────────────────────
+        canvas.drawPath(peninsulaPath,    borderPaint)
+        canvas.drawPath(jejuPath,         borderPaint)
+        canvas.drawPath(geojeIslandPath,  borderPaint)
+        canvas.drawPath(jindo1Path,       borderPaint)
+        canvas.drawPath(ganghwaPath,      borderPaint)
+
+        // ── 6. DMZ ────────────────────────────────────────────────────────────
+        canvas.drawPath(dmzPath, dmzPaint)
+
+        // ── 7. 바다 이름 라벨 ─────────────────────────────────────────────────
+        seaLabelPaint.textSize = (width * 0.038f).coerceIn(11f, 18f)
+        canvas.drawText("서  해", lngToX(124.8f), latToY(36.5f),  seaLabelPaint)
+        canvas.drawText("동  해", lngToX(130.3f), latToY(37.2f),  seaLabelPaint)
+        canvas.drawText("남  해", lngToX(127.8f), latToY(33.75f), seaLabelPaint)
+
+        // ── 8. 도 이름 라벨 ───────────────────────────────────────────────────
+        provinceLabelPaint.textSize = (width * 0.030f).coerceIn(9f, 14f)
+        for (label in provinceLabels) {
+            canvas.drawText(label.name, lngToX(label.lng), latToY(label.lat), provinceLabelPaint)
+        }
 
         // Station pins
         for (pin in pins) {

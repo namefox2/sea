@@ -27,7 +27,7 @@
     <!-- Map -->
     <color name="korea_land">#D4E8C2</color>
     <color name="korea_border">#6A8F4A</color>
-    <color name="korea_sea">#B3E5FC</color>
+    <color name="korea_sea">#C8E0F0</color>
 
     <!-- Chart -->
     <color name="chart_line">#0288D1</color>

@@ -8,6 +8,8 @@ import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.fragment.app.viewModels
 import androidx.navigation.fragment.findNavController
+import com.google.android.gms.ads.AdRequest
+import com.google.android.gms.ads.MobileAds
 import com.koretide.app.R
 import com.koretide.app.databinding.FragmentMapBinding
 import com.koretide.app.domain.model.ActivitySpot
@@ -38,7 +40,13 @@ class MapFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         setupMapView()
         setupActivityChips()
+        setupAdMob()
         observeState()
+    }
+
+    private fun setupAdMob() {
+        MobileAds.initialize(requireContext())
+        binding.adViewMap.loadAd(AdRequest.Builder().build())
     }
 
     private fun setupMapView() {
@@ -109,6 +117,7 @@ class MapFragment : Fragment() {
     }
 
     override fun onDestroyView() {
+        binding.adViewMap.destroy()
         super.onDestroyView()
         _binding = null
     }

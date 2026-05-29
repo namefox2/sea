@@ -13,6 +13,11 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.KoreTide">
 
+        <!-- AdMob -->
+        <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="@string/admob_app_id" />
+
         <activity
             android:name=".ui.main.MainActivity"
             android:exported="true"
