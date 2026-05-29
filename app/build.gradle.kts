@@ -1,4 +1,5 @@
 import java.util.Properties
+import org.gradle.api.tasks.compile.JavaCompile
 
 plugins {
     alias(libs.plugins.android.application)
@@ -68,9 +69,20 @@ ksp {
     arg("room.incremental", "true")
 }
 
-// Removes hiltJavaCompile* tasks, eliminating the Moshi APT discovery warning
+// enableAggregatingTask only affects Kapt-mode Hilt; harmless with KSP.
 hilt {
     enableAggregatingTask = true
+}
+
+// Hilt still creates hiltJavaCompile* tasks for component aggregation even in KSP mode.
+// Those tasks discover moshi-kotlin-codegen's bundled APT processor via the
+// META-INF/services/ manifest and invoke it, triggering the Kapt-deprecation warning.
+// Stripping the JAR from every JavaCompile AP classpath silences the warning.
+afterEvaluate {
+    tasks.withType<JavaCompile>().configureEach {
+        options.annotationProcessorPath = options.annotationProcessorPath
+            ?.filter { "moshi-kotlin-codegen" !in it.name }
+    }
 }
 
 dependencies {
