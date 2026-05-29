@@ -10,6 +10,8 @@ import android.graphics.RectF
 import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.View
+import com.koretide.app.domain.model.ActivitySpot
+import com.koretide.app.domain.model.ActivityType
 import com.koretide.app.domain.model.Station
 import com.koretide.app.domain.model.TideStatus
 import kotlin.math.sqrt
@@ -27,7 +29,11 @@ class KoreaMapView @JvmOverloads constructor(
     var pins: List<StationPin> = emptyList()
         set(value) { field = value; invalidate() }
 
+    var activitySpots: List<ActivitySpot> = emptyList()
+        set(value) { field = value; invalidate() }
+
     var onPinClick: ((Station) -> Unit)? = null
+    var onActivityPinClick: ((ActivitySpot) -> Unit)? = null
     var selectedCode: String? = null
         set(value) { field = value; invalidate() }
 
@@ -85,6 +91,14 @@ class KoreaMapView @JvmOverloads constructor(
     }
     private val pinLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.parseColor("#111111"); textAlign = Paint.Align.CENTER
+    }
+
+    // Activity spot pin paints — one per ActivityType, cached to avoid allocations in onDraw
+    private val activityPinPaints: Map<ActivityType, Paint> = ActivityType.values().associateWith { type ->
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor(type.colorHex)
+            style = Paint.Style.FILL
+        }
     }
 
     // Geographic bounds
@@ -378,11 +392,46 @@ class KoreaMapView @JvmOverloads constructor(
                 canvas.drawText(pin.station.name, x, y - r - 8f, pinLabelPaint)
             }
         }
+
+        // Activity spot pins (diamond shape)
+        val diamondPath = Path()
+        for (spot in activitySpots) {
+            val x = lngToX(spot.lng.toFloat())
+            val y = latToY(spot.lat.toFloat())
+            val paint = activityPinPaints[spot.type] ?: continue
+            val r = 9f
+            diamondPath.reset()
+            diamondPath.moveTo(x, y - r)
+            diamondPath.lineTo(x + r, y)
+            diamondPath.lineTo(x, y + r)
+            diamondPath.lineTo(x - r, y)
+            diamondPath.close()
+            canvas.drawPath(diamondPath, paint)
+            canvas.drawPath(diamondPath, pinBorderPaint)
+        }
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
         if (event.action == MotionEvent.ACTION_UP) {
             val tx = event.x; val ty = event.y
+
+            // Check activity spots first
+            val closestActivity = activitySpots.minByOrNull { spot ->
+                val dx = lngToX(spot.lng.toFloat()) - tx
+                val dy = latToY(spot.lat.toFloat()) - ty
+                dx * dx + dy * dy
+            }
+            if (closestActivity != null) {
+                val dx = lngToX(closestActivity.lng.toFloat()) - tx
+                val dy = latToY(closestActivity.lat.toFloat()) - ty
+                if (sqrt(dx * dx + dy * dy) < 52f) {
+                    onActivityPinClick?.invoke(closestActivity)
+                    performClick()
+                    return true
+                }
+            }
+
+            // Then check station pins
             val closest = pins.minByOrNull { pin ->
                 val dx = lngToX(pin.station.lng.toFloat()) - tx
                 val dy = latToY(pin.station.lat.toFloat()) - ty

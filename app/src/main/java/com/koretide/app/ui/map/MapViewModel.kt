@@ -2,6 +2,9 @@ package com.koretide.app.ui.map
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.koretide.app.data.MarineActivityData
+import com.koretide.app.domain.model.ActivitySpot
+import com.koretide.app.domain.model.ActivityType
 import com.koretide.app.domain.model.Station
 import com.koretide.app.domain.model.StationRegion
 import com.koretide.app.domain.usecase.GetAllStationsUseCase
@@ -12,6 +15,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
 
@@ -33,9 +37,18 @@ class MapViewModel @Inject constructor(
         if (region == null) all else all.filter { it.region == region }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    private val _activityFilter = MutableStateFlow<ActivityType?>(null)
+    val activityFilter: StateFlow<ActivityType?> = _activityFilter.asStateFlow()
+
+    val activitySpots: StateFlow<List<ActivitySpot>> = _activityFilter
+        .map { type -> if (type == null) emptyList() else MarineActivityData.getSpots(type) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     fun setRegionFilter(region: StationRegion?) { _regionFilter.value = region }
 
     fun selectPin(station: Station) { _selectedPin.value = station }
 
     fun clearPin() { _selectedPin.value = null }
+
+    fun setActivityFilter(type: ActivityType?) { _activityFilter.value = type }
 }

@@ -108,7 +108,7 @@ void main() {
 
         // Fresnel: near horizon = reflective, near viewer = transparent
         float fresnelBase = pow(1.0 - clamp(norm.y, 0.0, 1.0), 4.0);
-        float fresnel     = mix(fresnelBase, 0.95, 1.0 - depth);
+        float fresnel     = mix(fresnelBase, 0.95, depth);
         fresnel = clamp(fresnel, 0.0, 1.0);
 
         // Water body color (depth-dependent)
@@ -127,9 +127,9 @@ void main() {
         float spec    = pow(max(0.0, dot(norm, halfVec)), sPow);
         // Confine glitter to sun reflection path on water
         float azFrac  = fract((uWindDir + 1.0) / 6.2832);
-        float sunPath = exp(-pow((vUV.x - azFrac) * uAspect * 0.5, 2.0));
+        float sunPath = exp(-pow((vUV.x - azFrac) * uAspect * 0.32, 2.0));
         spec *= (0.22 + 0.78 * sunPath) * (1.0 - (1.0 - depth) * 0.4);
-        col += uSun * spec * (uDark > 0.5 ? 0.55 : 1.65);
+        col += uSun * spec * (uDark > 0.5 ? 0.55 : 2.8);
 
         // Foam / whitecaps
         float foamTh = 0.67 - wind * 0.10;
@@ -178,12 +178,22 @@ void main() {
 
         // Sun disc + corona
         float sunX = 0.65 + 0.18 * cos(uWindDir + 1.0);
-        float sunY = hY + 0.04 + (1.0 - hY - 0.04) * (uDark > 0.5 ? 0.48 : 0.68);
+        float sunY = hY + 0.04 + (1.0 - hY - 0.04) * (uDark > 0.5 ? 0.48 : 0.76);
         float sunR = uDark > 0.5 ? 0.026 : 0.036;
-        float dSun = length(vUV - vec2(sunX, sunY));
+        float dSun = length(vec2((vUV.x - sunX) * uAspect, vUV.y - sunY));
         float disc  = 1.0 - smoothstep(sunR * 0.88, sunR * 1.12, dSun);
         float glow  = exp(-dSun * (uDark > 0.5 ? 14.0 : 6.5)) * (uDark > 0.5 ? 0.30 : 0.62);
-        col = mix(col, uSun * (uDark > 0.5 ? 1.15 : 1.35), disc + glow * (1.0 - disc));
+
+        // Starburst rays (day only)
+        float sbStr = 0.0;
+        if (uDark < 0.5) {
+            float ang = atan(vUV.y - sunY, (vUV.x - sunX) * uAspect);
+            float r1 = pow(max(0.0, cos(ang * 8.0)), 14.0);
+            float r2 = pow(max(0.0, cos(ang * 14.0)), 10.0);
+            sbStr = (r1 * 0.55 + r2 * 0.40) * exp(-dSun * 13.0) * (1.0 - disc) * 0.9;
+        }
+
+        col = mix(col, uSun * (uDark > 0.5 ? 1.15 : 1.8), disc + glow * (1.0 - disc) + sbStr * (1.0 - disc));
 
         // Stars (night)
         if (uDark > 0.5) {

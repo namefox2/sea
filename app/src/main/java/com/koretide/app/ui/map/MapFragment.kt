@@ -10,6 +10,8 @@ import androidx.fragment.app.viewModels
 import androidx.navigation.fragment.findNavController
 import com.koretide.app.R
 import com.koretide.app.databinding.FragmentMapBinding
+import com.koretide.app.domain.model.ActivitySpot
+import com.koretide.app.domain.model.ActivityType
 import com.koretide.app.domain.model.Station
 import com.koretide.app.domain.model.StationRegion
 import com.koretide.app.ui.main.SharedViewModel
@@ -36,11 +38,13 @@ class MapFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         setupMapView()
         setupRegionTabs()
+        setupActivityChips()
         observeState()
     }
 
     private fun setupMapView() {
         binding.koreaMapView.onPinClick = { station -> onPinSelected(station) }
+        binding.koreaMapView.onActivityPinClick = { spot -> onActivityPinSelected(spot) }
     }
 
     private fun setupRegionTabs() {
@@ -51,11 +55,23 @@ class MapFragment : Fragment() {
         binding.chipJeju.setOnClickListener  { viewModel.setRegionFilter(StationRegion.JEJU) }
     }
 
+    private fun setupActivityChips() {
+        binding.chipActivityAll.setOnClickListener  { viewModel.setActivityFilter(null) }
+        binding.chipFishing.setOnClickListener      { viewModel.setActivityFilter(ActivityType.FISHING) }
+        binding.chipSurfing.setOnClickListener      { viewModel.setActivityFilter(ActivityType.SURFING) }
+        binding.chipTidalFlat.setOnClickListener    { viewModel.setActivityFilter(ActivityType.TIDAL_FLAT) }
+        binding.chipSwimming.setOnClickListener     { viewModel.setActivityFilter(ActivityType.SWIMMING) }
+        binding.chipScuba.setOnClickListener        { viewModel.setActivityFilter(ActivityType.SCUBA) }
+    }
+
     private fun observeState() {
         collectFlow(viewModel.stations) { stations ->
             binding.koreaMapView.pins = stations.map { station ->
                 KoreaMapView.StationPin(station = station)
             }
+        }
+        collectFlow(viewModel.activitySpots) { spots ->
+            binding.koreaMapView.activitySpots = spots
         }
         collectFlow(sharedViewModel.selectedStation) { station ->
             binding.koreaMapView.selectedCode = station?.code
@@ -65,6 +81,8 @@ class MapFragment : Fragment() {
                 binding.tooltipCard.visibility = View.VISIBLE
                 binding.tvTooltipName.text = pin.name
                 binding.tvTooltipRegion.text = pin.region.displayName
+                binding.btnViewDetail.visibility = View.VISIBLE
+                binding.btnGoWatch.visibility = View.VISIBLE
             } else {
                 binding.tooltipCard.visibility = View.GONE
             }
@@ -77,9 +95,22 @@ class MapFragment : Fragment() {
         binding.tooltipCard.visibility = View.VISIBLE
         binding.tvTooltipName.text = station.name
         binding.tvTooltipRegion.text = station.region.displayName
+        binding.btnViewDetail.visibility = View.VISIBLE
         binding.btnViewDetail.setOnClickListener {
             findNavController().navigate(R.id.action_global_to_detail)
         }
+        binding.btnGoWatch.visibility = View.VISIBLE
+        binding.btnGoWatch.setOnClickListener {
+            sharedViewModel.requestTabNavigation(R.id.navigation_watch)
+        }
+    }
+
+    private fun onActivityPinSelected(spot: ActivitySpot) {
+        binding.tooltipCard.visibility = View.VISIBLE
+        binding.tvTooltipName.text = spot.name
+        binding.tvTooltipRegion.text = spot.type.displayName
+        binding.btnViewDetail.visibility = View.GONE
+        binding.btnGoWatch.visibility = View.VISIBLE
         binding.btnGoWatch.setOnClickListener {
             sharedViewModel.requestTabNavigation(R.id.navigation_watch)
         }
