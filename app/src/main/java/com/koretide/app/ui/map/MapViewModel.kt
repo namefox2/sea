@@ -30,19 +30,43 @@ class MapViewModel @Inject constructor(
     private val _selectedPin = MutableStateFlow<Station?>(null)
     val selectedPin: StateFlow<Station?> = _selectedPin.asStateFlow()
 
-    val stations: StateFlow<List<Station>> = combine(
-        getAllStationsUseCase(),
-        _regionFilter
-    ) { all, region ->
-        if (region == null) all else all.filter { it.region == region }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
     private val _activityFilter = MutableStateFlow<ActivityType?>(null)
     val activityFilter: StateFlow<ActivityType?> = _activityFilter.asStateFlow()
 
+    val stations: StateFlow<List<Station>> = combine(
+        getAllStationsUseCase(),
+        _regionFilter,
+        _activityFilter
+    ) { all, region, activity ->
+
+        val regionFiltered =
+            if (region == null) all
+            else all.filter { it.region == region }
+
+        when (activity) {
+            null -> regionFiltered                   // 전체
+            ActivityType.HIGH_TIDE -> regionFiltered // 물멍
+            else -> emptyList()                      // 낚시/서핑/해수욕 등
+        }
+    }.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5000),
+        emptyList()
+    )
+
     val activitySpots: StateFlow<List<ActivitySpot>> = _activityFilter
-        .map { type -> if (type == null) emptyList() else MarineActivityData.getSpots(type) }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        .map { type ->
+            when (type) {
+                null -> MarineActivityData.getAllSpots()      // 전체
+                ActivityType.HIGH_TIDE -> emptyList()         // 물멍
+                else -> MarineActivityData.getSpots(type)
+            }
+        }
+        .stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5000),
+            emptyList()
+        )
 
     fun setRegionFilter(region: StationRegion?) { _regionFilter.value = region }
 

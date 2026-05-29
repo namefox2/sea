@@ -1,6 +1,7 @@
 package com.koretide.app.domain.model
 
 enum class ActivityType(val displayName: String, val colorHex: String) {
+    HIGH_TIDE("만조", "#FF7043"),
     FISHING("바다낚시", "#FF6B35"),
     SURFING("서핑", "#0097A7"),
     TIDAL_FLAT("갯벌체험", "#8D6E63"),

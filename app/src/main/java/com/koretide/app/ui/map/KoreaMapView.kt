@@ -120,6 +120,77 @@ class KoreaMapView @JvmOverloads constructor(
     private val ganghwaPath = Path()
     private var pathDirty = true
 
+    private fun drawSquare(
+        canvas: Canvas,
+        x: Float,
+        y: Float,
+        r: Float,
+        paint: Paint
+    ) {
+        canvas.drawRect(
+            x - r,
+            y - r,
+            x + r,
+            y + r,
+            paint
+        )
+    }
+    private fun drawTriangle(
+        canvas: Canvas,
+        x: Float,
+        y: Float,
+        r: Float,
+        paint: Paint
+    ) {
+        val path = Path()
+
+        path.moveTo(x, y - r)
+        path.lineTo(x + r, y + r)
+        path.lineTo(x - r, y + r)
+        path.close()
+
+        canvas.drawPath(path, paint)
+    }
+    private fun drawDiamond(
+        canvas: Canvas,
+        x: Float,
+        y: Float,
+        r: Float,
+        paint: Paint
+    ) {
+        val path = Path()
+
+        path.moveTo(x, y - r)
+        path.lineTo(x + r, y)
+        path.lineTo(x, y + r)
+        path.lineTo(x - r, y)
+        path.close()
+
+        canvas.drawPath(path, paint)
+    }
+    private fun drawStar(
+        canvas: Canvas,
+        x: Float,
+        y: Float,
+        r: Float,
+        paint: Paint
+    ) {
+        val path = Path()
+
+        for (i in 0 until 10) {
+            val angle = Math.PI / 5 * i - Math.PI / 2
+            val radius = if (i % 2 == 0) r else r / 2
+
+            val px = x + (radius * kotlin.math.cos(angle)).toFloat()
+            val py = y + (radius * kotlin.math.sin(angle)).toFloat()
+
+            if (i == 0) path.moveTo(px, py)
+            else path.lineTo(px, py)
+        }
+
+        path.close()
+        canvas.drawPath(path, paint)
+    }
     // Province boundary polylines — approximate geographic coordinates
     private val provinceBorders = listOf(
         // Gyeonggi / Chungnam–Chungbuk (roughly 37°N belt, W→E)
@@ -144,7 +215,37 @@ class KoreaMapView @JvmOverloads constructor(
         listOf(128.3f to 36.5f, 128.55f to 36.1f, 128.72f to 35.72f,
                129.0f to 35.5f, 129.35f to 35.35f)
     )
+    private fun drawHeart(
+        canvas: Canvas,
+        x: Float,
+        y: Float,
+        r: Float,
+        paint: Paint
+    ) {
+        val path = Path()
 
+        path.moveTo(x, y + r)
+
+        path.cubicTo(
+            x - r * 2,
+            y,
+            x - r,
+            y - r * 2,
+            x,
+            y - r
+        )
+
+        path.cubicTo(
+            x + r,
+            y - r * 2,
+            x + r * 2,
+            y,
+            x,
+            y + r
+        )
+
+        canvas.drawPath(path, paint)
+    }
     // Province name label positions
     private data class ProvinceLabel(val name: String, val lng: Float, val lat: Float)
     private val provinceLabels = listOf(
@@ -298,86 +399,13 @@ class KoreaMapView @JvmOverloads constructor(
     }
 
     override fun onDraw(canvas: Canvas) {
-        super.onDraw(canvas)
-        buildPaths()
-
-        // Sea background
-        canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), seaPaint)
-
-        // North Korea
-        canvas.drawPath(northKoreaPath, northKoreaPaint)
-        canvas.drawPath(northKoreaPath, northKoreaBorderPaint)
-
-        // South Korea mainland
-        canvas.drawPath(peninsulaPath, landPaint)
-        canvas.drawPath(peninsulaPath, borderPaint)
-
-        // Islands
-        canvas.drawPath(jejuPath, landPaint)
-        canvas.drawPath(jejuPath, borderPaint)
-        canvas.drawPath(geojeIslandPath, landPaint)
-        canvas.drawPath(geojeIslandPath, borderPaint)
-        canvas.drawPath(jindo1Path, landPaint)
-        canvas.drawPath(jindo1Path, borderPaint)
-        canvas.drawPath(ganghwaPath, landPaint)
-        canvas.drawPath(ganghwaPath, borderPaint)
-
-        // Province boundary lines
-        provincePaint.strokeWidth = (width * 0.003f).coerceIn(0.8f, 2f)
-        for (border in provinceBorders) {
-            if (border.size < 2) continue
-            val path = Path()
-            path.moveTo(lngToX(border[0].first), latToY(border[0].second))
-            for (i in 1 until border.size) {
-                path.lineTo(lngToX(border[i].first), latToY(border[i].second))
-            }
-            canvas.drawPath(path, provincePaint)
-        }
-
-        // DMZ dashed line
-        canvas.drawLine(
-            lngToX(126.02f), latToY(38.27f),
-            lngToX(128.62f), latToY(38.26f),
-            dmzPaint
-        )
-
-        // Sea labels
-        seaLabelPaint.textSize = (width * 0.055f).coerceIn(22f, 42f)
-        canvas.drawText("서  해", lngToX(125.0f), latToY(36.5f), seaLabelPaint)
-        canvas.drawText("동  해", lngToX(130.2f), latToY(37.0f), seaLabelPaint)
-        canvas.drawText("남  해", lngToX(127.6f), latToY(33.6f), seaLabelPaint)
-
-        // Province name labels
-        provinceLabelPaint.textSize = (width * 0.032f).coerceIn(11f, 18f)
-        for (label in provinceLabels) {
-            canvas.drawText(label.name, lngToX(label.lng), latToY(label.lat), provinceLabelPaint)
-        }
-
-        // City dots + labels
-        cityLabelPaint.textSize = (width * 0.042f).coerceIn(14f, 26f)
-        val dotR = (width * 0.012f).coerceIn(4f, 8f)
-        data class CityMark(val name: String, val lng: Float, val lat: Float)
-        val cities = listOf(
-            CityMark("서울", 126.98f, 37.57f),
-            CityMark("인천", 126.7f,  37.45f),
-            CityMark("부산", 129.05f, 35.1f),
-            CityMark("강릉", 128.88f, 37.77f),
-            CityMark("광주", 126.85f, 35.16f),
-            CityMark("전주", 127.15f, 35.82f),
-            CityMark("제주", 126.55f, 33.28f)
-        )
-        for (city in cities) {
-            val cx = lngToX(city.lng); val cy = latToY(city.lat)
-            canvas.drawCircle(cx, cy, dotR, cityDotPaint)
-            canvas.drawText(city.name, cx, cy - dotR - 4f, cityLabelPaint)
-        }
 
         // Station pins
         for (pin in pins) {
             val x = lngToX(pin.station.lng.toFloat())
             val y = latToY(pin.station.lat.toFloat())
             val isSelected = pin.station.code == selectedCode
-            val r = if (isSelected) 13f else 8f
+            val r = if (isSelected) 13f else 9f
 
             pinPaint.color = when (pin.tideStatus) {
                 TideStatus.RISING, TideStatus.HIGH_TIDE -> Color.parseColor("#1565C0")
@@ -394,20 +422,26 @@ class KoreaMapView @JvmOverloads constructor(
         }
 
         // Activity spot pins (diamond shape)
-        val diamondPath = Path()
         for (spot in activitySpots) {
             val x = lngToX(spot.lng.toFloat())
             val y = latToY(spot.lat.toFloat())
+
             val paint = activityPinPaints[spot.type] ?: continue
-            val r = 9f
-            diamondPath.reset()
-            diamondPath.moveTo(x, y - r)
-            diamondPath.lineTo(x + r, y)
-            diamondPath.lineTo(x, y + r)
-            diamondPath.lineTo(x - r, y)
-            diamondPath.close()
-            canvas.drawPath(diamondPath, paint)
-            canvas.drawPath(diamondPath, pinBorderPaint)
+            val r = 11f
+
+            when (spot.type) {
+                ActivityType.HIGH_TIDE -> drawStar(canvas, x, y, r, paint)
+
+                ActivityType.FISHING -> drawDiamond(canvas, x, y, r, paint)
+
+                ActivityType.SURFING -> drawTriangle(canvas, x, y, r, paint)
+
+                ActivityType.TIDAL_FLAT -> drawSquare(canvas, x, y, r, paint)
+
+                ActivityType.SWIMMING -> canvas.drawCircle(x, y, r, paint)
+
+                ActivityType.SCUBA -> drawHeart(canvas, x, y, 7f, paint)
+            }
         }
     }
 

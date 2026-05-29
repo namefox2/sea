@@ -57,6 +57,7 @@ class MapFragment : Fragment() {
 
     private fun setupActivityChips() {
         binding.chipActivityAll.setOnClickListener  { viewModel.setActivityFilter(null) }
+        binding.chipHighTide.setOnClickListener      { viewModel.setActivityFilter(ActivityType.HIGH_TIDE) }
         binding.chipFishing.setOnClickListener      { viewModel.setActivityFilter(ActivityType.FISHING) }
         binding.chipSurfing.setOnClickListener      { viewModel.setActivityFilter(ActivityType.SURFING) }
         binding.chipTidalFlat.setOnClickListener    { viewModel.setActivityFilter(ActivityType.TIDAL_FLAT) }
