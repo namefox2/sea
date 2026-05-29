@@ -1,0 +1,83 @@
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  RealisticOcean Scene — GameObject Hierarchy
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+▼ [Lighting]
+    ├── DirectionalLight_Sun         (Light, HDAdditionalLightData)
+    │       Intensity = 80000 lux  Color = (1.0, 0.96, 0.88)
+    │       Shadow = ON, Resolution 2048, Cascade 4
+    └── DirectionalLight_Moon        (Light, HDAdditionalLightData)
+            Intensity = 1 lux  Color = (0.7, 0.75, 1.0)
+
+▼ [Sky]
+    ├── SkyAndFogVolume              (Volume — Global, PhysicallyBasedSky, Fog, Exposure)
+    └── AtmosphericHazeVolume        (Volume — Local/Global, Fog override)
+            → HorizonHazeRenderer.cs
+
+▼ [Ocean]
+    ├── OceanRenderer                (Crest.OceanRenderer)
+    │       → RealisticOceanSetup.cs
+    │       → OceanDynamicsController.cs
+    ├── ShapeFFT_WindChop            (Crest.ShapeFFT)  WindSpeed=10  JONSWAP
+    ├── ShapeFFT_Swell               (Crest.ShapeFFT)  WindSpeed=12  TMA  Dir=220°
+    ├── OceanDepthCache              (Crest.OceanDepthCache)
+    └── RegisterDynWaves             (Crest.RegisterDynWavesInput)
+
+▼ [VFX]
+    ├── SprayParticles               (ParticleSystem — sea spray at crests)
+    │       → SeaSprayParticleDriver.cs
+    ├── MistParticles                (ParticleSystem — fine mist layer)
+    ├── FoamLineParticles            (ParticleSystem — long foam streaks)
+    └── CausticsProjector           (Projector)
+            → CausticsProjector.cs
+            Parent: DirectionalLight_Sun (follows sun angle automatically)
+
+▼ [Camera]
+    ├── CinematicCamera              (Camera, HDAdditionalCameraData, AudioListener)
+    │       → CinematicOceanCamera.cs
+    │       → UnderwaterRenderer.cs
+    │       → AudioLowPassFilter (cutoff=22000, resonance=1)
+    └── PostProcessVolume            (Volume — Local, follows camera)
+            → OceanPostProcessingController.cs
+            Overrides: Bloom, Tonemapping(ACES), ColorAdjustments,
+                       ChromaticAberration, Vignette, MotionBlur,
+                       LensDistortion, DepthOfField, SSR
+
+▼ [Weather]
+    └── WeatherSystem                (empty GameObject)
+            → OceanWeatherSystem.cs (ref: Sun, Volume, OceanSetup)
+            → OceanAudioManager.cs
+
+▼ [Audio]
+    ├── AudioSource_DeepSwell        (AudioSource, 3D=off, loop, clip=ocean_swell.wav)
+    ├── AudioSource_ChopWaves        (AudioSource, 3D=off, loop, clip=ocean_chop.wav)
+    ├── AudioSource_FoamSurf         (AudioSource, 3D=off, loop, clip=ocean_foam.wav)
+    ├── AudioSource_WindHiss         (AudioSource, 3D=off, loop, clip=wind_hiss.wav)
+    ├── AudioSource_Seagulls         (AudioSource, 3D=on,  loop, clip=seagulls.wav)
+    ├── AudioSource_Rain             (AudioSource, 3D=off, loop, clip=rain_heavy.wav)
+    └── AudioSource_Underwater       (AudioSource, 3D=off, loop, clip=underwater_amb.wav)
+
+▼ [SeaFloor]  (Layer = "SeaFloor" — captured by OceanDepthCache)
+    └── SeaFloor_Mesh                (flat plane or terrain, Lit HDRP material)
+            Material: sand/rock albedo, normal mapped, depth ~-15m average
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Recommended Camera Settings (Physical Camera)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Sensor Size      : 36 × 24 mm (Full Frame)
+  Focal Length     : 35 mm
+  Aperture (f/)    : 8.0
+  Shutter Speed    : 1/500 s
+  ISO              : 100
+  Focus Distance   : 20–80 m (rack focus via Timeline)
+  Anti-aliasing    : TAAU  Quality=High
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Recommended Asset Sources (free / CC0)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Sky HDRI     : Poly Haven — "Kloofendal 48d Partly Cloudy" or "Venice Sunset"
+  Seabed Sand  : Poly Haven — "Coast Sand 01" (4K PBR)
+  Rock Cliffs  : Poly Haven — "Rock Mossy 01"
+  Caustics     : Free on GitHub: "caustics-generator" 16-frame flipbook
+  Audio        : freesound.org — search "ocean waves stereo loop"
+  Foam Texture : Crest built-in (Assets/Crest/Textures/Foam02)
