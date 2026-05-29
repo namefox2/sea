@@ -7,61 +7,6 @@
     android:background="@color/korea_sea">
 
     <HorizontalScrollView
-        android:id="@+id/scrollChipsMap"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:scrollbars="none"
-        android:paddingHorizontal="@dimen/spacing_md"
-        android:paddingVertical="@dimen/spacing_sm"
-        android:background="?android:attr/windowBackground"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
-
-        <com.google.android.material.chip.ChipGroup
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            app:singleSelection="true">
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chipAll"
-                style="@style/Widget.MaterialComponents.Chip.Filter"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/filter_all"
-                android:checked="true" />
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chipWest"
-                style="@style/Widget.MaterialComponents.Chip.Filter"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/filter_west" />
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chipSouth"
-                style="@style/Widget.MaterialComponents.Chip.Filter"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/filter_south" />
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chipEast"
-                style="@style/Widget.MaterialComponents.Chip.Filter"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/filter_east" />
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chipJeju"
-                style="@style/Widget.MaterialComponents.Chip.Filter"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/filter_jeju" />
-        </com.google.android.material.chip.ChipGroup>
-    </HorizontalScrollView>
-
-    <HorizontalScrollView
         android:id="@+id/scrollActivityChips"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
@@ -69,7 +14,6 @@
         android:paddingHorizontal="@dimen/spacing_md"
         android:paddingVertical="@dimen/spacing_sm"
         android:background="?android:attr/windowBackground"
-        app:layout_constraintTop_toBottomOf="@id/scrollChipsMap"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
 

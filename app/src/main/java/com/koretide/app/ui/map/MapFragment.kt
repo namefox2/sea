@@ -37,7 +37,6 @@ class MapFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         setupMapView()
-        setupRegionTabs()
         setupActivityChips()
         observeState()
     }
@@ -45,14 +44,6 @@ class MapFragment : Fragment() {
     private fun setupMapView() {
         binding.koreaMapView.onPinClick = { station -> onPinSelected(station) }
         binding.koreaMapView.onActivityPinClick = { spot -> onActivityPinSelected(spot) }
-    }
-
-    private fun setupRegionTabs() {
-        binding.chipAll.setOnClickListener   { viewModel.setRegionFilter(null) }
-        binding.chipWest.setOnClickListener  { viewModel.setRegionFilter(StationRegion.WEST) }
-        binding.chipSouth.setOnClickListener { viewModel.setRegionFilter(StationRegion.SOUTH) }
-        binding.chipEast.setOnClickListener  { viewModel.setRegionFilter(StationRegion.EAST) }
-        binding.chipJeju.setOnClickListener  { viewModel.setRegionFilter(StationRegion.JEJU) }
     }
 
     private fun setupActivityChips() {
