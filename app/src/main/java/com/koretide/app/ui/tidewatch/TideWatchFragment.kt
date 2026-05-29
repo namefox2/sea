@@ -5,6 +5,7 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.SeekBar
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.fragment.app.viewModels
@@ -42,6 +43,7 @@ class TideWatchFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+
         val savedId = requireContext()
             .getSharedPreferences(PREFS_THEME, Context.MODE_PRIVATE)
             .getString(KEY_THEME_ID, null)
@@ -53,36 +55,42 @@ class TideWatchFragment : Fragment() {
         }
         binding.tideWatchView.themeConfig = theme
 
-        binding.tideWatchView.marineSettings = MarineLifePrefs.load(requireContext())
+        setupSliders()
 
-        binding.btnMarineSettings.setOnClickListener {
-            val sheet = MarineSettingsSheet()
-            sheet.onSettingsChanged = { settings ->
-                binding.tideWatchView.marineSettings = settings
-            }
-            sheet.show(childFragmentManager, MarineSettingsSheet.TAG)
-        }
-
-        // Tap anywhere (except buttons) to toggle immersive mode
+        // Tap background to toggle immersive; slider panel consumes its own touches
         binding.root.setOnClickListener { toggleImmersive() }
-        // Buttons should not toggle immersive when clicked
-        binding.btnMarineSettings.setOnClickListener {
-            if (!uiVisible) return@setOnClickListener
-            val sheet = MarineSettingsSheet()
-            sheet.onSettingsChanged = { settings ->
-                binding.tideWatchView.marineSettings = settings
-            }
-            sheet.show(childFragmentManager, MarineSettingsSheet.TAG)
-        }
 
         observeState()
+    }
+
+    private fun setupSliders() {
+        binding.tideWatchView.setTide(binding.seekTide.progress / 100f)
+        binding.tideWatchView.setWind(binding.seekWind.progress)
+
+        binding.seekWind.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(sb: SeekBar, progress: Int, fromUser: Boolean) {
+                binding.tvWindBft.text = "$progress bft"
+                binding.tideWatchView.setWind(progress)
+            }
+            override fun onStartTrackingTouch(sb: SeekBar) {}
+            override fun onStopTrackingTouch(sb: SeekBar) {}
+        })
+
+        binding.seekTide.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(sb: SeekBar, progress: Int, fromUser: Boolean) {
+                binding.tvTidePct.text = "$progress%"
+                binding.tideWatchView.setTide(progress / 100f)
+            }
+            override fun onStartTrackingTouch(sb: SeekBar) {}
+            override fun onStopTrackingTouch(sb: SeekBar) {}
+        })
     }
 
     private fun toggleImmersive() {
         uiVisible = !uiVisible
         val vis = if (uiVisible) View.VISIBLE else View.GONE
         binding.overlayCard.visibility = vis
-        binding.btnMarineSettings.visibility = vis
+        binding.sliderPanel.visibility = vis
         binding.bannerNoStation.visibility = if (uiVisible && sharedViewModel.selectedStation.value == null)
             View.VISIBLE else View.GONE
         sharedViewModel.setWatchImmersive(!uiVisible)
@@ -107,15 +115,16 @@ class TideWatchFragment : Fragment() {
 
         collectFlow(viewModel.tideData) { data ->
             if (data != null) {
-                binding.tideWatchView.setTide(data.tidePercent)
+                val pct = (data.tidePercent * 100).toInt().coerceIn(0, 100)
+                binding.seekTide.progress = pct
                 sharedViewModel.updateTideData(data)
-                binding.tvTideInfo.text = "${data.tideStatus.displayName} ${(data.tidePercent * 100).toInt()}%"
+                binding.tvTideInfo.text = "${data.tideStatus.displayName} $pct%"
             }
         }
 
         collectFlow(viewModel.windData) { data ->
             if (data != null) {
-                binding.tideWatchView.setWind(data.beaufort)
+                binding.seekWind.progress = data.beaufort
                 binding.tideWatchView.windDirectionDeg = data.directionDeg
                 sharedViewModel.updateWindData(data)
                 binding.tvWindInfo.text = "${data.beaufortName} (${data.beaufort}bft, ${data.speedMs}m/s)"
@@ -125,8 +134,8 @@ class TideWatchFragment : Fragment() {
 
     override fun onPause() {
         super.onPause()
+        binding.tideWatchView.onPause()
         viewModel.stopPolling()
-        // Always restore UI when leaving the screen
         if (!uiVisible) {
             uiVisible = true
             sharedViewModel.setWatchImmersive(false)
@@ -135,6 +144,7 @@ class TideWatchFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
+        binding.tideWatchView.onResume()
         val station = sharedViewModel.selectedStation.value
         if (station != null) {
             viewModel.startPolling(station.code, station.lat, station.lng)

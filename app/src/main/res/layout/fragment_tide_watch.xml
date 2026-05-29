@@ -6,7 +6,7 @@
     android:layout_height="match_parent"
     android:background="@android:color/black">
 
-    <com.koretide.app.ui.tidewatch.TideWatchView
+    <com.koretide.app.ui.tidewatch.OceanGLView
         android:id="@+id/tideWatchView"
         android:layout_width="0dp"
         android:layout_height="0dp"
@@ -46,19 +46,6 @@
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 
-    <!-- Marine life settings button -->
-    <ImageButton
-        android:id="@+id/btnMarineSettings"
-        android:layout_width="44dp"
-        android:layout_height="44dp"
-        android:layout_margin="@dimen/spacing_md"
-        android:background="#AA000000"
-        android:padding="10dp"
-        android:src="@drawable/ic_settings"
-        android:contentDescription="해양생물 설정"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent" />
-
     <!-- Station info overlay -->
     <com.google.android.material.card.MaterialCardView
         android:id="@+id/overlayCard"
@@ -97,6 +84,96 @@
                 android:layout_height="wrap_content"
                 android:textColor="#CC81D4FA"
                 android:textSize="12sp" />
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
+
+    <!-- Wind / Tide slider panel -->
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/sliderPanel"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_margin="@dimen/spacing_md"
+        android:clickable="true"
+        android:focusable="true"
+        app:cardBackgroundColor="#CC000000"
+        app:cardCornerRadius="@dimen/card_radius"
+        app:cardElevation="8dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingHorizontal="@dimen/spacing_md"
+            android:paddingVertical="@dimen/spacing_sm">
+
+            <!-- Wind row -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="2dp">
+
+                <TextView
+                    android:layout_width="52dp"
+                    android:layout_height="wrap_content"
+                    android:text="바다세기"
+                    android:textColor="#CCFFFFFF"
+                    android:textSize="12sp" />
+
+                <SeekBar
+                    android:id="@+id/seekWind"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:max="12"
+                    android:progress="3" />
+
+                <TextView
+                    android:id="@+id/tvWindBft"
+                    android:layout_width="44dp"
+                    android:layout_height="wrap_content"
+                    android:text="3 bft"
+                    android:textColor="@android:color/white"
+                    android:textSize="12sp"
+                    android:gravity="end" />
+            </LinearLayout>
+
+            <!-- Tide row -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <TextView
+                    android:layout_width="52dp"
+                    android:layout_height="wrap_content"
+                    android:text="수위"
+                    android:textColor="#CCFFFFFF"
+                    android:textSize="12sp" />
+
+                <SeekBar
+                    android:id="@+id/seekTide"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:max="100"
+                    android:progress="55" />
+
+                <TextView
+                    android:id="@+id/tvTidePct"
+                    android:layout_width="44dp"
+                    android:layout_height="wrap_content"
+                    android:text="55%"
+                    android:textColor="@android:color/white"
+                    android:textSize="12sp"
+                    android:gravity="end" />
+            </LinearLayout>
+
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 

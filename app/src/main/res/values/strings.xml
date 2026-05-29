@@ -49,4 +49,5 @@
 
     <!-- Map -->
     <string name="tooltip_view_detail">상세 보기</string>
+    <string name="btn_go_watch">물멍하러가기</string>
 </resources>

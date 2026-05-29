@@ -68,6 +68,11 @@ ksp {
     arg("room.incremental", "true")
 }
 
+// Removes hiltJavaCompile* tasks, eliminating the Moshi APT discovery warning
+hilt {
+    enableAggregatingTask = true
+}
+
 dependencies {
     // Core
     implementation(libs.androidx.core.ktx)

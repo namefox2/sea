@@ -80,6 +80,9 @@ class MapFragment : Fragment() {
         binding.btnViewDetail.setOnClickListener {
             findNavController().navigate(R.id.action_global_to_detail)
         }
+        binding.btnGoWatch.setOnClickListener {
+            sharedViewModel.requestTabNavigation(R.id.navigation_watch)
+        }
     }
 
     override fun onDestroyView() {
