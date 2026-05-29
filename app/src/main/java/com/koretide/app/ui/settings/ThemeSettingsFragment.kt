@@ -62,6 +62,7 @@ class ThemeSettingsFragment : Fragment() {
 
         val adapter = ThemeCardAdapter(themes, activeTheme.id) { selected ->
             saveTheme(selected)
+            sharedViewModel.setSelectedTheme(selected.id)
             binding.tvCurrentTheme.text = selected.displayName
             binding.tvCurrentSeason.text = selected.season.koreanName() +
                     if (selected.isDark) " (야간)" else " (주간)"

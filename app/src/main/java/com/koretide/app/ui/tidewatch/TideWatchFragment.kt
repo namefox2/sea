@@ -1,5 +1,6 @@
 package com.koretide.app.ui.tidewatch
 
+import android.content.Context
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -15,6 +16,9 @@ import com.koretide.app.util.gone
 import com.koretide.app.util.visible
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
+
+private const val PREFS_THEME = "theme_prefs"
+private const val KEY_THEME_ID = "selected_theme_id"
 
 @AndroidEntryPoint
 class TideWatchFragment : Fragment() {
@@ -38,7 +42,15 @@ class TideWatchFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        val theme = seasonThemeManager.getThemeForContext(requireContext())
+        val savedId = requireContext()
+            .getSharedPreferences(PREFS_THEME, Context.MODE_PRIVATE)
+            .getString(KEY_THEME_ID, null)
+        val theme = if (savedId != null) {
+            seasonThemeManager.allThemes().firstOrNull { it.id == savedId }
+                ?: seasonThemeManager.getThemeForContext(requireContext())
+        } else {
+            seasonThemeManager.getThemeForContext(requireContext())
+        }
         binding.tideWatchView.themeConfig = theme
 
         binding.tideWatchView.marineSettings = MarineLifePrefs.load(requireContext())
@@ -77,6 +89,12 @@ class TideWatchFragment : Fragment() {
     }
 
     private fun observeState() {
+        collectFlow(sharedViewModel.selectedThemeId) { themeId ->
+            if (themeId != null) {
+                val newTheme = seasonThemeManager.allThemes().firstOrNull { it.id == themeId }
+                if (newTheme != null) binding.tideWatchView.themeConfig = newTheme
+            }
+        }
         collectFlow(sharedViewModel.selectedStation) { station ->
             if (station == null) {
                 if (uiVisible) binding.bannerNoStation.visible()

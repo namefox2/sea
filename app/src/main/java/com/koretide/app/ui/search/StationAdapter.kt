@@ -19,7 +19,8 @@ class StationAdapter(
         val station: Station,
         val tidePercent: Float? = null,
         val tideStatus: TideStatus? = null,
-        val windBft: Int? = null
+        val windBft: Int? = null,
+        val waterLevelCm: Int? = null
     )
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
@@ -62,9 +63,16 @@ class StationAdapter(
                 binding.tvTideStatus.visibility = android.view.View.GONE
             }
 
-            if (item.windBft != null) {
+            val windText = buildString {
+                if (item.windBft != null) append("💨 ${item.windBft}bft")
+                if (item.waterLevelCm != null) {
+                    if (isNotEmpty()) append("  ·  ")
+                    append("수위 ${item.waterLevelCm}cm")
+                }
+            }
+            if (windText.isNotEmpty()) {
                 binding.tvWind.visibility = android.view.View.VISIBLE
-                binding.tvWind.text = "💨 ${item.windBft}bft"
+                binding.tvWind.text = windText
             } else {
                 binding.tvWind.visibility = android.view.View.GONE
             }

@@ -77,17 +77,9 @@ class SearchFragment : Fragment() {
     }
 
     private fun observeState() {
-        collectFlow(viewModel.stations) { stations ->
-            val items = stations.map { station ->
-                StationAdapter.StationItem(
-                    station = station,
-                    tidePercent = station.lastTideLevel?.let { level ->
-                        (level.toFloat() / 600f).coerceIn(0f, 1f)
-                    }
-                )
-            }
+        collectFlow(viewModel.stationItems) { items ->
             adapter.submitList(items)
-            if (stations.isEmpty()) {
+            if (items.isEmpty()) {
                 binding.tvEmpty.visible()
                 binding.recyclerStations.gone()
             } else {

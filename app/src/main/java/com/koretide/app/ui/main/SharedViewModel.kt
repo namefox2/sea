@@ -28,6 +28,9 @@ class SharedViewModel @Inject constructor() : ViewModel() {
     private val _isWatchImmersive = MutableStateFlow(false)
     val isWatchImmersive: StateFlow<Boolean> = _isWatchImmersive.asStateFlow()
 
+    private val _selectedThemeId = MutableStateFlow<String?>(null)
+    val selectedThemeId: StateFlow<String?> = _selectedThemeId.asStateFlow()
+
     fun selectStation(station: Station) {
         _selectedStation.value = station
     }
@@ -50,5 +53,9 @@ class SharedViewModel @Inject constructor() : ViewModel() {
 
     fun setWatchImmersive(immersive: Boolean) {
         _isWatchImmersive.value = immersive
+    }
+
+    fun setSelectedTheme(themeId: String) {
+        _selectedThemeId.value = themeId
     }
 }

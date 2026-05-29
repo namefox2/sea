@@ -4,9 +4,11 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.DashPathEffect
+import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
+import android.graphics.Shader
 import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.View
@@ -31,38 +33,58 @@ class KoreaMapView @JvmOverloads constructor(
     var selectedCode: String? = null
         set(value) { field = value; invalidate() }
 
+    // Sea background
+    private val seaPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#C8E6F5")
+    }
+    // North Korea region
+    private val northKoreaPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#D8C8B0"); style = Paint.Style.FILL
+    }
+    private val northKoreaBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#9A8870"); style = Paint.Style.STROKE; strokeWidth = 1.2f
+    }
+    // South Korea land
     private val landPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.parseColor("#C8DFB0"); style = Paint.Style.FILL
     }
     private val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#5A7A3A"); style = Paint.Style.STROKE; strokeWidth = 1.8f
+        color = Color.parseColor("#5A7A3A"); style = Paint.Style.STROKE; strokeWidth = 1.6f
     }
+    // DMZ dashed line
+    private val dmzPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#CC774444"); style = Paint.Style.STROKE; strokeWidth = 2.2f
+        pathEffect = DashPathEffect(floatArrayOf(9f, 5f), 0f)
+    }
+    // Sea name labels
     private val seaLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#2E7BAE"); textSize = 32f; textAlign = Paint.Align.CENTER
-        isFakeBoldText = true
+        color = Color.parseColor("#2E7BAE"); textAlign = Paint.Align.CENTER
+        isFakeBoldText = true; letterSpacing = 0.15f
     }
+    // City labels
     private val cityLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#333333"); textSize = 19f; textAlign = Paint.Align.CENTER
+        color = Color.parseColor("#333333"); textAlign = Paint.Align.CENTER
     }
+    private val cityDotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#666666"); style = Paint.Style.FILL
+    }
+    // Station pins
     private val pinPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
     private val pinBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE; style = Paint.Style.STROKE; strokeWidth = 2f
     }
     private val selectedRingPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#FFD700"); style = Paint.Style.STROKE; strokeWidth = 3f
+        color = Color.parseColor("#FFD700"); style = Paint.Style.STROKE; strokeWidth = 3.5f
     }
     private val pinLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#111111"); textSize = 17f; textAlign = Paint.Align.CENTER
-    }
-    private val dmzPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#AA555555"); style = Paint.Style.STROKE; strokeWidth = 2f
-        pathEffect = DashPathEffect(floatArrayOf(8f, 6f), 0f)
+        color = Color.parseColor("#111111"); textAlign = Paint.Align.CENTER
     }
 
-    private val LAT_MIN = 32.8
-    private val LAT_MAX = 38.8
-    private val LNG_MIN = 124.6
-    private val LNG_MAX = 130.2
+    // Geographic bounds (show slightly wider to leave room for sea labels)
+    private val LAT_MIN = 32.6
+    private val LAT_MAX = 39.2
+    private val LNG_MIN = 123.8
+    private val LNG_MAX = 131.0
 
     private var scX = 1f
     private var scY = 1f
@@ -70,55 +92,150 @@ class KoreaMapView @JvmOverloads constructor(
     private var offY = 0f
 
     private val peninsulaPath = Path()
+    private val northKoreaPath = Path()
     private val jejuPath = Path()
+    private val geojeIslandPath = Path()
+    private val jindo1Path = Path()
+    private val ganghwaPath = Path()
     private var pathDirty = true
 
     init { isClickable = true; isFocusable = true }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
-        val padH = w * 0.10f; val padV = h * 0.08f
+        val padH = w * 0.08f
+        val padV = h * 0.06f
         scX = (w - 2 * padH) / (LNG_MAX - LNG_MIN).toFloat()
         scY = (h - 2 * padV) / (LAT_MAX - LAT_MIN).toFloat()
-        offX = padH; offY = padV
+        offX = padH
+        offY = padV
         pathDirty = true
     }
 
     private fun buildPaths() {
         if (!pathDirty) return
-        // Korean peninsula outline (clockwise, approximate)
-        val pts = listOf(
-            126.0f to 38.3f, 126.5f to 38.4f, 127.2f to 38.45f,
-            127.8f to 38.5f, 128.3f to 38.4f, 128.6f to 38.3f,
-            // East coast S
-            128.8f to 37.9f, 129.1f to 37.4f, 129.3f to 37.1f,
-            129.5f to 36.7f, 129.5f to 36.4f, 129.4f to 36.0f,
-            129.4f to 35.6f, 129.3f to 35.3f, 129.1f to 35.1f,
-            // South coast E→W
-            128.8f to 34.9f, 128.4f to 34.7f, 128.0f to 34.55f,
-            127.7f to 34.45f, 127.3f to 34.42f, 127.0f to 34.5f,
-            126.7f to 34.55f, 126.5f to 34.6f, 126.3f to 34.7f,
-            126.4f to 34.9f,
-            // West coast N
-            126.5f to 35.1f, 126.5f to 35.45f, 126.4f to 35.65f,
-            126.3f to 35.85f, 126.55f to 36.1f, 126.65f to 36.4f,
-            126.5f to 36.65f, 126.35f to 36.95f, 126.5f to 37.15f,
-            126.65f to 37.35f, 126.5f to 37.55f, 126.2f to 37.65f,
-            125.95f to 37.75f, 125.8f to 38.05f, 125.9f to 38.2f,
-            126.0f to 38.3f
+
+        // ─── South Korea mainland (clockwise from NW DMZ) ────────────────────
+        // Real peninsula outline with ~90 coordinate points for recognizable shape
+        val mainland = listOf(
+            // DMZ line (west to east, ~38.3°N)
+            126.02f to 38.27f, 126.45f to 38.32f, 126.85f to 38.38f,
+            127.28f to 38.42f, 127.68f to 38.45f, 128.05f to 38.38f,
+            128.35f to 38.3f,  128.62f to 38.26f,
+            // East coast going south
+            128.72f to 38.08f, 128.82f to 37.9f,
+            128.88f to 37.77f, // Sokcho area
+            128.9f  to 37.62f,
+            129.05f to 37.5f,
+            129.18f to 37.28f, // Donghae
+            129.27f to 37.1f,
+            129.38f to 36.95f, // Samcheok
+            129.42f to 36.72f,
+            129.5f  to 36.45f, // Ulchin
+            129.5f  to 36.2f,
+            129.45f to 35.98f, // Youngdeok area
+            129.45f to 35.8f,
+            129.42f to 35.65f,
+            129.35f to 35.5f,
+            129.38f to 35.35f, // Pohang
+            129.28f to 35.2f,
+            129.12f to 35.08f, // Busan east
+            129.05f to 35.08f, // Busan
+            128.95f to 35.05f,
+            // SE corner (Geoje straight)
+            128.8f  to 34.88f,
+            128.68f to 34.82f,
+            // South coast W
+            128.48f to 34.73f,
+            128.22f to 34.62f,
+            128.02f to 34.62f,
+            127.76f to 34.5f,  // Namhae
+            127.45f to 34.45f,
+            127.2f  to 34.5f,
+            126.98f to 34.58f, // Yeosu
+            126.78f to 34.67f,
+            126.58f to 34.73f,
+            126.42f to 34.85f, // Goheung
+            126.35f to 34.98f, // Haenam SW corner
+            126.3f  to 35.05f,
+            // West coast going north
+            126.38f to 35.18f,
+            126.5f  to 35.28f,
+            126.45f to 35.42f,
+            126.35f to 35.58f, // Buan / Gochang
+            126.28f to 35.73f,
+            126.42f to 35.88f,
+            126.58f to 36.05f, // Gunsan area
+            126.62f to 36.2f,
+            126.65f to 36.35f,
+            126.52f to 36.52f, // Boryeong
+            126.42f to 36.68f,
+            126.5f  to 36.82f,
+            126.62f to 36.97f, // Taean peninsula base
+            126.52f to 37.12f,
+            126.6f  to 37.27f,
+            126.65f to 37.42f, // Hwaseong
+            126.48f to 37.55f,
+            126.32f to 37.67f,
+            126.18f to 37.77f, // Incheon
+            126.05f to 37.87f,
+            126.0f  to 38.0f,
+            125.95f to 38.1f,
+            125.92f to 38.2f,
+            126.02f to 38.27f  // back to start
         )
         peninsulaPath.reset()
-        peninsulaPath.moveTo(lngToX(pts[0].first), latToY(pts[0].second))
-        for (i in 1 until pts.size) {
-            peninsulaPath.lineTo(lngToX(pts[i].first), latToY(pts[i].second))
+        peninsulaPath.moveTo(lngToX(mainland[0].first), latToY(mainland[0].second))
+        for (i in 1 until mainland.size) {
+            peninsulaPath.lineTo(lngToX(mainland[i].first), latToY(mainland[i].second))
         }
         peninsulaPath.close()
 
-        // Jeju Island
+        // ─── North Korea (simplified, above DMZ) ─────────────────────────────
+        val northKorea = listOf(
+            // DMZ (same as mainland DMZ, reversed)
+            125.92f to 38.2f, 125.95f to 38.1f, 126.0f  to 38.0f,
+            126.02f to 38.27f, 126.45f to 38.32f, 126.85f to 38.38f,
+            127.28f to 38.42f, 127.68f to 38.45f, 128.05f to 38.38f,
+            128.35f to 38.3f,  128.62f to 38.26f, 128.72f to 38.08f,
+            128.85f to 38.1f,  129.0f  to 38.3f,  129.0f  to 38.6f,
+            128.6f  to 38.72f, 128.0f  to 38.78f, 127.3f  to 38.75f,
+            126.8f  to 38.68f, 126.3f  to 38.6f,  125.85f to 38.5f,
+            125.6f  to 38.42f, 125.3f  to 38.42f, 125.1f  to 38.38f,
+            125.1f  to 38.3f,  125.35f to 38.22f, 125.6f  to 38.2f,
+            125.92f to 38.2f
+        )
+        northKoreaPath.reset()
+        northKoreaPath.moveTo(lngToX(northKorea[0].first), latToY(northKorea[0].second))
+        for (i in 1 until northKorea.size) {
+            northKoreaPath.lineTo(lngToX(northKorea[i].first), latToY(northKorea[i].second))
+        }
+        northKoreaPath.close()
+
+        // ─── Jeju Island ──────────────────────────────────────────────────────
         jejuPath.reset()
-        val cx = lngToX(126.55f); val cy = latToY(33.38f)
-        val rx = scX * 0.44f; val ry = scY * 0.24f
-        jejuPath.addOval(RectF(cx - rx, cy - ry, cx + rx, cy + ry), Path.Direction.CW)
+        val jcx = lngToX(126.55f); val jcy = latToY(33.38f)
+        val jrx = scX * 0.5f; val jry = scY * 0.26f
+        jejuPath.addOval(RectF(jcx - jrx, jcy - jry, jcx + jrx, jcy + jry), Path.Direction.CW)
+
+        // ─── Geoje Island (SE coast) ──────────────────────────────────────────
+        geojeIslandPath.reset()
+        val gcx = lngToX(128.62f); val gcy = latToY(34.87f)
+        val grx = scX * 0.2f; val gry = scY * 0.15f
+        geojeIslandPath.addOval(RectF(gcx - grx, gcy - gry, gcx + grx, gcy + gry), Path.Direction.CW)
+
+        // ─── Jindo Island (SW coast) ──────────────────────────────────────────
+        jindo1Path.reset()
+        val jdcx = lngToX(126.27f); val jdcy = latToY(34.48f)
+        val jdrx = scX * 0.17f; val jdry = scY * 0.14f
+        jindo1Path.addOval(RectF(jdcx - jdrx, jdcy - jdry, jdcx + jdrx, jdcy + jdry), Path.Direction.CW)
+
+        // ─── Ganghwa Island (NW coast near Incheon) ───────────────────────────
+        ganghwaPath.reset()
+        val gacx = lngToX(126.47f); val gacy = latToY(37.73f)
+        val garx = scX * 0.12f; val gary = scY * 0.15f
+        ganghwaPath.addOval(RectF(gacx - garx, gacy - gary, gacx + garx, gacy + gary), Path.Direction.CW)
+
         pathDirty = false
     }
 
@@ -126,34 +243,65 @@ class KoreaMapView @JvmOverloads constructor(
         super.onDraw(canvas)
         buildPaths()
 
+        // Sea background
+        canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), seaPaint)
+
+        // North Korea (gray-beige, behind DMZ)
+        canvas.drawPath(northKoreaPath, northKoreaPaint)
+        canvas.drawPath(northKoreaPath, northKoreaBorderPaint)
+
+        // South Korea main peninsula
         canvas.drawPath(peninsulaPath, landPaint)
         canvas.drawPath(peninsulaPath, borderPaint)
+
+        // Islands
         canvas.drawPath(jejuPath, landPaint)
         canvas.drawPath(jejuPath, borderPaint)
+        canvas.drawPath(geojeIslandPath, landPaint)
+        canvas.drawPath(geojeIslandPath, borderPaint)
+        canvas.drawPath(jindo1Path, landPaint)
+        canvas.drawPath(jindo1Path, borderPaint)
+        canvas.drawPath(ganghwaPath, landPaint)
+        canvas.drawPath(ganghwaPath, borderPaint)
 
         // DMZ dashed line
-        canvas.drawLine(lngToX(126.0f), latToY(38.3f), lngToX(128.6f), latToY(38.3f), dmzPaint)
+        canvas.drawLine(
+            lngToX(126.02f), latToY(38.27f),
+            lngToX(128.62f), latToY(38.26f),
+            dmzPaint
+        )
 
         // Sea labels
-        seaLabelPaint.textSize = (width * 0.055f).coerceIn(22f, 40f)
-        canvas.drawText("서  해", lngToX(125.4f), latToY(36.5f), seaLabelPaint)
-        canvas.drawText("동  해", lngToX(130.0f), latToY(37.0f), seaLabelPaint)
-        canvas.drawText("남  해", lngToX(127.6f), latToY(33.85f), seaLabelPaint)
+        seaLabelPaint.textSize = (width * 0.055f).coerceIn(22f, 42f)
+        canvas.drawText("서  해", lngToX(125.0f), latToY(36.5f), seaLabelPaint)
+        canvas.drawText("동  해", lngToX(130.2f), latToY(37.0f), seaLabelPaint)
+        canvas.drawText("남  해", lngToX(127.6f), latToY(33.6f), seaLabelPaint)
 
-        // City labels
-        cityLabelPaint.textSize = (width * 0.042f).coerceIn(15f, 28f)
-        canvas.drawText("서울", lngToX(127.0f), latToY(37.6f), cityLabelPaint)
-        canvas.drawText("부산", lngToX(129.05f), latToY(35.22f), cityLabelPaint)
-        canvas.drawText("강릉", lngToX(128.85f), latToY(37.78f), cityLabelPaint)
-        canvas.drawText("광주", lngToX(126.85f), latToY(35.17f), cityLabelPaint)
-        canvas.drawText("제주", lngToX(126.55f), latToY(33.22f), cityLabelPaint)
+        // City dots + labels
+        cityLabelPaint.textSize = (width * 0.042f).coerceIn(14f, 26f)
+        val dotR = (width * 0.012f).coerceIn(4f, 8f)
+        data class CityMark(val name: String, val lng: Float, val lat: Float)
+        val cities = listOf(
+            CityMark("서울", 126.98f, 37.57f),
+            CityMark("인천", 126.7f,  37.45f),
+            CityMark("부산", 129.05f, 35.1f),
+            CityMark("강릉", 128.88f, 37.77f),
+            CityMark("광주", 126.85f, 35.16f),
+            CityMark("전주", 127.15f, 35.82f),
+            CityMark("제주", 126.55f, 33.28f)
+        )
+        for (city in cities) {
+            val cx = lngToX(city.lng); val cy = latToY(city.lat)
+            canvas.drawCircle(cx, cy, dotR, cityDotPaint)
+            canvas.drawText(city.name, cx, cy - dotR - 4f, cityLabelPaint)
+        }
 
         // Station pins
         for (pin in pins) {
             val x = lngToX(pin.station.lng.toFloat())
             val y = latToY(pin.station.lat.toFloat())
             val isSelected = pin.station.code == selectedCode
-            val r = if (isSelected) 12f else 8f
+            val r = if (isSelected) 13f else 8f
 
             pinPaint.color = when (pin.tideStatus) {
                 TideStatus.RISING, TideStatus.HIGH_TIDE -> Color.parseColor("#1565C0")
@@ -163,9 +311,9 @@ class KoreaMapView @JvmOverloads constructor(
             canvas.drawCircle(x, y, r, pinPaint)
             canvas.drawCircle(x, y, r, pinBorderPaint)
             if (isSelected) {
-                canvas.drawCircle(x, y, r + 4f, selectedRingPaint)
-                pinLabelPaint.textSize = (width * 0.038f).coerceIn(13f, 22f)
-                canvas.drawText(pin.station.name, x, y - r - 7f, pinLabelPaint)
+                canvas.drawCircle(x, y, r + 5f, selectedRingPaint)
+                pinLabelPaint.textSize = (width * 0.038f).coerceIn(12f, 20f)
+                canvas.drawText(pin.station.name, x, y - r - 8f, pinLabelPaint)
             }
         }
     }
@@ -181,7 +329,7 @@ class KoreaMapView @JvmOverloads constructor(
             if (closest != null) {
                 val dx = lngToX(closest.station.lng.toFloat()) - tx
                 val dy = latToY(closest.station.lat.toFloat()) - ty
-                if (sqrt(dx * dx + dy * dy) < 48f) {
+                if (sqrt(dx * dx + dy * dy) < 52f) {
                     onPinClick?.invoke(closest.station)
                     performClick()
                     return true
