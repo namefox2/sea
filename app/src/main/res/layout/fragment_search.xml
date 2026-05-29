@@ -6,13 +6,43 @@
     android:layout_height="match_parent"
     android:background="?android:attr/windowBackground">
 
+    <!-- Banner ad placeholder -->
+    <FrameLayout
+        android:id="@+id/adBanner"
+        android:layout_width="0dp"
+        android:layout_height="50dp"
+        android:background="#F5F5F5"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:text="@string/ad_label"
+            android:textSize="11sp"
+            android:textColor="#AAAAAA"
+            android:background="#E8E8E8"
+            android:paddingHorizontal="10dp"
+            android:paddingVertical="3dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:text="Korea Tide — 실시간 조위 정보 앱"
+            android:textSize="13sp"
+            android:textColor="#555555" />
+    </FrameLayout>
+
     <com.google.android.material.textfield.TextInputLayout
         android:id="@+id/tilSearch"
         style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_margin="@dimen/spacing_md"
-        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/adBanner"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
 

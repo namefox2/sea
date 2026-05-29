@@ -106,7 +106,7 @@ class TideWatchView @JvmOverloads constructor(
 
     private val foamParticles  = Array(40) { randomFoam() }
     private val sprayParticles = Array(20) { randomSpray() }
-    private val glitterPoints  = Array(30) { randomGlitter() }
+    private val glitterPoints  = Array(60) { randomGlitter() }
 
     private data class Gull(var x: Float, var y: Float, var phase: Float, var speed: Float)
     private val seagulls = Array(5) { i ->
@@ -322,9 +322,26 @@ class TideWatchView @JvmOverloads constructor(
     }
 
     private fun drawSea(canvas: Canvas, w: Float, h: Float, seaY: Float, wind: Int, theme: ThemeConfig) {
+        // Deep multi-stop gradient: surface → mid-depth → deep
+        val midColor = Color.argb(255,
+            ((Color.red(theme.seaTopColor) + Color.red(theme.seaBottomColor)) / 2),
+            ((Color.green(theme.seaTopColor) + Color.green(theme.seaBottomColor)) / 2),
+            ((Color.blue(theme.seaTopColor) + Color.blue(theme.seaBottomColor)) / 2))
         seaPaint.shader = LinearGradient(0f, seaY, 0f, h,
-            theme.seaTopColor, theme.seaBottomColor, Shader.TileMode.CLAMP)
+            intArrayOf(theme.seaTopColor, midColor, theme.seaBottomColor),
+            floatArrayOf(0f, 0.4f, 1f), Shader.TileMode.CLAMP)
         canvas.drawRect(0f, seaY, w, h, seaPaint)
+
+        // Subtle caustic shimmer on upper water surface
+        if (wind <= 6) {
+            tidalPoolPaint.color = Color.argb(18, 255, 255, 220)
+            val shimW = w / 5f
+            for (i in 0..4) {
+                val sx = i * shimW + sin((animT * 0.012f + i * 1.3f).toDouble()).toFloat() * 20f
+                val sy = seaY + (h - seaY) * 0.15f + sin((animT * 0.008f + i).toDouble()).toFloat() * 8f
+                canvas.drawOval(sx, sy, sx + shimW * 0.7f, sy + 12f, tidalPoolPaint)
+            }
+        }
     }
 
     private fun drawWaves(canvas: Canvas, w: Float, h: Float, seaY: Float, tide: Float, wind: Int, theme: ThemeConfig) {
@@ -413,18 +430,36 @@ class TideWatchView @JvmOverloads constructor(
         }
     }
 
+    // 윤슬: realistic sun-glitter on water — star-shaped sparkles drifting rightward
     private fun drawGlitter(canvas: Canvas, w: Float, h: Float, seaY: Float, tide: Float) {
-        val intensity = (1f - windBeaufort * 0.2f).coerceAtLeast(0f)
+        val intensity = (1f - windBeaufort * 0.18f).coerceIn(0.1f, 1f)
+        // Sun is at w*0.75, glitter concentrates in that half of the screen
+        val sunX = w * 0.75f
         for (i in glitterPoints.indices) {
             val p = glitterPoints[i]
-            val flicker = abs(sin((animT * 0.1f + i).toDouble())).toFloat()
-            if (flicker < 0.5f) continue
-            p.x += p.vx * 0.5f
-            if (p.x > w) p.x = 0f
-            glitterPaint.alpha = (flicker * intensity * 200).toInt()
-            val s = p.r * flicker
-            canvas.drawLine(p.x - s, p.y, p.x + s, p.y, glitterPaint)
+            // Drift slowly with wind
+            p.x += p.vx * 0.4f
+            if (p.x > w + 20f) p.x = -20f
+
+            // Multi-frequency flicker for natural sparkle
+            val f1 = sin((animT * 0.12f + i * 2.3f).toDouble()).toFloat()
+            val f2 = sin((animT * 0.07f + i * 1.1f).toDouble()).toFloat()
+            val flicker = ((f1 * 0.6f + f2 * 0.4f + 1f) / 2f)
+            if (flicker < 0.45f) continue
+
+            // Brighter closer to the sun's reflection line (x near sunX)
+            val distFactor = (1f - (abs(p.x - sunX) / (w * 0.7f)).coerceIn(0f, 1f)) * 0.7f + 0.3f
+            val alpha = (flicker * intensity * distFactor * 230).toInt().coerceIn(0, 230)
+            glitterPaint.alpha = alpha
+
+            val s = p.r * flicker * distFactor
+            // Horizontal arm (longer — sun reflection on water)
+            canvas.drawLine(p.x - s * 1.6f, p.y, p.x + s * 1.6f, p.y, glitterPaint)
+            // Vertical arm (shorter)
             canvas.drawLine(p.x, p.y - s, p.x, p.y + s, glitterPaint)
+            // Diagonal sparkle arms for star effect
+            canvas.drawLine(p.x - s * 0.7f, p.y - s * 0.7f, p.x + s * 0.7f, p.y + s * 0.7f, glitterPaint)
+            canvas.drawLine(p.x - s * 0.7f, p.y + s * 0.7f, p.x + s * 0.7f, p.y - s * 0.7f, glitterPaint)
         }
     }
 
@@ -512,6 +547,10 @@ class TideWatchView @JvmOverloads constructor(
         for (i in foamParticles.indices)  foamParticles[i]  = randomFoam(w, seaY)
         for (i in sprayParticles.indices) sprayParticles[i] = randomSpray(w * Random.nextFloat(), seaY)
         for (i in glitterPoints.indices)  glitterPoints[i]  = randomGlitter(w, h)
+        // Spread glitter more toward the sun-reflection half of the screen
+        for (i in glitterPoints.indices step 3) {
+            glitterPoints[i] = glitterPoints[i].copy(x = w * 0.4f + Random.nextFloat() * w * 0.6f)
+        }
         for ((i, g) in seagulls.withIndex()) {
             g.x = i * (w / 5f) + Random.nextFloat() * 100f
             g.y = h * (0.2f + Random.nextFloat() * 0.15f)
@@ -549,11 +588,11 @@ class TideWatchView @JvmOverloads constructor(
 
     private fun randomGlitter(w: Float = 400f, h: Float = 600f) = Particle(
         x = Random.nextFloat() * w,
-        y = h * 0.6f + Random.nextFloat() * h * 0.35f,
-        vx = 0.3f + Random.nextFloat() * 0.7f,
+        y = h * 0.55f + Random.nextFloat() * h * 0.40f,
+        vx = 0.2f + Random.nextFloat() * 0.8f,
         vy = 0f,
         life = 1f,
         maxLife = 1f,
-        r = 3f + Random.nextFloat() * 5f
+        r = 4f + Random.nextFloat() * 7f
     )
 }

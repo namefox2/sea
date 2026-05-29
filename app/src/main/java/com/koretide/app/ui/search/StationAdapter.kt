@@ -49,6 +49,7 @@ class StationAdapter(
             }
 
             if (item.tideStatus != null) {
+                binding.tvTideStatus.visibility = android.view.View.VISIBLE
                 binding.tvTideStatus.text = item.tideStatus.displayName
                 val color = when (item.tideStatus) {
                     TideStatus.RISING, TideStatus.HIGH_TIDE ->
@@ -58,13 +59,14 @@ class StationAdapter(
                 }
                 binding.tvTideStatus.setTextColor(color)
             } else {
-                binding.tvTideStatus.text = "--"
+                binding.tvTideStatus.visibility = android.view.View.GONE
             }
 
             if (item.windBft != null) {
-                binding.tvWind.text = "바람 ${item.windBft}bft"
+                binding.tvWind.visibility = android.view.View.VISIBLE
+                binding.tvWind.text = "💨 ${item.windBft}bft"
             } else {
-                binding.tvWind.text = "--"
+                binding.tvWind.visibility = android.view.View.GONE
             }
 
             binding.root.setOnClickListener { onStationClick(station) }

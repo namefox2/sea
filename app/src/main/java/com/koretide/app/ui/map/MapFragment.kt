@@ -7,6 +7,7 @@ import android.view.ViewGroup
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.fragment.app.viewModels
+import androidx.navigation.fragment.findNavController
 import com.koretide.app.R
 import com.koretide.app.databinding.FragmentMapBinding
 import com.koretide.app.domain.model.Station
@@ -77,7 +78,7 @@ class MapFragment : Fragment() {
         binding.tvTooltipName.text = station.name
         binding.tvTooltipRegion.text = station.region.displayName
         binding.btnViewDetail.setOnClickListener {
-            sharedViewModel.requestTabNavigation(R.id.navigation_detail)
+            findNavController().navigate(R.id.action_global_to_detail)
         }
     }
 

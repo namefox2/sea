@@ -27,6 +27,8 @@ class TideWatchFragment : Fragment() {
     private val viewModel: TideWatchViewModel by viewModels()
     private val sharedViewModel: SharedViewModel by activityViewModels()
 
+    private var uiVisible = true
+
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
     ): View {
@@ -39,7 +41,6 @@ class TideWatchFragment : Fragment() {
         val theme = seasonThemeManager.getThemeForContext(requireContext())
         binding.tideWatchView.themeConfig = theme
 
-        // Apply saved marine life settings
         binding.tideWatchView.marineSettings = MarineLifePrefs.load(requireContext())
 
         binding.btnMarineSettings.setOnClickListener {
@@ -50,13 +51,35 @@ class TideWatchFragment : Fragment() {
             sheet.show(childFragmentManager, MarineSettingsSheet.TAG)
         }
 
+        // Tap anywhere (except buttons) to toggle immersive mode
+        binding.root.setOnClickListener { toggleImmersive() }
+        // Buttons should not toggle immersive when clicked
+        binding.btnMarineSettings.setOnClickListener {
+            if (!uiVisible) return@setOnClickListener
+            val sheet = MarineSettingsSheet()
+            sheet.onSettingsChanged = { settings ->
+                binding.tideWatchView.marineSettings = settings
+            }
+            sheet.show(childFragmentManager, MarineSettingsSheet.TAG)
+        }
+
         observeState()
+    }
+
+    private fun toggleImmersive() {
+        uiVisible = !uiVisible
+        val vis = if (uiVisible) View.VISIBLE else View.GONE
+        binding.overlayCard.visibility = vis
+        binding.btnMarineSettings.visibility = vis
+        binding.bannerNoStation.visibility = if (uiVisible && sharedViewModel.selectedStation.value == null)
+            View.VISIBLE else View.GONE
+        sharedViewModel.setWatchImmersive(!uiVisible)
     }
 
     private fun observeState() {
         collectFlow(sharedViewModel.selectedStation) { station ->
             if (station == null) {
-                binding.bannerNoStation.visible()
+                if (uiVisible) binding.bannerNoStation.visible()
             } else {
                 binding.bannerNoStation.gone()
                 binding.tvStationName.text = station.name
@@ -85,6 +108,11 @@ class TideWatchFragment : Fragment() {
     override fun onPause() {
         super.onPause()
         viewModel.stopPolling()
+        // Always restore UI when leaving the screen
+        if (!uiVisible) {
+            uiVisible = true
+            sharedViewModel.setWatchImmersive(false)
+        }
     }
 
     override fun onResume() {
@@ -97,6 +125,7 @@ class TideWatchFragment : Fragment() {
 
     override fun onDestroyView() {
         super.onDestroyView()
+        sharedViewModel.setWatchImmersive(false)
         _binding = null
     }
 }

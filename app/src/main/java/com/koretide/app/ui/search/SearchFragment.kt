@@ -8,8 +8,8 @@ import androidx.core.widget.addTextChangedListener
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.fragment.app.viewModels
+import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
-import com.google.android.material.chip.Chip
 import com.koretide.app.R
 import com.koretide.app.databinding.FragmentSearchBinding
 import com.koretide.app.domain.model.Station
@@ -102,7 +102,7 @@ class SearchFragment : Fragment() {
 
     private fun onStationSelected(station: Station) {
         sharedViewModel.selectStation(station)
-        sharedViewModel.requestTabNavigation(R.id.navigation_detail)
+        findNavController().navigate(R.id.action_global_to_detail)
     }
 
     override fun onDestroyView() {

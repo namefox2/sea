@@ -4,6 +4,11 @@
     android:id="@+id/nav_graph"
     app:startDestination="@id/navigation_search">
 
+    <!-- Global action reachable from any destination -->
+    <action
+        android:id="@+id/action_global_to_detail"
+        app:destination="@id/navigation_detail" />
+
     <fragment
         android:id="@+id/navigation_search"
         android:name="com.koretide.app.ui.search.SearchFragment"
@@ -14,6 +19,7 @@
         android:name="com.koretide.app.ui.map.MapFragment"
         android:label="@string/nav_map" />
 
+    <!-- Detail: secondary screen, NOT a bottom-nav tab -->
     <fragment
         android:id="@+id/navigation_detail"
         android:name="com.koretide.app.ui.detail.DetailFragment"
@@ -23,4 +29,9 @@
         android:id="@+id/navigation_watch"
         android:name="com.koretide.app.ui.tidewatch.TideWatchFragment"
         android:label="@string/nav_watch" />
+
+    <fragment
+        android:id="@+id/navigation_settings"
+        android:name="com.koretide.app.ui.settings.ThemeSettingsFragment"
+        android:label="@string/nav_settings" />
 </navigation>

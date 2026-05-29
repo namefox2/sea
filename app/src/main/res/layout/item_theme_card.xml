@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.cardview.widget.CardView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/cardTheme"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_margin="8dp"
+    app:cardCornerRadius="10dp"
+    app:cardElevation="2dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <!-- Gradient preview -->
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="80dp">
+
+            <View
+                android:id="@+id/viewThemePreview"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent" />
+
+            <!-- Selected check -->
+            <View
+                android:id="@+id/ivSelected"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_gravity="top|end"
+                android:layout_margin="6dp"
+                android:background="@drawable/ic_check_circle"
+                android:visibility="gone" />
+        </FrameLayout>
+
+        <TextView
+            android:id="@+id/tvThemeName"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:padding="8dp"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:gravity="center" />
+    </LinearLayout>
+</androidx.cardview.widget.CardView>

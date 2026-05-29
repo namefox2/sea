@@ -42,5 +42,9 @@ class MainActivity : AppCompatActivity() {
                 sharedViewModel.onTabNavigated()
             }
         }
+        collectFlow(sharedViewModel.isWatchImmersive) { immersive ->
+            binding.bottomNavigation.visibility =
+                if (immersive) android.view.View.GONE else android.view.View.VISIBLE
+        }
     }
 }

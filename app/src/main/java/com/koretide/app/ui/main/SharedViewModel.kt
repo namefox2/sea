@@ -25,6 +25,9 @@ class SharedViewModel @Inject constructor() : ViewModel() {
     private val _navigateToTab = MutableStateFlow<Int?>(null)
     val navigateToTab: StateFlow<Int?> = _navigateToTab.asStateFlow()
 
+    private val _isWatchImmersive = MutableStateFlow(false)
+    val isWatchImmersive: StateFlow<Boolean> = _isWatchImmersive.asStateFlow()
+
     fun selectStation(station: Station) {
         _selectedStation.value = station
     }
@@ -43,5 +46,9 @@ class SharedViewModel @Inject constructor() : ViewModel() {
 
     fun onTabNavigated() {
         _navigateToTab.value = null
+    }
+
+    fun setWatchImmersive(immersive: Boolean) {
+        _isWatchImmersive.value = immersive
     }
 }
