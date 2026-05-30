@@ -84,15 +84,32 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
-    <!-- 지도: KoreaMapView가 바다·육지를 직접 그려 핀 좌표계를 일치시킴 -->
-    <com.koretide.app.ui.map.KoreaMapView
-        android:id="@+id/koreaMapView"
+    <!-- 지도 컨테이너: 이미지 배경 + 핀 오버레이 -->
+    <FrameLayout
+        android:id="@+id/mapContainer"
         android:layout_width="0dp"
         android:layout_height="0dp"
         app:layout_constraintTop_toBottomOf="@id/adViewMap"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent" />
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <!-- 배경 지도 이미지 -->
+        <ImageView
+            android:id="@+id/mapImage"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:src="@drawable/korea_map"
+            android:scaleType="fitCenter"
+            android:background="@color/korea_sea" />
+
+        <!-- 핀 오버레이: 투명 배경, 이미지 위에 겹침 -->
+        <com.koretide.app.ui.map.KoreaMapView
+            android:id="@+id/koreaMapView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+    </FrameLayout>
 
     <com.google.android.material.card.MaterialCardView
         android:id="@+id/tooltipCard"

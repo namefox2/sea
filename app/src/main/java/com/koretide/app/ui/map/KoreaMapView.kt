@@ -275,6 +275,26 @@ class KoreaMapView @JvmOverloads constructor(
         pathDirty = true
     }
 
+    /**
+     * 이미지뷰의 fitCenter 렌더링 영역을 알려주면 핀 좌표계를 이미지에 맞게 재계산한다.
+     * MapFragment에서 이미지 레이아웃 완료 후 호출할 것.
+     *
+     * @param imgLeft   뷰 내에서 이미지가 시작되는 x 픽셀
+     * @param imgTop    뷰 내에서 이미지가 시작되는 y 픽셀
+     * @param imgWidth  렌더링된 이미지 픽셀 너비
+     * @param imgHeight 렌더링된 이미지 픽셀 높이
+     */
+    fun setMapImageRect(imgLeft: Float, imgTop: Float, imgWidth: Float, imgHeight: Float) {
+        scX = imgWidth  / (LNG_MAX - LNG_MIN).toFloat()
+        scY = imgHeight / (LAT_MAX - LAT_MIN).toFloat()
+        offX = imgLeft
+        // latToY uses: height - offY - (lat-LAT_MIN)*scY
+        // At LAT_MIN: height - offY = imgTop + imgHeight  →  offY = height - imgTop - imgHeight
+        offY = height - imgTop - imgHeight
+        pathDirty = true
+        invalidate()
+    }
+
     private fun buildPaths() {
         if (!pathDirty) return
 
@@ -421,46 +441,6 @@ class KoreaMapView @JvmOverloads constructor(
     }
 
     override fun onDraw(canvas: Canvas) {
-        buildPaths()
-
-        // ── 1. 바다 배경 ──────────────────────────────────────────────────────
-        canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), seaPaint)
-
-        // ── 2. 북한 ───────────────────────────────────────────────────────────
-        canvas.drawPath(northKoreaPath, northKoreaPaint)
-        canvas.drawPath(northKoreaPath, northKoreaBorderPaint)
-
-        // ── 3. 한국 육지 + 섬 ────────────────────────────────────────────────
-        canvas.drawPath(peninsulaPath,    landPaint)
-        canvas.drawPath(jejuPath,         landPaint)
-        canvas.drawPath(geojeIslandPath,  landPaint)
-        canvas.drawPath(jindo1Path,       landPaint)
-        canvas.drawPath(ganghwaPath,      landPaint)
-
-        // ── 4. 도 경계선 ──────────────────────────────────────────────────────
-        for (path in provinceBorderPaths) canvas.drawPath(path, provincePaint)
-
-        // ── 5. 해안선 ─────────────────────────────────────────────────────────
-        canvas.drawPath(peninsulaPath,    borderPaint)
-        canvas.drawPath(jejuPath,         borderPaint)
-        canvas.drawPath(geojeIslandPath,  borderPaint)
-        canvas.drawPath(jindo1Path,       borderPaint)
-        canvas.drawPath(ganghwaPath,      borderPaint)
-
-        // ── 6. DMZ ────────────────────────────────────────────────────────────
-        canvas.drawPath(dmzPath, dmzPaint)
-
-        // ── 7. 바다 이름 라벨 ─────────────────────────────────────────────────
-        seaLabelPaint.textSize = (width * 0.038f).coerceIn(11f, 18f)
-        canvas.drawText("서  해", lngToX(124.8f), latToY(36.5f),  seaLabelPaint)
-        canvas.drawText("동  해", lngToX(130.3f), latToY(37.2f),  seaLabelPaint)
-        canvas.drawText("남  해", lngToX(127.8f), latToY(33.75f), seaLabelPaint)
-
-        // ── 8. 도 이름 라벨 ───────────────────────────────────────────────────
-        provinceLabelPaint.textSize = (width * 0.030f).coerceIn(9f, 14f)
-        for (label in provinceLabels) {
-            canvas.drawText(label.name, lngToX(label.lng), latToY(label.lat), provinceLabelPaint)
-        }
 
         // Station pins
         for (pin in pins) {

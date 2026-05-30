@@ -1,9 +1,11 @@
 package com.koretide.app.ui.map
 
+import android.graphics.Matrix
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.ViewTreeObserver
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.fragment.app.viewModels
@@ -41,12 +43,37 @@ class MapFragment : Fragment() {
         setupMapView()
         setupActivityChips()
         setupAdMob()
+        syncPinCoordinatesToImage()
         observeState()
     }
 
     private fun setupAdMob() {
         MobileAds.initialize(requireContext())
         binding.adViewMap.loadAd(AdRequest.Builder().build())
+    }
+
+    /**
+     * ImageView(fitCenter)가 실제로 이미지를 그린 위치/크기를 읽어
+     * KoreaMapView 핀 좌표계를 이미지 기준으로 보정한다.
+     */
+    private fun syncPinCoordinatesToImage() {
+        binding.mapImage.viewTreeObserver.addOnGlobalLayoutListener(
+            object : ViewTreeObserver.OnGlobalLayoutListener {
+                override fun onGlobalLayout() {
+                    binding.mapImage.viewTreeObserver.removeOnGlobalLayoutListener(this)
+                    val drawable = binding.mapImage.drawable ?: return
+                    val m = FloatArray(9)
+                    binding.mapImage.imageMatrix.getValues(m)
+                    val scaleX   = m[Matrix.MSCALE_X]
+                    val scaleY   = m[Matrix.MSCALE_Y]
+                    val transX   = m[Matrix.MTRANS_X]
+                    val transY   = m[Matrix.MTRANS_Y]
+                    val imgW     = drawable.intrinsicWidth  * scaleX
+                    val imgH     = drawable.intrinsicHeight * scaleY
+                    binding.koreaMapView.setMapImageRect(transX, transY, imgW, imgH)
+                }
+            }
+        )
     }
 
     private fun setupMapView() {
