@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    HTTPS 강제 — 평문 HTTP 트래픽 차단 (개인정보보호법 제29조 안전조치 의무)
+    모든 통신은 TLS/HTTPS를 사용합니다.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

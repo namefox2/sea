@@ -93,13 +93,8 @@ class KoreaMapView @JvmOverloads constructor(
         color = Color.parseColor("#111111"); textAlign = Paint.Align.CENTER
     }
 
-    // Activity spot pin paints — one per ActivityType, cached to avoid allocations in onDraw
-    private val activityPinPaints: Map<ActivityType, Paint> = ActivityType.values().associateWith { type ->
-        Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor(type.colorHex)
-            style = Paint.Style.FILL
-        }
-    }
+    // companion object 의 공유 Paint 맵 사용 (인스턴스별 재할당 방지)
+    private val activityPinPaints get() = Companion.activityPinPaints
 
     // Geographic bounds
     private val LAT_MIN = 32.6
@@ -122,6 +117,9 @@ class KoreaMapView @JvmOverloads constructor(
     private val provinceBorderPaths = mutableListOf<Path>()
     private var pathDirty = true
 
+    // onDraw 매 프레임 Path 할당 방지 — 도형 그리기 전용 재사용 경로
+    private val shapePath = Path()
+
     private fun drawSquare(
         canvas: Canvas,
         x: Float,
@@ -137,61 +135,36 @@ class KoreaMapView @JvmOverloads constructor(
             paint
         )
     }
-    private fun drawTriangle(
-        canvas: Canvas,
-        x: Float,
-        y: Float,
-        r: Float,
-        paint: Paint
-    ) {
-        val path = Path()
-
-        path.moveTo(x, y - r)
-        path.lineTo(x + r, y + r)
-        path.lineTo(x - r, y + r)
-        path.close()
-
-        canvas.drawPath(path, paint)
+    private fun drawTriangle(canvas: Canvas, x: Float, y: Float, r: Float, paint: Paint) {
+        shapePath.rewind()
+        shapePath.moveTo(x, y - r)
+        shapePath.lineTo(x + r, y + r)
+        shapePath.lineTo(x - r, y + r)
+        shapePath.close()
+        canvas.drawPath(shapePath, paint)
     }
-    private fun drawDiamond(
-        canvas: Canvas,
-        x: Float,
-        y: Float,
-        r: Float,
-        paint: Paint
-    ) {
-        val path = Path()
 
-        path.moveTo(x, y - r)
-        path.lineTo(x + r, y)
-        path.lineTo(x, y + r)
-        path.lineTo(x - r, y)
-        path.close()
-
-        canvas.drawPath(path, paint)
+    private fun drawDiamond(canvas: Canvas, x: Float, y: Float, r: Float, paint: Paint) {
+        shapePath.rewind()
+        shapePath.moveTo(x, y - r)
+        shapePath.lineTo(x + r, y)
+        shapePath.lineTo(x, y + r)
+        shapePath.lineTo(x - r, y)
+        shapePath.close()
+        canvas.drawPath(shapePath, paint)
     }
-    private fun drawStar(
-        canvas: Canvas,
-        x: Float,
-        y: Float,
-        r: Float,
-        paint: Paint
-    ) {
-        val path = Path()
 
+    private fun drawStar(canvas: Canvas, x: Float, y: Float, r: Float, paint: Paint) {
+        shapePath.rewind()
         for (i in 0 until 10) {
             val angle = Math.PI / 5 * i - Math.PI / 2
             val radius = if (i % 2 == 0) r else r / 2
-
             val px = x + (radius * kotlin.math.cos(angle)).toFloat()
             val py = y + (radius * kotlin.math.sin(angle)).toFloat()
-
-            if (i == 0) path.moveTo(px, py)
-            else path.lineTo(px, py)
+            if (i == 0) shapePath.moveTo(px, py) else shapePath.lineTo(px, py)
         }
-
-        path.close()
-        canvas.drawPath(path, paint)
+        shapePath.close()
+        canvas.drawPath(shapePath, paint)
     }
     // Province boundary polylines — approximate geographic coordinates
     private val provinceBorders = listOf(
@@ -217,36 +190,12 @@ class KoreaMapView @JvmOverloads constructor(
         listOf(128.3f to 36.5f, 128.55f to 36.1f, 128.72f to 35.72f,
                129.0f to 35.5f, 129.35f to 35.35f)
     )
-    private fun drawHeart(
-        canvas: Canvas,
-        x: Float,
-        y: Float,
-        r: Float,
-        paint: Paint
-    ) {
-        val path = Path()
-
-        path.moveTo(x, y + r)
-
-        path.cubicTo(
-            x - r * 2,
-            y,
-            x - r,
-            y - r * 2,
-            x,
-            y - r
-        )
-
-        path.cubicTo(
-            x + r,
-            y - r * 2,
-            x + r * 2,
-            y,
-            x,
-            y + r
-        )
-
-        canvas.drawPath(path, paint)
+    private fun drawHeart(canvas: Canvas, x: Float, y: Float, r: Float, paint: Paint) {
+        shapePath.rewind()
+        shapePath.moveTo(x, y + r)
+        shapePath.cubicTo(x - r * 2, y,      x - r, y - r * 2, x, y - r)
+        shapePath.cubicTo(x + r,     y - r * 2, x + r * 2, y, x, y + r)
+        canvas.drawPath(shapePath, paint)
     }
     // Province name label positions
     private data class ProvinceLabel(val name: String, val lng: Float, val lat: Float)
@@ -530,4 +479,15 @@ class KoreaMapView @JvmOverloads constructor(
 
     fun lngToX(lng: Float): Float = offX + (lng - LNG_MIN).toFloat() * scX
     fun latToY(lat: Float): Float = height - offY - (lat - LAT_MIN).toFloat() * scY
+
+    companion object {
+        // 인스턴스별 재할당 없이 앱 전체에서 공유하는 Paint 맵
+        val activityPinPaints: Map<ActivityType, Paint> =
+            ActivityType.values().associateWith { type ->
+                Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = Color.parseColor(type.colorHex)
+                    style = Paint.Style.FILL
+                }
+            }
+    }
 }

@@ -27,6 +27,7 @@ class MapFragment : Fragment() {
 
     private var _binding: FragmentMapBinding? = null
     private val binding get() = _binding!!
+    private var mapLayoutListener: ViewTreeObserver.OnGlobalLayoutListener? = null
 
     private val viewModel: MapViewModel by viewModels()
     private val sharedViewModel: SharedViewModel by activityViewModels()
@@ -57,23 +58,17 @@ class MapFragment : Fragment() {
      * KoreaMapView 핀 좌표계를 이미지 기준으로 보정한다.
      */
     private fun syncPinCoordinatesToImage() {
-        binding.mapImage.viewTreeObserver.addOnGlobalLayoutListener(
-            object : ViewTreeObserver.OnGlobalLayoutListener {
-                override fun onGlobalLayout() {
-                    binding.mapImage.viewTreeObserver.removeOnGlobalLayoutListener(this)
-                    val drawable = binding.mapImage.drawable ?: return
-                    val m = FloatArray(9)
-                    binding.mapImage.imageMatrix.getValues(m)
-                    val scaleX   = m[Matrix.MSCALE_X]
-                    val scaleY   = m[Matrix.MSCALE_Y]
-                    val transX   = m[Matrix.MTRANS_X]
-                    val transY   = m[Matrix.MTRANS_Y]
-                    val imgW     = drawable.intrinsicWidth  * scaleX
-                    val imgH     = drawable.intrinsicHeight * scaleY
-                    binding.koreaMapView.setMapImageRect(transX, transY, imgW, imgH)
-                }
-            }
-        )
+        mapLayoutListener = ViewTreeObserver.OnGlobalLayoutListener {
+            binding.mapImage.viewTreeObserver.removeOnGlobalLayoutListener(mapLayoutListener)
+            mapLayoutListener = null
+            val drawable = binding.mapImage.drawable ?: return@OnGlobalLayoutListener
+            val m = FloatArray(9)
+            binding.mapImage.imageMatrix.getValues(m)
+            val imgW = drawable.intrinsicWidth  * m[Matrix.MSCALE_X]
+            val imgH = drawable.intrinsicHeight * m[Matrix.MSCALE_Y]
+            binding.koreaMapView.setMapImageRect(m[Matrix.MTRANS_X], m[Matrix.MTRANS_Y], imgW, imgH)
+        }
+        binding.mapImage.viewTreeObserver.addOnGlobalLayoutListener(mapLayoutListener)
     }
 
     private fun setupMapView() {
@@ -144,6 +139,9 @@ class MapFragment : Fragment() {
     }
 
     override fun onDestroyView() {
+        // 레이아웃 리스너가 아직 등록돼 있으면 제거 (Fragment 누수 방지)
+        mapLayoutListener?.let { binding.mapImage.viewTreeObserver.removeOnGlobalLayoutListener(it) }
+        mapLayoutListener = null
         binding.adViewMap.destroy()
         super.onDestroyView()
         _binding = null

@@ -46,6 +46,8 @@ class TideRepositoryImpl @Inject constructor(
             } ?: emptyList()
 
             tideRecordDao.insertAll(records)
+            // 30일 초과 기록 자동 삭제 — 개인정보 최소 보관 원칙
+            tideRecordDao.deleteOlderThan(System.currentTimeMillis() - 30L * 24 * 3_600_000)
 
             TideData(
                 stationCode = stationCode,

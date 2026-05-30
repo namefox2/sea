@@ -1,5 +1,4 @@
-package com.koretide.app.di
-
+import com.koretide.app.BuildConfig
 import com.koretide.app.data.remote.KhoaApiService
 import com.koretide.app.data.remote.KmaApiService
 import com.squareup.moshi.Moshi
@@ -40,7 +39,9 @@ object NetworkModule {
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .addInterceptor(HttpLoggingInterceptor().apply {
-            level = HttpLoggingInterceptor.Level.BODY
+            // 릴리스 빌드에서는 로깅 완전 비활성 — 개인정보보호법·GDPR 준수
+            level = if (BuildConfig.DEBUG) HttpLoggingInterceptor.Level.BASIC
+                    else HttpLoggingInterceptor.Level.NONE
         })
         .build()
 
@@ -59,7 +60,7 @@ object NetworkModule {
     @KmaRetrofit
     fun provideKmaRetrofit(client: OkHttpClient, moshi: Moshi): Retrofit =
         Retrofit.Builder()
-            .baseUrl("http://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/")
+            .baseUrl("https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/")
             .client(client)
             .addConverterFactory(MoshiConverterFactory.create(moshi))
             .build()

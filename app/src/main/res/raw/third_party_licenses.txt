@@ -1,0 +1,85 @@
+Korea Tide — 오픈소스 라이선스 고지
+========================================
+본 앱은 아래 오픈소스 라이브러리를 사용합니다.
+
+--------------------------------------------------
+1. AndroidX Core / AppCompat / Material Components / Navigation
+   Copyright 2018 The Android Open Source Project
+   License: Apache License 2.0
+   https://www.apache.org/licenses/LICENSE-2.0
+
+--------------------------------------------------
+2. AndroidX Lifecycle (ViewModel, LiveData, Runtime)
+   Copyright 2018 The Android Open Source Project
+   License: Apache License 2.0
+   https://www.apache.org/licenses/LICENSE-2.0
+
+--------------------------------------------------
+3. AndroidX Room
+   Copyright 2017 The Android Open Source Project
+   License: Apache License 2.0
+   https://www.apache.org/licenses/LICENSE-2.0
+
+--------------------------------------------------
+4. AndroidX ConstraintLayout
+   Copyright 2016 The Android Open Source Project
+   License: Apache License 2.0
+   https://www.apache.org/licenses/LICENSE-2.0
+
+--------------------------------------------------
+5. Dagger Hilt
+   Copyright 2020 The Dagger Authors
+   License: Apache License 2.0
+   https://www.apache.org/licenses/LICENSE-2.0
+
+--------------------------------------------------
+6. Retrofit2
+   Copyright 2013 Square, Inc.
+   License: Apache License 2.0
+   https://www.apache.org/licenses/LICENSE-2.0
+
+--------------------------------------------------
+7. OkHttp3
+   Copyright 2019 Square, Inc.
+   License: Apache License 2.0
+   https://www.apache.org/licenses/LICENSE-2.0
+
+--------------------------------------------------
+8. Moshi
+   Copyright 2015 Square, Inc.
+   License: Apache License 2.0
+   https://www.apache.org/licenses/LICENSE-2.0
+
+--------------------------------------------------
+9. Kotlin Coroutines
+   Copyright 2016 JetBrains s.r.o.
+   License: Apache License 2.0
+   https://www.apache.org/licenses/LICENSE-2.0
+
+--------------------------------------------------
+10. MPAndroidChart
+    Copyright 2020 Philipp Jahoda
+    License: Apache License 2.0
+    https://www.apache.org/licenses/LICENSE-2.0
+
+--------------------------------------------------
+11. Google Play Services Ads (AdMob)
+    Copyright Google LLC
+    License: Google APIs Terms of Service
+    https://developers.google.com/terms
+
+--------------------------------------------------
+Apache License 2.0 전문:
+https://www.apache.org/licenses/LICENSE-2.0
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.

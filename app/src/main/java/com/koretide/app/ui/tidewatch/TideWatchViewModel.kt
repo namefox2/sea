@@ -8,6 +8,7 @@ import com.koretide.app.domain.usecase.GetTideUseCase
 import com.koretide.app.domain.usecase.GetWindUseCase
 import com.koretide.app.util.Result
 import dagger.hilt.android.lifecycle.HiltViewModel
+import android.util.Log
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -44,7 +45,8 @@ class TideWatchViewModel @Inject constructor(
                     _tideData.value = tide
                     val wind = getWindUseCase(lat, lng, stationCode)
                     _windData.value = wind
-                } catch (_: Exception) {
+                } catch (e: Exception) {
+                    Log.w(TAG, "Poll failed for $stationCode", e)
                 } finally {
                     _isLoading.value = false
                 }
@@ -56,5 +58,9 @@ class TideWatchViewModel @Inject constructor(
     fun stopPolling() {
         pollJob?.cancel()
         pollJob = null
+    }
+
+    companion object {
+        private const val TAG = "TideWatchViewModel"
     }
 }

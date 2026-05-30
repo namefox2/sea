@@ -13,6 +13,8 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -46,21 +48,25 @@ class SearchViewModel @Inject constructor(
     @OptIn(ExperimentalCoroutinesApi::class)
     val stationItems: StateFlow<List<StationAdapter.StationItem>> = stations
         .mapLatest { list ->
+            // 최대 5개 동시 API 호출로 제한 — 한꺼번에 수백 개 요청 방지
+            val semaphore = Semaphore(5)
             coroutineScope {
                 list.map { station ->
                     async {
-                        val tide = runCatching { getTideUseCase(station.code) }.getOrNull()
-                        val wind = runCatching {
-                            getWindUseCase(station.lat, station.lng, station.code)
-                        }.getOrNull()
-                        StationAdapter.StationItem(
-                            station = station,
-                            tidePercent = tide?.tidePercent
-                                ?: station.lastTideLevel?.let { (it.toFloat() / 600f).coerceIn(0f, 1f) },
-                            tideStatus = tide?.tideStatus,
-                            windBft = wind?.beaufort,
-                            waterLevelCm = tide?.currentLevel
-                        )
+                        semaphore.withPermit {
+                            val tide = runCatching { getTideUseCase(station.code) }.getOrNull()
+                            val wind = runCatching {
+                                getWindUseCase(station.lat, station.lng, station.code)
+                            }.getOrNull()
+                            StationAdapter.StationItem(
+                                station = station,
+                                tidePercent = tide?.tidePercent
+                                    ?: station.lastTideLevel?.let { (it.toFloat() / 600f).coerceIn(0f, 1f) },
+                                tideStatus = tide?.tideStatus,
+                                windBft = wind?.beaufort,
+                                waterLevelCm = tide?.currentLevel
+                            )
+                        }
                     }
                 }.awaitAll()
             }
