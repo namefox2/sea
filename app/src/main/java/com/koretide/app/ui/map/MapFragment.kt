@@ -28,6 +28,7 @@ class MapFragment : Fragment() {
     private var _binding: FragmentMapBinding? = null
     private val binding get() = _binding!!
     private var mapLayoutListener: ViewTreeObserver.OnGlobalLayoutListener? = null
+    private var activitySpotNearestStation: Station? = null  // 상세보기 클릭 시점에만 sharedVM에 전달
 
     private val viewModel: MapViewModel by viewModels()
     private val sharedViewModel: SharedViewModel by activityViewModels()
@@ -78,6 +79,8 @@ class MapFragment : Fragment() {
 
     private fun dismissTooltip() {
         binding.tooltipCard.visibility = View.GONE
+        binding.koreaMapView.clearSelection()
+        activitySpotNearestStation = null
         viewModel.clearPin()
     }
 
@@ -117,8 +120,10 @@ class MapFragment : Fragment() {
     }
 
     private fun onPinSelected(station: Station) {
+        activitySpotNearestStation = null
         viewModel.selectPin(station)
         sharedViewModel.selectStation(station)
+        // selectedCode 설정은 sharedViewModel 옵저버가 처리 → 자동으로 selectedSpotKey 해제
         binding.tooltipCard.visibility = View.VISIBLE
         binding.tvTooltipName.text = station.name
         binding.tvTooltipRegion.text = station.region.displayName
@@ -133,8 +138,12 @@ class MapFragment : Fragment() {
     }
 
     private fun onActivityPinSelected(spot: ActivitySpot) {
-        // 가장 가까운 KHOA 관측소를 찾아 수위·바람 데이터 연결
+        // 스팟 선택 → 스테이션 핀 하이라이트 해제, 스팟 핀 하이라이트
+        binding.koreaMapView.selectedSpotKey = "${spot.lat}_${spot.lng}"
+
         val nearest = viewModel.findNearestStation(spot.lat.toDouble(), spot.lng.toDouble())
+        activitySpotNearestStation = nearest
+
         binding.tooltipCard.visibility = View.VISIBLE
         binding.tvTooltipName.text = spot.name
         binding.tvTooltipRegion.text = buildString {
@@ -142,9 +151,10 @@ class MapFragment : Fragment() {
             if (nearest != null) append(" · 인근: ${nearest.name}")
         }
         if (nearest != null) {
-            sharedViewModel.selectStation(nearest)
             binding.btnViewDetail.visibility = View.VISIBLE
             binding.btnViewDetail.setOnClickListener {
+                // 상세보기 클릭 시점에 인근 관측소 선택 → Detail이 수위·바람 표시
+                sharedViewModel.selectStation(nearest)
                 findNavController().navigate(R.id.action_global_to_detail)
             }
         } else {
@@ -152,6 +162,7 @@ class MapFragment : Fragment() {
         }
         binding.btnGoWatch.visibility = View.VISIBLE
         binding.btnGoWatch.setOnClickListener {
+            activitySpotNearestStation?.let { sharedViewModel.selectStation(it) }
             sharedViewModel.requestTabNavigation(R.id.navigation_watch)
         }
     }

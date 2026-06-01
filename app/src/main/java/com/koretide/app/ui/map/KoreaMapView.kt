@@ -34,8 +34,20 @@ class KoreaMapView @JvmOverloads constructor(
 
     var onPinClick: ((Station) -> Unit)? = null
     var onActivityPinClick: ((ActivitySpot) -> Unit)? = null
-    var selectedCode: String? = null
-        set(value) { field = value; invalidate() }
+
+    // 두 선택 상태는 상호 배타 — 한 쪽 설정 시 다른 쪽 자동 해제
+    private var _selectedCode: String? = null
+    private var _selectedSpotKey: String? = null
+
+    var selectedCode: String?
+        get() = _selectedCode
+        set(value) { _selectedCode = value; if (value != null) _selectedSpotKey = null; invalidate() }
+
+    var selectedSpotKey: String?
+        get() = _selectedSpotKey
+        set(value) { _selectedSpotKey = value; if (value != null) _selectedCode = null; invalidate() }
+
+    fun clearSelection() { _selectedCode = null; _selectedSpotKey = null; invalidate() }
 
     // Sea background — light blue like Wikipedia
     private val seaPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -411,8 +423,8 @@ class KoreaMapView @JvmOverloads constructor(
         for (pin in pins) {
             val x = lngToX(pin.station.lng.toFloat())
             val y = latToY(pin.station.lat.toFloat())
-            val isSelected = pin.station.code == selectedCode
-            val r = if (isSelected) 8f * density else 6f * density
+            val isSelected = pin.station.code == _selectedCode
+            val r = if (isSelected) 5f * density else 3.5f * density
 
             pinPaint.color = when (pin.tideStatus) {
                 TideStatus.RISING, TideStatus.HIGH_TIDE -> Color.parseColor("#1565C0")
@@ -422,32 +434,33 @@ class KoreaMapView @JvmOverloads constructor(
             canvas.drawCircle(x, y, r, pinPaint)
             canvas.drawCircle(x, y, r, pinBorderPaint)
             if (isSelected) {
-                canvas.drawCircle(x, y, r + 4f * density, selectedRingPaint)
-                pinLabelPaint.textSize = (width * 0.038f).coerceIn(12f * density, 20f * density)
-                canvas.drawText(pin.station.name, x, y - r - 6f * density, pinLabelPaint)
+                canvas.drawCircle(x, y, r + 3.5f * density, selectedRingPaint)
+                pinLabelPaint.textSize = (width * 0.034f).coerceIn(10f * density, 18f * density)
+                canvas.drawText(pin.station.name, x, y - r - 5f * density, pinLabelPaint)
             }
         }
 
-        // Activity spot pins (diamond shape)
+        // Activity spot pins
         for (spot in activitySpots) {
             val x = lngToX(spot.lng.toFloat())
             val y = latToY(spot.lat.toFloat())
 
             val paint = activityPinPaints[spot.type] ?: continue
-            val r = 7f * density
+            val isSelected = "${spot.lat}_${spot.lng}" == _selectedSpotKey
+            val r = if (isSelected) 6f * density else 4f * density
 
             when (spot.type) {
                 ActivityType.HIGH_TIDE -> drawStar(canvas, x, y, r, paint)
-
-                ActivityType.FISHING -> drawDiamond(canvas, x, y, r, paint)
-
-                ActivityType.SURFING -> drawTriangle(canvas, x, y, r, paint)
-
+                ActivityType.FISHING   -> drawDiamond(canvas, x, y, r, paint)
+                ActivityType.SURFING   -> drawTriangle(canvas, x, y, r, paint)
                 ActivityType.TIDAL_FLAT -> drawSquare(canvas, x, y, r, paint)
-
-                ActivityType.SWIMMING -> canvas.drawCircle(x, y, r, paint)
-
-                ActivityType.SCUBA -> drawHeart(canvas, x, y, 7f, paint)
+                ActivityType.SWIMMING  -> canvas.drawCircle(x, y, r, paint)
+                ActivityType.SCUBA     -> drawHeart(canvas, x, y, r, paint)
+            }
+            if (isSelected) {
+                canvas.drawCircle(x, y, r + 3f * density, selectedRingPaint)
+                pinLabelPaint.textSize = (width * 0.034f).coerceIn(10f * density, 18f * density)
+                canvas.drawText(spot.name, x, y - r - 5f * density, pinLabelPaint)
             }
         }
     }
