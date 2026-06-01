@@ -147,6 +147,22 @@ class TideWatchView @JvmOverloads constructor(
     fun setTide(percent: Float) { targetTide = percent.coerceIn(0f, 1f) }
     fun setWind(bft: Int) { targetWind = bft.coerceIn(0, 12) }
 
+    fun onPause() {
+        isRendering = false
+        renderHandler?.removeCallbacksAndMessages(null)
+    }
+
+    fun onResume() {
+        if (!isRendering && holder.surface.isValid) {
+            isRendering = true
+            if (renderThread == null) {
+                renderThread = HandlerThread("TideWaveRender").apply { start() }
+                renderHandler = Handler(renderThread!!.looper)
+            }
+            scheduleFrame()
+        }
+    }
+
     private fun scheduleFrame() {
         if (!isRendering) return
         renderHandler?.postDelayed({
