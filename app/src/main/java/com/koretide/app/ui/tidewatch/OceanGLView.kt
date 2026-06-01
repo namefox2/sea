@@ -19,7 +19,7 @@ class OceanGLView @JvmOverloads constructor(
         set(value) { field = value; renderer.windDir = (value * PI / 180.0).toFloat() }
 
     init {
-        setEGLContextClientVersion(2)
+        setEGLContextClientVersion(3)
         setRenderer(renderer)
         renderMode = RENDERMODE_CONTINUOUSLY
     }
