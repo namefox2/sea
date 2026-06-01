@@ -1,3 +1,5 @@
+package com.koretide.app.di
+
 import com.koretide.app.BuildConfig
 import com.koretide.app.data.remote.KhoaApiService
 import com.koretide.app.data.remote.KmaApiService
