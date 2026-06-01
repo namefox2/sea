@@ -68,6 +68,16 @@ class MapViewModel @Inject constructor(
             emptyList()
         )
 
+    // 필터링되지 않은 전체 관측소 (액티비티 스팟 → 인근 관측소 연결용)
+    private val _allStations: StateFlow<List<Station>> = getAllStationsUseCase()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun findNearestStation(lat: Double, lng: Double): Station? =
+        _allStations.value.minByOrNull { s ->
+            val dlat = s.lat - lat; val dlng = s.lng - lng
+            dlat * dlat + dlng * dlng
+        }
+
     fun setRegionFilter(region: StationRegion?) { _regionFilter.value = region }
 
     fun selectPin(station: Station) { _selectedPin.value = station }

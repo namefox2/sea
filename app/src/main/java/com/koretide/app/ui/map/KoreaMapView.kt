@@ -81,13 +81,15 @@ class KoreaMapView @JvmOverloads constructor(
     private val cityDotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.parseColor("#666666"); style = Paint.Style.FILL
     }
+    private val density = context.resources.displayMetrics.density
+
     // Station pins
     private val pinPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
     private val pinBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.WHITE; style = Paint.Style.STROKE; strokeWidth = 2f
+        color = Color.WHITE; style = Paint.Style.STROKE
     }
     private val selectedRingPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#FFD700"); style = Paint.Style.STROKE; strokeWidth = 3.5f
+        color = Color.parseColor("#FFD700"); style = Paint.Style.STROKE
     }
     private val pinLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.parseColor("#111111"); textAlign = Paint.Align.CENTER
@@ -106,6 +108,11 @@ class KoreaMapView @JvmOverloads constructor(
     private var scY = 1f
     private var offX = 0f
     private var offY = 0f
+
+    // ImageView fitCenter 렌더링 영역 (이 값이 설정되면 latToY/lngToX가 이미지 기준으로 동작)
+    private var mapImgTop    = 0f
+    private var mapImgHeight = 0f
+    private var useImageRect = false
 
     private val peninsulaPath = Path()
     private val northKoreaPath = Path()
@@ -211,16 +218,25 @@ class KoreaMapView @JvmOverloads constructor(
         ProvinceLabel("제주", 126.55f, 33.4f)
     )
 
-    init { isClickable = true; isFocusable = true }
+    var onEmptyTap: (() -> Unit)? = null
+
+    init {
+        isClickable = true; isFocusable = true
+        pinBorderPaint.strokeWidth  = 2f  * density
+        selectedRingPaint.strokeWidth = 3.5f * density
+    }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
-        val padH = w * 0.08f
-        val padV = h * 0.06f
-        scX = (w - 2 * padH) / (LNG_MAX - LNG_MIN).toFloat()
-        scY = (h - 2 * padV) / (LAT_MAX - LAT_MIN).toFloat()
-        offX = padH
-        offY = padV
+        if (!useImageRect) {
+            // ImageRect 미설정 시 패딩 기반 폴백
+            val padH = w * 0.08f
+            val padV = h * 0.06f
+            scX = (w - 2 * padH) / (LNG_MAX - LNG_MIN).toFloat()
+            scY = (h - 2 * padV) / (LAT_MAX - LAT_MIN).toFloat()
+            offX = padH
+            offY = padV
+        }
         pathDirty = true
     }
 
@@ -237,9 +253,9 @@ class KoreaMapView @JvmOverloads constructor(
         scX = imgWidth  / (LNG_MAX - LNG_MIN).toFloat()
         scY = imgHeight / (LAT_MAX - LAT_MIN).toFloat()
         offX = imgLeft
-        // latToY uses: height - offY - (lat-LAT_MIN)*scY
-        // At LAT_MIN: height - offY = imgTop + imgHeight  →  offY = height - imgTop - imgHeight
-        offY = height - imgTop - imgHeight
+        mapImgTop    = imgTop
+        mapImgHeight = imgHeight
+        useImageRect = true
         pathDirty = true
         invalidate()
     }
@@ -396,7 +412,7 @@ class KoreaMapView @JvmOverloads constructor(
             val x = lngToX(pin.station.lng.toFloat())
             val y = latToY(pin.station.lat.toFloat())
             val isSelected = pin.station.code == selectedCode
-            val r = if (isSelected) 13f else 9f
+            val r = if (isSelected) 8f * density else 6f * density
 
             pinPaint.color = when (pin.tideStatus) {
                 TideStatus.RISING, TideStatus.HIGH_TIDE -> Color.parseColor("#1565C0")
@@ -406,9 +422,9 @@ class KoreaMapView @JvmOverloads constructor(
             canvas.drawCircle(x, y, r, pinPaint)
             canvas.drawCircle(x, y, r, pinBorderPaint)
             if (isSelected) {
-                canvas.drawCircle(x, y, r + 5f, selectedRingPaint)
-                pinLabelPaint.textSize = (width * 0.038f).coerceIn(12f, 20f)
-                canvas.drawText(pin.station.name, x, y - r - 8f, pinLabelPaint)
+                canvas.drawCircle(x, y, r + 4f * density, selectedRingPaint)
+                pinLabelPaint.textSize = (width * 0.038f).coerceIn(12f * density, 20f * density)
+                canvas.drawText(pin.station.name, x, y - r - 6f * density, pinLabelPaint)
             }
         }
 
@@ -418,7 +434,7 @@ class KoreaMapView @JvmOverloads constructor(
             val y = latToY(spot.lat.toFloat())
 
             val paint = activityPinPaints[spot.type] ?: continue
-            val r = 11f
+            val r = 7f * density
 
             when (spot.type) {
                 ActivityType.HIGH_TIDE -> drawStar(canvas, x, y, r, paint)
@@ -440,6 +456,8 @@ class KoreaMapView @JvmOverloads constructor(
         if (event.action == MotionEvent.ACTION_UP) {
             val tx = event.x; val ty = event.y
 
+            val touchR = 16f * density   // dp → px 터치 판정 반경
+
             // Check activity spots first
             val closestActivity = activitySpots.minByOrNull { spot ->
                 val dx = lngToX(spot.lng.toFloat()) - tx
@@ -449,7 +467,7 @@ class KoreaMapView @JvmOverloads constructor(
             if (closestActivity != null) {
                 val dx = lngToX(closestActivity.lng.toFloat()) - tx
                 val dy = latToY(closestActivity.lat.toFloat()) - ty
-                if (sqrt(dx * dx + dy * dy) < 52f) {
+                if (sqrt(dx * dx + dy * dy) < touchR) {
                     onActivityPinClick?.invoke(closestActivity)
                     performClick()
                     return true
@@ -465,12 +483,16 @@ class KoreaMapView @JvmOverloads constructor(
             if (closest != null) {
                 val dx = lngToX(closest.station.lng.toFloat()) - tx
                 val dy = latToY(closest.station.lat.toFloat()) - ty
-                if (sqrt(dx * dx + dy * dy) < 52f) {
+                if (sqrt(dx * dx + dy * dy) < touchR) {
                     onPinClick?.invoke(closest.station)
                     performClick()
                     return true
                 }
             }
+
+            // 빈 공간 탭 → 툴팁 닫기
+            onEmptyTap?.invoke()
+            performClick()
         }
         return super.onTouchEvent(event)
     }
@@ -478,7 +500,11 @@ class KoreaMapView @JvmOverloads constructor(
     override fun performClick(): Boolean { super.performClick(); return true }
 
     fun lngToX(lng: Float): Float = offX + (lng - LNG_MIN).toFloat() * scX
-    fun latToY(lat: Float): Float = height - offY - (lat - LAT_MIN).toFloat() * scY
+    fun latToY(lat: Float): Float =
+        if (useImageRect)
+            mapImgTop + mapImgHeight - (lat - LAT_MIN).toFloat() * scY
+        else
+            height - offY - (lat - LAT_MIN).toFloat() * scY
 
     companion object {
         // 인스턴스별 재할당 없이 앱 전체에서 공유하는 Paint 맵

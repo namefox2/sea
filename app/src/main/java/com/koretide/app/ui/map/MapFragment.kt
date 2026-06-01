@@ -59,8 +59,7 @@ class MapFragment : Fragment() {
      */
     private fun syncPinCoordinatesToImage() {
         mapLayoutListener = ViewTreeObserver.OnGlobalLayoutListener {
-            binding.mapImage.viewTreeObserver.removeOnGlobalLayoutListener(mapLayoutListener)
-            mapLayoutListener = null
+            // 제거하지 않고 유지 — 광고 로드·툴팁 표시 등 레이아웃 변경 시 자동 재동기
             val drawable = binding.mapImage.drawable ?: return@OnGlobalLayoutListener
             val m = FloatArray(9)
             binding.mapImage.imageMatrix.getValues(m)
@@ -74,6 +73,12 @@ class MapFragment : Fragment() {
     private fun setupMapView() {
         binding.koreaMapView.onPinClick = { station -> onPinSelected(station) }
         binding.koreaMapView.onActivityPinClick = { spot -> onActivityPinSelected(spot) }
+        binding.koreaMapView.onEmptyTap = { dismissTooltip() }
+    }
+
+    private fun dismissTooltip() {
+        binding.tooltipCard.visibility = View.GONE
+        viewModel.clearPin()
     }
 
     private fun setupActivityChips() {
@@ -128,10 +133,23 @@ class MapFragment : Fragment() {
     }
 
     private fun onActivityPinSelected(spot: ActivitySpot) {
+        // 가장 가까운 KHOA 관측소를 찾아 수위·바람 데이터 연결
+        val nearest = viewModel.findNearestStation(spot.lat.toDouble(), spot.lng.toDouble())
         binding.tooltipCard.visibility = View.VISIBLE
         binding.tvTooltipName.text = spot.name
-        binding.tvTooltipRegion.text = spot.type.displayName
-        binding.btnViewDetail.visibility = View.GONE
+        binding.tvTooltipRegion.text = buildString {
+            append(spot.type.displayName)
+            if (nearest != null) append(" · 인근: ${nearest.name}")
+        }
+        if (nearest != null) {
+            sharedViewModel.selectStation(nearest)
+            binding.btnViewDetail.visibility = View.VISIBLE
+            binding.btnViewDetail.setOnClickListener {
+                findNavController().navigate(R.id.action_global_to_detail)
+            }
+        } else {
+            binding.btnViewDetail.visibility = View.GONE
+        }
         binding.btnGoWatch.visibility = View.VISIBLE
         binding.btnGoWatch.setOnClickListener {
             sharedViewModel.requestTabNavigation(R.id.navigation_watch)
