@@ -49,10 +49,9 @@ float fbm(vec2 p) {
 void main() {
     float wind = uWind / 12.0;
     float wx   = vUV.x * uAspect;   // aspect-corrected x
-
     // Scene Y divisions (UV: 0=bottom, 1=top)
-    float horizonY = 0.57 + uTide * 0.08;          // 0.57–0.65 depending on tide
-    float flatTopY = (1.0 - uTide) * 0.27;          // 0 at high tide, 0.27 at low tide
+    float horizonY =  0.65;        // 0.57–0.65 depending on tide
+    float flatTopY = (1.0 - uTide) * 0.20;         // 0 at high tide, 0.27 at low tide
 
     // Animated wave displacement of the horizon line
     float wD = (sin(wx * 14.0 + uTime * 0.85)  * 0.013
@@ -61,6 +60,7 @@ void main() {
     float hY = horizonY + wD;
 
     vec3 col;
+    float sunX = 0.70;
 
     // ── TIDAL FLAT (갯벌) ──────────────────────────────────────────────────────
     if (vUV.y < flatTopY - 0.008) {
@@ -68,6 +68,9 @@ void main() {
         vec3 mud  = mix(uFlat * 0.70, uFlat, ft);
         // Muddy texture
         float tex = fbm(vec2(wx * 3.6, ft * 2.8 + uTime * 0.004)) * 0.07 - 0.035;
+        float channels = smoothstep( 0.55, 0.80, fbm(vec2(wx * 7.0, ft * 3.0)));
+
+        mud = mix( mud, mud * 0.55, channels * 0.5);
         mud += tex;
         // Tidal pools (dark patches)
         float pool = step(0.63, fbm(vec2(wx * 1.7, ft * 4.2 + 6.0)));
@@ -87,10 +90,25 @@ void main() {
         // depth: 0 = near viewer (bottom/shallow),  1 = horizon (far/deep)
         float depth  = clamp(1.0 - (hY - vUV.y) / max(0.001, waterH), 0.0, 1.0);
 
+        float swell = sin(wx * 2.0 + uTime * 0.4) * 0.04;
+        float chop = sin(wx * 15.0 + uTime * 2.5) * 0.005;
+        float wave = swell + chop;
+
+        float bigWave =
+              sin(wx * 5.0 + uTime * 0.8) * 0.015
+            + sin(wx * 13.0 - uTime * 1.4) * 0.008
+            + sin(wx * 27.0 + uTime * 2.2) * 0.004;
+
+        bigWave *= (0.4 + wind * 1.6);
+
+        depth += bigWave;
+        depth = clamp(depth,0.0,1.0);
+
         // Perspective-scaled wave UV
         float psc = 1.0 + (1.0 - depth) * 2.2;
         float spd = 0.10 + wind * 0.22;
         float wdx = cos(uWindDir), wdy = sin(uWindDir);
+
         vec2 w1 = vec2(wx * psc * 0.75 + uTime * spd * wdx,
                        vUV.y * psc * 1.2  + uTime * spd * wdy * 0.45);
         vec2 w2 = vec2(wx * psc * 0.50 - uTime * spd * 0.55,
@@ -129,7 +147,17 @@ void main() {
         float azFrac  = fract((uWindDir + 1.0) / 6.2832);
         float sunPath = exp(-pow((vUV.x - azFrac) * uAspect * 0.32, 2.0));
         spec *= (0.22 + 0.78 * sunPath) * (1.0 - (1.0 - depth) * 0.4);
-        col += uSun * spec * (uDark > 0.5 ? 0.55 : 2.8);
+        float moonFactor = uDark > 0.5 ? 1.8 : 2.8;
+
+        col += uSun * spec * moonFactor;
+
+        float glitterNoise = noise(vec2(vUV.x * 180.0,vUV.y * 350.0- uTime * 3.0));
+
+        float reflectionBand = exp(-pow((vUV.x - sunX)* uAspect* 4.0,2.0));
+
+        float glitter = step(0.975, glitterNoise) * reflectionBand;
+
+        col += uSun * glitter * 1.8;
 
         // Foam / whitecaps
         float foamTh = 0.67 - wind * 0.10;
@@ -137,6 +165,13 @@ void main() {
         float foam   = max(0.0, fNoise - foamTh) / (1.0 - foamTh) * wind;
         foam *= (1.0 - (1.0 - depth) * 0.6);
         col = mix(col, vec3(0.91, 0.94, 0.99), foam * 0.82);
+        float shoreFoam = smoothstep(flatTopY + 0.01, flatTopY + 0.05, vUV.y);
+
+        shoreFoam = 1.0 - shoreFoam;
+
+        shoreFoam *= 0.5 + 0.5 * sin( wx * 25.0 + uTime * 3.0 );
+
+        col += vec3(1.0) * shoreFoam * 0.35;
 
         // Caustics in very shallow water (near viewer)
         if (depth > 0.62) {
@@ -177,7 +212,6 @@ void main() {
         }
 
         // Sun disc + corona
-        float sunX = 0.65 + 0.18 * cos(uWindDir + 1.0);
         float sunY = hY + 0.04 + (1.0 - hY - 0.04) * (uDark > 0.5 ? 0.48 : 0.76);
         float sunR = uDark > 0.5 ? 0.026 : 0.036;
         float dSun = length(vec2((vUV.x - sunX) * uAspect, vUV.y - sunY));

@@ -45,6 +45,16 @@ class OceanRenderer(private val appContext: Context) : GLSurfaceView.Renderer {
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         startTime = System.currentTimeMillis()
+        val linkStatus = IntArray(1)
+        GLES20.glGetProgramiv(program, GLES20.GL_LINK_STATUS, linkStatus, 0)
+
+        if (linkStatus[0] == 0) {
+            Log.e(
+                "OceanRenderer",
+                GLES20.glGetProgramInfoLog(program)
+            )
+        }
+
         GLES20.glClearColor(0.05f, 0.15f, 0.30f, 1.0f)
 
         val vert = compile(GLES20.GL_VERTEX_SHADER,   load(R.raw.ocean_vert))
