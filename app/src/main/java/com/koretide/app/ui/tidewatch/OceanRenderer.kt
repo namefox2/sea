@@ -1,9 +1,11 @@
 package com.koretide.app.ui.tidewatch
 
 import android.content.Context
+import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.opengl.GLES20
 import android.opengl.GLSurfaceView
+import android.opengl.GLUtils
 import android.util.Log
 import com.koretide.app.R
 import com.koretide.app.theme.ThemeConfig
@@ -30,9 +32,10 @@ class OceanRenderer(private val appContext: Context) : GLSurfaceView.Renderer {
     @Volatile private var mtnCol  = floatArrayOf(0.18f, 0.28f, 0.20f)
     @Volatile private var flatCol = floatArrayOf(0.47f, 0.42f, 0.33f)
 
-    private var startTime = 0L
-    private var program   = 0
-    private var vboId     = 0
+    private var startTime  = 0L
+    private var program    = 0
+    private var vboId      = 0
+    private var mtnTexId   = 0
 
     // Cached uniform locations
     private var locTime    = -1; private var locTide   = -1; private var locWind   = -1
@@ -40,6 +43,7 @@ class OceanRenderer(private val appContext: Context) : GLSurfaceView.Renderer {
     private var locSkyTop  = -1; private var locSkyBot = -1
     private var locSeaTop  = -1; private var locSeaBot = -1
     private var locSun     = -1; private var locMtn    = -1; private var locFlat   = -1
+    private var locMtnTex  = -1
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -80,6 +84,22 @@ class OceanRenderer(private val appContext: Context) : GLSurfaceView.Renderer {
         locSun    = GLES20.glGetUniformLocation(program, "uSun")
         locMtn    = GLES20.glGetUniformLocation(program, "uMtn")
         locFlat   = GLES20.glGetUniformLocation(program, "uFlat")
+        locMtnTex = GLES20.glGetUniformLocation(program, "uMtnTex")
+
+        // Load mountain silhouette texture
+        val texIds = IntArray(1)
+        GLES20.glGenTextures(1, texIds, 0)
+        mtnTexId = texIds[0]
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, mtnTexId)
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR)
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR)
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE)
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE)
+        val bmp = BitmapFactory.decodeResource(appContext.resources, R.drawable.mountain_silhouette)
+        if (bmp != null) {
+            GLUtils.texImage2D(GLES20.GL_TEXTURE_2D, 0, bmp, 0)
+            bmp.recycle()
+        }
 
         // Full-screen quad: 2 triangles covering NDC [-1,1]
         val verts = floatArrayOf(-1f,-1f, 1f,-1f, -1f,1f, 1f,-1f, 1f,1f, -1f,1f)
@@ -116,6 +136,11 @@ class OceanRenderer(private val appContext: Context) : GLSurfaceView.Renderer {
         GLES20.glUniform3fv(locSun,    1, sunCol,   0)
         GLES20.glUniform3fv(locMtn,    1, mtnCol,   0)
         GLES20.glUniform3fv(locFlat,   1, flatCol,  0)
+
+        // Bind mountain texture to unit 0
+        GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, mtnTexId)
+        GLES20.glUniform1i(locMtnTex, 0)
 
         GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, vboId)
         val posLoc = GLES20.glGetAttribLocation(program, "aPosition")
