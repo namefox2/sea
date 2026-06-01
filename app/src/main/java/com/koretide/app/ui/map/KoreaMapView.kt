@@ -98,8 +98,8 @@ class KoreaMapView @JvmOverloads constructor(
 
     // Geographic bounds
     private val LAT_MIN = 32.6
-    private val LAT_MAX = 39.2
-    private val LNG_MIN = 123.8
+    private val LAT_MAX = 38.5
+    private val LNG_MIN = 124.5
     private val LNG_MAX = 131.0
 
     private var scX = 1f
