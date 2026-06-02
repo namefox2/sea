@@ -2,6 +2,8 @@ package com.koretide.app.ui.tidewatch
 
 import android.content.Context
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -61,6 +63,15 @@ class TideWatchFragment : Fragment() {
         binding.root.setOnClickListener { toggleImmersive() }
 
         observeState()
+        scheduleGlErrorCheck()
+    }
+
+    private fun scheduleGlErrorCheck() {
+        Handler(Looper.getMainLooper()).postDelayed({
+            val b = _binding ?: return@postDelayed
+            val err = b.tideWatchView.initError ?: return@postDelayed
+            android.widget.Toast.makeText(requireContext(), "GL오류: $err", android.widget.Toast.LENGTH_LONG).show()
+        }, 3000L)
     }
 
     private fun setupSliders() {

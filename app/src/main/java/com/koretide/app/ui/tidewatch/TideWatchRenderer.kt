@@ -64,6 +64,7 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
     // Procedural normal map texture (128×128 RGBA, tiling ripple normals)
     private var normalMapTex = 0
     private var glReady = false
+    @Volatile var initError: String? = null
 
     // Camera: standing on beach, ~6° downward pitch → horizon at ~40% from screen top
     private val eyePos = floatArrayOf(0f, 1.8f, 18f)
@@ -142,6 +143,7 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
             glReady = true
 
         } catch (e: Exception) {
+            initError = e.message ?: e.javaClass.simpleName
             Log.e("TideWatchRenderer", "onSurfaceCreated error", e)
         }
     }
@@ -155,7 +157,8 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
 
     override fun onDrawFrame(gl: GL10?) {
         if (!glReady) {
-            GLES20.glClearColor(0.05f, 0.05f, 0.05f, 1f)
+            // Visible orange tint so init failure is distinguishable from dark night sky
+            GLES20.glClearColor(0.25f, 0.08f, 0.02f, 1f)
             GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
             return
         }

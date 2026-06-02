@@ -50,8 +50,12 @@ class MapFragment : Fragment() {
     }
 
     private fun setupAdMob() {
-        MobileAds.initialize(requireContext())
-        binding.adViewMap.loadAd(AdRequest.Builder().build())
+        try {
+            MobileAds.initialize(requireContext())
+            binding.adViewMap.loadAd(AdRequest.Builder().build())
+        } catch (e: Exception) {
+            android.util.Log.w("MapFragment", "AdMob init failed", e)
+        }
     }
 
     /**
@@ -96,25 +100,29 @@ class MapFragment : Fragment() {
 
     private fun observeState() {
         collectFlow(viewModel.stations) { stations ->
-            binding.koreaMapView.pins = stations.map { station ->
+            val b = _binding ?: return@collectFlow
+            b.koreaMapView.pins = stations.map { station ->
                 KoreaMapView.StationPin(station = station)
             }
         }
         collectFlow(viewModel.activitySpots) { spots ->
-            binding.koreaMapView.activitySpots = spots
+            val b = _binding ?: return@collectFlow
+            b.koreaMapView.activitySpots = spots
         }
         collectFlow(sharedViewModel.selectedStation) { station ->
-            binding.koreaMapView.selectedCode = station?.code
+            val b = _binding ?: return@collectFlow
+            b.koreaMapView.selectedCode = station?.code
         }
         collectFlow(viewModel.selectedPin) { pin ->
+            val b = _binding ?: return@collectFlow
             if (pin != null) {
-                binding.tooltipCard.visibility = View.VISIBLE
-                binding.tvTooltipName.text = pin.name
-                binding.tvTooltipRegion.text = pin.region.displayName
-                binding.btnViewDetail.visibility = View.VISIBLE
-                binding.btnGoWatch.visibility = View.VISIBLE
+                b.tooltipCard.visibility = View.VISIBLE
+                b.tvTooltipName.text = pin.name
+                b.tvTooltipRegion.text = pin.region.displayName
+                b.btnViewDetail.visibility = View.VISIBLE
+                b.btnGoWatch.visibility = View.VISIBLE
             } else {
-                binding.tooltipCard.visibility = View.GONE
+                b.tooltipCard.visibility = View.GONE
             }
         }
     }
