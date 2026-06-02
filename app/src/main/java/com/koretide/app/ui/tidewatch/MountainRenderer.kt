@@ -8,28 +8,29 @@ import kotlin.math.max
 import kotlin.math.min
 
 /**
- * Renders 3 procedural mountain silhouette layers using the painter's algorithm
- * (no depth write). Far → Mid → Near drawn in order so near occludes far.
+ * Renders 5 procedural mountain silhouette layers using the painter's algorithm
+ * (no depth write). Far → Near drawn in order so near occludes far.
  * Beach/Ocean draws after with depth write ON, automatically covering mountains.
  *
  * Layers (world Z, world-space max ridge height, ridge segments):
- *   Far  Z=-150  maxH=30  seg=150
- *   Mid  Z=-60   maxH=15  seg=120
- *   Near Z=-22   maxH=8   seg=100
+ *   VeryFar Z=-300  maxH=45  seg=200
+ *   Far     Z=-150  maxH=30  seg=150
+ *   Mid     Z=-60   maxH=15  seg=120
+ *   MidNear Z=-38   maxH=11  seg=110
+ *   Near    Z=-22   maxH=8   seg=100
  *
- * To add a 4th/5th layer later: append to LAYER_Z / LAYER_MAX_H / LAYER_SEGS /
- * LAYER_SEEDS arrays and LAYER_FOG_FACTORS — no other changes needed.
+ * To add more layers: append to all 5 companion arrays — no other changes needed.
  */
 class MountainRenderer(private val program: Int) {
 
     companion object {
         // Layer configuration — extend these arrays to add more layers
-        private val LAYER_Z         = floatArrayOf(-150f, -60f, -22f)
-        private val LAYER_MAX_H     = floatArrayOf(30f,   15f,   8f)
-        private val LAYER_SEGS      = intArrayOf(150,    120,   100)
-        private val LAYER_SEEDS     = floatArrayOf(0.00f, 3.71f, 7.23f)
+        private val LAYER_Z         = floatArrayOf(-300f, -150f, -60f,  -38f,  -22f)
+        private val LAYER_MAX_H     = floatArrayOf( 45f,   30f,  15f,   11f,    8f)
+        private val LAYER_SEGS      = intArrayOf(  200,   150,  120,   110,   100)
+        private val LAYER_SEEDS     = floatArrayOf(  1.44f,  0.00f, 3.71f, 5.12f, 7.23f)
         // Fog mix factor: 1.0 = pure sky (far), 0.0 = pure rock (near)
-        private val LAYER_FOG       = floatArrayOf(0.82f, 0.55f, 0.22f)
+        private val LAYER_FOG       = floatArrayOf(  0.92f,  0.82f, 0.55f, 0.38f, 0.22f)
         // Dark blue-gray base rock color
         private val MOUNTAIN_BASE   = floatArrayOf(0.18f, 0.22f, 0.30f)
         // X extent of ridge mesh — wide enough for any orientation

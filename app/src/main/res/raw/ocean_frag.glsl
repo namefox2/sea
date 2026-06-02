@@ -96,13 +96,19 @@ void main() {
     vec3  diffuse = water * (NdotL * 0.65 + 0.35);
     vec3  col     = mix(diffuse + sssCol, foamCol, foamFactor);
 
+    // ── Sky reflection (Fresnel-weighted, suppressed under foam) ─────────────
+    // At grazing angles Fresnel→1: water acts as mirror → reflect horizon sky
+    vec3 skyReflColor = mix(u_ShallowColor * 0.5, vec3(0.72, 0.88, 1.0), 0.55);
+    col = mix(col, skyReflColor * 0.88, fresnel * 0.62 * (1.0 - foamFactor));
+
     // 윤슬 added on top — visible even at low sun angle (most dramatic at dawn/dusk)
     col += yunseulColor * (0.5 + fresnel * 0.5);
 
-    // Atmospheric fog
-    float fogD = length(v_World - u_CamPos);
-    float fog  = clamp((fogD - 6.0) / 28.0, 0.0, 0.6);
-    col = mix(col, u_LightColor * 0.38, fog);
+    // ── Exponential² atmospheric fog ─────────────────────────────────────────
+    float fogD    = length(v_World - u_CamPos);
+    float fogFact = clamp(1.0 - exp(-0.002 * fogD * fogD), 0.0, 0.72);
+    vec3  fogCol  = mix(u_ShallowColor * 0.4, vec3(0.72, 0.88, 1.0), 0.50);
+    col = mix(col, fogCol, fogFact);
 
     gl_FragColor = vec4(col, 1.0);
 }

@@ -81,5 +81,10 @@ void main() {
     foamEdge *= smoothstep(-0.5, 0.0, distToWater);
     baseColor = mix(baseColor, vec3(0.95, 0.97, 1.0), foamEdge * 0.85);
 
+    // ── Atmospheric distance fog (camera at Z≈18, exponential²) ─────────────
+    float fogZ    = max(18.0 - v_World.z, 0.0);
+    float fogFact = clamp(1.0 - exp(-0.006 * fogZ * fogZ), 0.0, 0.50);
+    baseColor = mix(baseColor, u_Horizon * 0.82, fogFact);
+
     gl_FragColor = vec4(baseColor, 1.0);
 }
