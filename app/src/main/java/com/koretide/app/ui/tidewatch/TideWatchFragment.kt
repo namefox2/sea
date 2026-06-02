@@ -98,36 +98,40 @@ class TideWatchFragment : Fragment() {
 
     private fun observeState() {
         collectFlow(sharedViewModel.selectedThemeId) { themeId ->
+            val b = _binding ?: return@collectFlow
             if (themeId != null) {
                 val newTheme = seasonThemeManager.allThemes().firstOrNull { it.id == themeId }
-                if (newTheme != null) binding.tideWatchView.themeConfig = newTheme
+                if (newTheme != null) b.tideWatchView.themeConfig = newTheme
             }
         }
         collectFlow(sharedViewModel.selectedStation) { station ->
+            val b = _binding ?: return@collectFlow
             if (station == null) {
-                if (uiVisible) binding.bannerNoStation.visible()
+                if (uiVisible) b.bannerNoStation.visible()
             } else {
-                binding.bannerNoStation.gone()
-                binding.tvStationName.text = station.name
+                b.bannerNoStation.gone()
+                b.tvStationName.text = station.name
                 viewModel.startPolling(station.code, station.lat, station.lng)
             }
         }
 
         collectFlow(viewModel.tideData) { data ->
+            val b = _binding ?: return@collectFlow
             if (data != null) {
                 val pct = (data.tidePercent * 100).toInt().coerceIn(0, 100)
-                binding.seekTide.progress = pct
+                b.seekTide.progress = pct
                 sharedViewModel.updateTideData(data)
-                binding.tvTideInfo.text = "${data.tideStatus.displayName} $pct%"
+                b.tvTideInfo.text = "${data.tideStatus.displayName} $pct%"
             }
         }
 
         collectFlow(viewModel.windData) { data ->
+            val b = _binding ?: return@collectFlow
             if (data != null) {
-                binding.seekWind.progress = data.beaufort
-                binding.tideWatchView.windDirectionDeg = data.directionDeg
+                b.seekWind.progress = data.beaufort
+                b.tideWatchView.windDirectionDeg = data.directionDeg
                 sharedViewModel.updateWindData(data)
-                binding.tvWindInfo.text = "${data.beaufortName} (${data.beaufort}bft, ${data.speedMs}m/s)"
+                b.tvWindInfo.text = "${data.beaufortName} (${data.beaufort}bft, ${data.speedMs}m/s)"
             }
         }
     }

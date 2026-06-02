@@ -35,8 +35,8 @@ class TideWatchView @JvmOverloads constructor(
     @Volatile var windDirectionDeg: Float = 225f
     @Volatile var themeConfig: ThemeConfig? = null
 
-    private var targetTide: Float = 0.5f
-    private var targetWind: Int = 3
+    @Volatile private var targetTide: Float = 0.5f
+    @Volatile private var targetWind: Int = 3
 
     private var renderThread: HandlerThread? = null
     private var renderHandler: Handler? = null
@@ -175,20 +175,24 @@ class TideWatchView @JvmOverloads constructor(
             if (!isRendering) return@postDelayed
             val surf = holder.surface
             if (surf.isValid) {
-                val canvas = holder.lockCanvas() ?: run { scheduleFrame(); return@postDelayed }
                 try {
-                    animT += 1f
-                    tidePercent += (targetTide - tidePercent) * 0.015f
-                    if (animT.toInt() % 60 == 0 && windBeaufort != targetWind) {
-                        windBeaufort += if (targetWind > windBeaufort) 1 else -1
-                    }
+                    val canvas = holder.lockCanvas() ?: run { scheduleFrame(); return@postDelayed }
                     try {
-                        renderFrame(canvas)
-                    } catch (e: Throwable) {
-                        Log.e("TideWatchView", "renderFrame error", e)
+                        animT += 1f
+                        tidePercent += (targetTide - tidePercent) * 0.015f
+                        if (animT.toInt() % 60 == 0 && windBeaufort != targetWind) {
+                            windBeaufort += if (targetWind > windBeaufort) 1 else -1
+                        }
+                        try {
+                            renderFrame(canvas)
+                        } catch (e: Throwable) {
+                            Log.e("TideWatchView", "renderFrame error", e)
+                        }
+                    } finally {
+                        holder.unlockCanvasAndPost(canvas)
                     }
-                } finally {
-                    holder.unlockCanvasAndPost(canvas)
+                } catch (e: Throwable) {
+                    Log.e("TideWatchView", "surface canvas error", e)
                 }
             }
             scheduleFrame()
@@ -496,7 +500,7 @@ class TideWatchView @JvmOverloads constructor(
     private fun drawSpecularPath(canvas: Canvas, w: Float, h: Float, seaY: Float, theme: ThemeConfig) {
         val windScale = windBeaufort / 12f
         val intensity = (1f - windScale * 0.6f).coerceIn(0.15f, 1f)
-        if (!theme.hasSunGlitter && windBeaufort > 6) return
+        if (!theme.hasSunGlitter || windBeaufort > 6) return
 
         // Sun/moon position — matches drawSunOrMoon (MOON_X constant = w * 0.72f)
         val lightX = w * 0.72f
@@ -667,7 +671,7 @@ class TideWatchView @JvmOverloads constructor(
     private fun drawFog(canvas: Canvas, w: Float, h: Float, seaY: Float, theme: ThemeConfig) {
         fogPaint.color = theme.fogColor
         val layers = 3
-        for (i in 0..layers) {
+        for (i in 0 until layers) {
             val y = seaY - 20f + i * 30f
             val shift = sin((animT * 0.005f + i).toDouble()).toFloat() * 20f
             fogPaint.shader = LinearGradient(0f, y, 0f, y + 30f,

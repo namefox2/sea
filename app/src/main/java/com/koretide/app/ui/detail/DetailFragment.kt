@@ -61,38 +61,40 @@ class DetailFragment : Fragment() {
 
     private fun observeState() {
         collectFlow(sharedViewModel.selectedStation) { station ->
+            val b = _binding ?: return@collectFlow
             if (station != null) {
-                binding.tvNoStation.gone()
-                binding.contentGroup.visible()
-                // Hide transient views immediately after group becomes visible
-                binding.progressBar.gone()
-                binding.tvError.gone()
-                binding.tvStationName.text = station.name
+                b.tvNoStation.gone()
+                b.contentGroup.visible()
+                b.progressBar.gone()
+                b.tvError.gone()
+                b.tvStationName.text = station.name
                 viewModel.loadData(station)
             } else {
-                binding.tvNoStation.visible()
-                binding.contentGroup.gone()
+                b.tvNoStation.visible()
+                b.contentGroup.gone()
             }
         }
 
         collectFlow(viewModel.tideResult) { result ->
+            val b = _binding ?: return@collectFlow
             when (result) {
-                is Result.Loading -> binding.progressBar.visible()
+                is Result.Loading -> b.progressBar.visible()
                 is Result.Success -> {
-                    binding.progressBar.gone()
+                    b.progressBar.gone()
                     bindTideData(result.data)
                 }
                 is Result.Error -> {
-                    binding.progressBar.gone()
-                    binding.tvError.text = result.message
-                    binding.tvError.visible()
+                    b.progressBar.gone()
+                    b.tvError.text = result.message
+                    b.tvError.visible()
                 }
             }
         }
 
         collectFlow(viewModel.windResult) { result ->
+            val b = _binding ?: return@collectFlow
             if (result is Result.Success) {
-                binding.tvWind.text = "${result.data.beaufortName} (${result.data.beaufort}bft)"
+                b.tvWind.text = "${result.data.beaufortName} (${result.data.beaufort}bft)"
             }
         }
     }

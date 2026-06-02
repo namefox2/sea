@@ -37,8 +37,10 @@ class TideRepositoryImpl @Inject constructor(
             val lowItem = tableItems.firstOrNull { it.hlCode == "LL" }
             val maxLevel = highItem?.tphLevel ?: 600
             val minLevel = lowItem?.tphLevel ?: 50
-            val tidePercent = ((currentLevel - minLevel).toFloat() / (maxLevel - minLevel).toFloat())
-                .coerceIn(0f, 1f)
+            val range = (maxLevel - minLevel).toFloat()
+            val tidePercent = if (range > 0f)
+                ((currentLevel - minLevel).toFloat() / range).coerceIn(0f, 1f)
+            else 0.5f
 
             val records = current.result?.data?.map { item ->
                 val ts = parseDateToMillis(item.recordTime ?: date)
