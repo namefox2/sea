@@ -7,6 +7,7 @@ import android.opengl.Matrix
 import android.util.Log
 import com.koretide.app.R
 import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import java.util.Calendar
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
@@ -62,6 +63,7 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
 
     // Procedural normal map texture (128×128 RGBA, tiling ripple normals)
     private var normalMapTex = 0
+    private var glReady = false
 
     // Camera: standing on beach, ~6° downward pitch → horizon at ~40% from screen top
     private val eyePos = floatArrayOf(0f, 1.8f, 18f)
@@ -137,6 +139,7 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
             ocean        = OceanMesh()
             ocean.uploadToGPU()
             normalMapTex = buildNormalMap()
+            glReady = true
 
         } catch (e: Exception) {
             Log.e("TideWatchRenderer", "onSurfaceCreated error", e)
@@ -151,6 +154,7 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
     }
 
     override fun onDrawFrame(gl: GL10?) {
+        if (!glReady) return
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
 
         val t    = (System.currentTimeMillis() - startMs) / 1000f
@@ -286,7 +290,9 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
                 pixels[i++] = 255.toByte()
             }
         }
-        val buf   = ByteBuffer.wrap(pixels)
+        val buf = ByteBuffer.allocateDirect(pixels.size).order(ByteOrder.nativeOrder())
+        buf.put(pixels)
+        buf.position(0)
         val texId = IntArray(1)
         GLES20.glGenTextures(1, texId, 0)
         GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, texId[0])
