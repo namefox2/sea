@@ -6,17 +6,20 @@ import android.opengl.GLSurfaceView
 import android.opengl.Matrix
 import android.util.Log
 import com.koretide.app.R
+import java.util.Calendar
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
+import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
+import kotlin.math.sqrt
 
 class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Renderer {
 
     // ── State (written from UI thread via queueEvent, read on GL thread) ──────
     @Volatile var tidePercent  = 0.5f
-    @Volatile var windAmp      = 0.25f     // 0..1
-    @Volatile var windDirRad   = 3.93f     // 225° default
+    @Volatile var windAmp      = 0.25f
+    @Volatile var windDirRad   = 3.93f
     @Volatile var isDark       = 0f
 
     @Volatile var deepColor    = floatArrayOf(0.04f, 0.22f, 0.58f)
@@ -40,20 +43,22 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
     private lateinit var ocean: OceanMesh
 
     private var ocProg = 0
-    private var oc_aPos    = -1
-    private var oc_mvp     = -1
-    private var oc_time    = -1
-    private var oc_windAmp = -1
-    private var oc_windDir = -1
-    private var oc_tide    = -1
-    private var oc_lightDir   = -1
-    private var oc_lightColor = -1
-    private var oc_deepColor  = -1
+    private var oc_aPos         = -1
+    private var oc_mvp          = -1
+    private var oc_time         = -1
+    private var oc_windAmp      = -1
+    private var oc_windDir      = -1
+    private var oc_tide         = -1
+    private var oc_lightDir     = -1
+    private var oc_lightColor   = -1
+    private var oc_deepColor    = -1
     private var oc_shallowColor = -1
-    private var oc_camPos    = -1
-    private var oc_roughness = -1
+    private var oc_camPos       = -1
+    private var oc_roughness    = -1
+    private var oc_yunseulStr   = -1
+    private var oc_waterlineZ   = -1
 
-    // Camera
+    // Fixed camera: standing on beach looking at horizon
     private val eyePos = floatArrayOf(0f, 1.8f, 18f)
     private val center = floatArrayOf(0f, 0.2f, 0f)
 
@@ -66,12 +71,12 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         GLES20.glDepthFunc(GLES20.GL_LEQUAL)
 
         try {
-            val skyVert  = load(R.raw.sky_vert)
-            val skyFrag  = load(R.raw.sky_frag)
-            val ocVert   = load(R.raw.ocean_vert)
-            val ocFrag   = load(R.raw.ocean_frag)
-            val bchVert  = load(R.raw.beach_vert)
-            val bchFrag  = load(R.raw.beach_frag)
+            val skyVert = load(R.raw.sky_vert)
+            val skyFrag = load(R.raw.sky_frag)
+            val ocVert  = load(R.raw.ocean_vert)
+            val ocFrag  = load(R.raw.ocean_frag)
+            val bchVert = load(R.raw.beach_vert)
+            val bchFrag = load(R.raw.beach_frag)
 
             sky   = SkyRenderer(link(compile(GLES20.GL_VERTEX_SHADER, skyVert),
                                      compile(GLES20.GL_FRAGMENT_SHADER, skyFrag)))
@@ -80,18 +85,20 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
             ocProg = link(compile(GLES20.GL_VERTEX_SHADER, ocVert),
                           compile(GLES20.GL_FRAGMENT_SHADER, ocFrag))
 
-            oc_aPos      = GLES20.glGetAttribLocation (ocProg, "a_Pos")
-            oc_mvp       = GLES20.glGetUniformLocation(ocProg, "u_MVP")
-            oc_time      = GLES20.glGetUniformLocation(ocProg, "u_Time")
-            oc_windAmp   = GLES20.glGetUniformLocation(ocProg, "u_WindAmp")
-            oc_windDir   = GLES20.glGetUniformLocation(ocProg, "u_WindDir")
-            oc_tide      = GLES20.glGetUniformLocation(ocProg, "u_Tide")
-            oc_lightDir  = GLES20.glGetUniformLocation(ocProg, "u_LightDir")
-            oc_lightColor = GLES20.glGetUniformLocation(ocProg, "u_LightColor")
-            oc_deepColor  = GLES20.glGetUniformLocation(ocProg, "u_DeepColor")
+            oc_aPos         = GLES20.glGetAttribLocation (ocProg, "a_Pos")
+            oc_mvp          = GLES20.glGetUniformLocation(ocProg, "u_MVP")
+            oc_time         = GLES20.glGetUniformLocation(ocProg, "u_Time")
+            oc_windAmp      = GLES20.glGetUniformLocation(ocProg, "u_WindAmp")
+            oc_windDir      = GLES20.glGetUniformLocation(ocProg, "u_WindDir")
+            oc_tide         = GLES20.glGetUniformLocation(ocProg, "u_Tide")
+            oc_lightDir     = GLES20.glGetUniformLocation(ocProg, "u_LightDir")
+            oc_lightColor   = GLES20.glGetUniformLocation(ocProg, "u_LightColor")
+            oc_deepColor    = GLES20.glGetUniformLocation(ocProg, "u_DeepColor")
             oc_shallowColor = GLES20.glGetUniformLocation(ocProg, "u_ShallowColor")
-            oc_camPos    = GLES20.glGetUniformLocation(ocProg, "u_CamPos")
-            oc_roughness = GLES20.glGetUniformLocation(ocProg, "u_Roughness")
+            oc_camPos       = GLES20.glGetUniformLocation(ocProg, "u_CamPos")
+            oc_roughness    = GLES20.glGetUniformLocation(ocProg, "u_Roughness")
+            oc_yunseulStr   = GLES20.glGetUniformLocation(ocProg, "u_YunseulStr")
+            oc_waterlineZ   = GLES20.glGetUniformLocation(ocProg, "u_WaterlineZ")
 
             ocean = OceanMesh()
             ocean.uploadToGPU()
@@ -110,7 +117,7 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
     override fun onDrawFrame(gl: GL10?) {
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
 
-        val t = (System.currentTimeMillis() - startMs) / 1000f
+        val t    = (System.currentTimeMillis() - startMs) / 1000f
         val tide = tidePercent
         val wAmp = windAmp
         val wDir = windDirRad
@@ -122,46 +129,59 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
             0f, 1f, 0f)
         Matrix.multiplyMM(mvp, 0, proj, 0, view, 0)
 
-        // Sun/moon direction from wind dir (opposite = light comes from wind direction)
-        // Elevation: 45° up, slightly left of center
-        val lightElev = 0.55f
-        val lightAzim = wDir + 3.14f   // light opposite to wind
-        val lightDir = floatArrayOf(
-            cos(lightElev) * cos(lightAzim),
-            sin(lightElev),
-            cos(lightElev) * sin(lightAzim)
-        )
+        // ── Sun/moon direction from real time of day ──────────────────────────
+        val lightDir = computeLightDir()
 
-        // Sky: map light direction to UV (approximate screen projection)
+        // Sky UV: map 3D light dir to approximate 2D screen position
         val lightUV = floatArrayOf(
             (lightDir[0] * 0.4f + 0.5f).coerceIn(0.05f, 0.95f),
             (lightDir[1] * 0.4f + 0.72f).coerceIn(0.52f, 0.96f)
         )
 
-        // Roughness: calm=0.04, storm=0.4
-        val roughness = (wAmp * wAmp * 0.40f + 0.04f).coerceAtMost(0.40f)
+        // Roughness and 윤슬 strength
+        val roughness  = (wAmp * wAmp * 0.40f + 0.04f).coerceAtMost(0.40f)
+        val yunseulStr = (1f - wAmp * 0.9f).coerceIn(0f, 1f)
+
+        // Waterline Z: where ocean meets beach (breathing with wave rhythm)
+        val baseWaterlineZ = 2.0f + (1.0f - tide) * 14.0f
+        val shoreBreath    = sin(t * 0.4f) * wAmp * 0.3f
+        val waterlineZ     = (baseWaterlineZ + shoreBreath).coerceIn(1.5f, 16.5f)
 
         // ── Pass 1: Sky (no depth write) ────────────────────────────────────
         sky.draw(skyHorizon, skyZenith, lightColor, lightUV, isDark, t)
 
         // ── Pass 2: Beach ────────────────────────────────────────────────────
-        beach.draw(mvp, tide, sandDry, sandWet, skyHorizon, t)
+        beach.draw(mvp, tide, waterlineZ, sandDry, sandWet, skyHorizon, t)
 
         // ── Pass 3: Ocean ────────────────────────────────────────────────────
         GLES20.glUseProgram(ocProg)
-        GLES20.glUniformMatrix4fv(oc_mvp,   1, false, mvp,          0)
-        GLES20.glUniform1f (oc_time,     t)
-        GLES20.glUniform1f (oc_windAmp,  wAmp)
-        GLES20.glUniform1f (oc_windDir,  wDir)
-        GLES20.glUniform1f (oc_tide,     tide)
+        GLES20.glUniformMatrix4fv(oc_mvp,         1, false, mvp,          0)
+        GLES20.glUniform1f (oc_time,       t)
+        GLES20.glUniform1f (oc_windAmp,    wAmp)
+        GLES20.glUniform1f (oc_windDir,    wDir)
+        GLES20.glUniform1f (oc_tide,       tide)
         GLES20.glUniform3fv(oc_lightDir,   1, lightDir,    0)
         GLES20.glUniform3fv(oc_lightColor, 1, lightColor,  0)
         GLES20.glUniform3fv(oc_deepColor,  1, deepColor,   0)
         GLES20.glUniform3fv(oc_shallowColor, 1, shallowColor, 0)
         GLES20.glUniform3fv(oc_camPos,     1, eyePos,      0)
         GLES20.glUniform1f (oc_roughness,  roughness)
+        GLES20.glUniform1f (oc_yunseulStr, yunseulStr)
+        GLES20.glUniform1f (oc_waterlineZ, waterlineZ)
 
         ocean.draw(oc_aPos)
+    }
+
+    private fun computeLightDir(): FloatArray {
+        val cal   = Calendar.getInstance()
+        val hour  = cal.get(Calendar.HOUR_OF_DAY) + cal.get(Calendar.MINUTE) / 60f
+        // Sun arc: rises at 6am, peaks at noon, sets at 6pm
+        val hourAngle = ((hour - 6f) / 12f) * PI.toFloat()
+        val elevation = (sin(hourAngle.toDouble()).toFloat() * 0.8f + 0.1f).coerceAtLeast(0.05f)
+        val azimuth   = cos(hourAngle.toDouble()).toFloat()
+        val raw = floatArrayOf(azimuth, elevation, -0.6f)
+        val len = sqrt((raw[0]*raw[0] + raw[1]*raw[1] + raw[2]*raw[2]).toDouble()).toFloat()
+        return floatArrayOf(raw[0]/len, raw[1]/len, raw[2]/len)
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
