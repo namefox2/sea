@@ -1,5 +1,6 @@
 package com.koretide.app.ui.tidewatch
 
+import android.graphics.BlurMaskFilter
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.LinearGradient
@@ -45,49 +46,48 @@ class TideWatchView @JvmOverloads constructor(
     private var animT = 0f
 
     // Pre-allocated paints
-    private val skyPaint     = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val seaPaint     = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val wavePaint    = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val skyPaint      = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val seaPaint      = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val wavePaint     = Paint(Paint.ANTI_ALIAS_FLAG)
     private val whitecapPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(200, 255, 255, 255); style = Paint.Style.FILL
     }
-    private val foamPaint    = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(160, 255, 255, 255); style = Paint.Style.FILL
+    private val foamPaint     = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.WHITE; style = Paint.Style.FILL
     }
-    private val sunPaint     = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val sunHaloPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val mtnPaint     = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
-    private val flatPaint    = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
-    private val cloudPaint   = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
-    private val fogPaint     = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
-    private val rainPaint    = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    private val sunPaint      = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val sunHaloPaint  = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val mtnPaint      = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
+    private val flatPaint     = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
+    private val cloudPaint    = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
+    private val fogPaint      = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
+    private val rainPaint     = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(100, 180, 210, 255); strokeWidth = 1.5f; style = Paint.Style.STROKE
     }
-    private val glitterPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(200, 255, 240, 160)
+    private val glitterPaint  = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
-        strokeWidth = 2f
+        strokeWidth = 1.8f
     }
-    private val sprayPaint   = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    private val sprayPaint    = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(180, 240, 248, 255); style = Paint.Style.FILL
     }
-    private val gullPaint    = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    private val gullPaint     = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE; strokeWidth = 2f; color = Color.argb(200, 50, 50, 80)
     }
-    private val compassPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val compassPaint     = Paint(Paint.ANTI_ALIAS_FLAG)
     private val compassTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         textSize = 28f; textAlign = Paint.Align.CENTER
     }
 
-    private val wavePath = Path()
-    private val mtnPath  = Path()
-    private val flatPath = Path()
-    private val gullPath = Path()
-    private val rayPath  = Path()
-    private val rayPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    private val wavePath         = Path()
+    private val mtnPath          = Path()
+    private val flatPath         = Path()
+    private val gullPath         = Path()
+    private val rayPath          = Path()
+    private val rayPaint         = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(30, 255, 255, 200); style = Paint.Style.FILL
     }
-    private val ripplePath = Path()
+    private val ripplePath       = Path()
     private val tidalDetailPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val tidalPoolPaint   = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
 
@@ -104,9 +104,9 @@ class TideWatchView @JvmOverloads constructor(
     private data class Particle(var x: Float, var y: Float, var vx: Float, var vy: Float,
                                  var life: Float, var maxLife: Float, var r: Float)
 
-    private val foamParticles  = Array(40) { randomFoam() }
-    private val sprayParticles = Array(20) { randomSpray() }
+    // glitterPoints: 60 particles — vx/vy are phase/frequency multipliers, not actual velocity
     private val glitterPoints  = Array(60) { randomGlitter() }
+    private val sprayParticles = Array(20) { randomSpray() }
 
     private data class Gull(var x: Float, var y: Float, var phase: Float, var speed: Float)
     private val seagulls = Array(5) { i ->
@@ -197,31 +197,37 @@ class TideWatchView @JvmOverloads constructor(
 
         drawSky(canvas, w, h, wind, theme)
         drawClouds(canvas, w, h, wind, theme)
-        if (wind <= 7) drawSun(canvas, w, h, tide, wind, theme)
+        drawSunOrMoon(canvas, w, h, tide, wind, theme)
         drawMountains(canvas, w, h, theme)
         if (tide < 0.25f) {
             drawTidalFlat(canvas, w, h, seaY, tide, theme)
             marineLifeSystem.drawTidalCreatures(canvas, tide)
         }
-        drawSea(canvas, w, h, seaY, wind, theme)
+        drawPerspectiveWater(canvas, w, h, seaY, wind, theme)
         marineLifeSystem.drawWaterCreatures(canvas)
-        drawWaves(canvas, w, h, seaY, tide, wind, theme)
-        if (wind >= 4) drawWhitecaps(canvas, w, h, seaY, tide, wind)
-        updateAndDrawFoam(canvas, w, h, seaY, wind)
+        drawSpecularPath(canvas, w, h, seaY, theme)
+        if (wind >= 2) drawOrganicFoam(canvas, w, h, seaY)
+        if (wind >= 4) drawWhitecaps(canvas, w, h, seaY, wind)
         if (wind >= 7) updateAndDrawSpray(canvas, h, seaY, wind)
-        if (wind <= 5) drawGlitter(canvas, w, h, seaY, tide)
-        if (wind <= 3) drawSunRays(canvas, w, h, seaY, tide)
-        if (wind <= 9 && theme.hasSeagulls) drawSeagulls(canvas, w, h, seaY, wind)
         if (wind >= 8) drawFog(canvas, w, h, seaY, theme)
         if (wind >= 9) drawRain(canvas, w, h, wind)
+        if (wind <= 9 && theme.hasSeagulls) drawSeagulls(canvas, w, h, seaY, wind)
         drawCompass(canvas, w, h, wind)
     }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Sky
+    // ─────────────────────────────────────────────────────────────────────────
 
     private fun drawSky(canvas: Canvas, w: Float, h: Float, wind: Int, theme: ThemeConfig) {
         skyPaint.shader = LinearGradient(0f, 0f, 0f, h * 0.75f,
             theme.skyTopColor, theme.skyBottomColor, Shader.TileMode.CLAMP)
         canvas.drawRect(0f, 0f, w, h, skyPaint)
     }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Clouds
+    // ─────────────────────────────────────────────────────────────────────────
 
     private fun drawClouds(canvas: Canvas, w: Float, h: Float, wind: Int, theme: ThemeConfig) {
         cloudPaint.color = theme.cloudColor
@@ -243,8 +249,14 @@ class TideWatchView @JvmOverloads constructor(
         }
     }
 
-    private fun drawSun(canvas: Canvas, w: Float, h: Float, tide: Float, wind: Int, theme: ThemeConfig) {
-        val sunX = w * 0.75f
+    // ─────────────────────────────────────────────────────────────────────────
+    // Sun / Moon (renamed from drawSun)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private fun drawSunOrMoon(canvas: Canvas, w: Float, h: Float, tide: Float, wind: Int, theme: ThemeConfig) {
+        if (wind > 7) return
+        // lightX matches the MOON_X constant used by the specular path
+        val sunX = w * 0.72f
         val sunY = h * (0.15f - tide * 0.05f)
         val sunR = 35f
         val vis = (1f - wind * 0.08f).coerceAtLeast(0f)
@@ -258,7 +270,30 @@ class TideWatchView @JvmOverloads constructor(
         sunPaint.color = Color.argb((255 * vis).toInt(), Color.red(theme.sunColor),
             Color.green(theme.sunColor), Color.blue(theme.sunColor))
         canvas.drawCircle(sunX, sunY, sunR, sunPaint)
+
+        // Sun rays at low wind
+        if (wind <= 3) {
+            repeat(6) { i ->
+                val angle = (i * 60f + animT * 0.1f) * (PI / 180f)
+                rayPath.reset()
+                rayPath.moveTo(sunX, sunY)
+                rayPath.lineTo(
+                    sunX + cos(angle - 0.1).toFloat() * 300f,
+                    sunY + sin(angle - 0.1).toFloat() * 300f
+                )
+                rayPath.lineTo(
+                    sunX + cos(angle + 0.1).toFloat() * 300f,
+                    sunY + sin(angle + 0.1).toFloat() * 300f
+                )
+                rayPath.close()
+                canvas.drawPath(rayPath, rayPaint)
+            }
+        }
     }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Mountains
+    // ─────────────────────────────────────────────────────────────────────────
 
     private fun drawMountains(canvas: Canvas, w: Float, h: Float, theme: ThemeConfig) {
         mtnPaint.color = theme.mountainColor
@@ -275,6 +310,10 @@ class TideWatchView @JvmOverloads constructor(
         mtnPath.close()
         canvas.drawPath(mtnPath, mtnPaint)
     }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Tidal Flat
+    // ─────────────────────────────────────────────────────────────────────────
 
     private fun drawTidalFlat(canvas: Canvas, w: Float, h: Float, seaY: Float, tide: Float, theme: ThemeConfig) {
         val flatTop = h * 0.655f
@@ -337,8 +376,16 @@ class TideWatchView @JvmOverloads constructor(
         }
     }
 
-    private fun drawSea(canvas: Canvas, w: Float, h: Float, seaY: Float, wind: Int, theme: ThemeConfig) {
-        // Deep multi-stop gradient: surface → mid-depth → deep
+    // ─────────────────────────────────────────────────────────────────────────
+    // Perspective Water — replaces flat drawSea + drawWaves
+    // 25–35 horizontal perspective rows: narrow at horizon, full-width at camera
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private fun drawPerspectiveWater(canvas: Canvas, w: Float, h: Float, seaY: Float, wind: Int, theme: ThemeConfig) {
+        val windScale = windBeaufort / 12f
+        val rowCount = 30  // in 25–35 range
+
+        // Fill solid sea base first to cover any gaps between rows
         val midColor = Color.argb(255,
             ((Color.red(theme.seaTopColor) + Color.red(theme.seaBottomColor)) / 2),
             ((Color.green(theme.seaTopColor) + Color.green(theme.seaBottomColor)) / 2),
@@ -347,8 +394,62 @@ class TideWatchView @JvmOverloads constructor(
             intArrayOf(theme.seaTopColor, midColor, theme.seaBottomColor),
             floatArrayOf(0f, 0.4f, 1f), Shader.TileMode.CLAMP)
         canvas.drawRect(0f, seaY, w, h, seaPaint)
+        seaPaint.shader = null
 
-        // Subtle caustic shimmer on upper water surface
+        // Draw perspective wave rows front-to-back (bottom row first so foreground paints over top)
+        for (i in 0 until rowCount) {
+            val t = i.toFloat() / rowCount
+
+            // Quadratic Y placement — perspective compression near horizon
+            val rowY = seaY + (h - seaY) * (t * t)
+
+            // Row width: narrow at horizon (t≈0), full-width at bottom (t≈1)
+            val rowW = w * (0.15f + 0.85f * t)
+            val xOff = (w - rowW) / 2f
+
+            // Wave amplitude grows with perspective depth and wind
+            val amp = (1.5f + t * t * 12f) * (0.3f + windScale * 0.7f)
+            val freq1 = 0.022f + t * 0.008f
+            val freq2 = freq1 * 0.55f
+            val phase = animT * (0.015f + windScale * 0.012f) + i * 0.42f
+
+            // Color: darker/lower-opacity near horizon, brighter/opaque in foreground
+            val seaR = (Color.red(theme.seaTopColor)   + ((Color.red(theme.seaBottomColor)   - Color.red(theme.seaTopColor))   * t)).toInt()
+            val seaG = (Color.green(theme.seaTopColor) + ((Color.green(theme.seaBottomColor) - Color.green(theme.seaTopColor)) * t)).toInt()
+            val seaB = (Color.blue(theme.seaTopColor)  + ((Color.blue(theme.seaBottomColor)  - Color.blue(theme.seaTopColor))  * t)).toInt()
+            val rowAlpha = (100 + (t * 155f).toInt()).coerceIn(0, 255)
+
+            wavePaint.color = Color.argb(rowAlpha,
+                seaR.coerceIn(0, 255), seaG.coerceIn(0, 255), seaB.coerceIn(0, 255))
+            wavePaint.style = Paint.Style.FILL
+
+            // Build the wave-strip path for this depth row
+            wavePath.reset()
+            wavePath.moveTo(xOff, h)
+
+            val startWy = rowY + sin((xOff * freq1 + phase).toDouble()).toFloat() * amp +
+                    cos((xOff * freq2 + phase * 1.4f).toDouble()).toFloat() * amp * 0.38f
+            wavePath.lineTo(xOff, startWy)
+
+            var x = xOff + 5f
+            while (x <= xOff + rowW) {
+                val wy = rowY +
+                        sin((x * freq1 + phase).toDouble()).toFloat() * amp +
+                        cos((x * freq2 + phase * 1.4f).toDouble()).toFloat() * amp * 0.38f
+                wavePath.lineTo(x, wy)
+                x += 5f
+            }
+
+            val endX = xOff + rowW
+            val endWy = rowY + sin((endX * freq1 + phase).toDouble()).toFloat() * amp +
+                    cos((endX * freq2 + phase * 1.4f).toDouble()).toFloat() * amp * 0.38f
+            wavePath.lineTo(endX, endWy)
+            wavePath.lineTo(endX, h)
+            wavePath.close()
+            canvas.drawPath(wavePath, wavePaint)
+        }
+
+        // Subtle caustic shimmer on upper water surface at low wind
         if (wind <= 6) {
             tidalPoolPaint.color = Color.argb(18, 255, 255, 220)
             val shimW = w / 5f
@@ -360,74 +461,155 @@ class TideWatchView @JvmOverloads constructor(
         }
     }
 
-    private fun drawWaves(canvas: Canvas, w: Float, h: Float, seaY: Float, tide: Float, wind: Int, theme: ThemeConfig) {
-        val numLayers = when {
-            wind <= 2 -> 2
-            wind <= 5 -> 3
-            wind <= 8 -> 4
-            else      -> 5
-        }
-        for (layer in 0 until numLayers) {
-            val alpha = 100 - layer * 15
-            wavePaint.color = Color.argb(alpha, Color.red(theme.waveColor),
-                Color.green(theme.waveColor), Color.blue(theme.waveColor))
-            wavePaint.style = Paint.Style.FILL
+    // ─────────────────────────────────────────────────────────────────────────
+    // Whitecaps (Beaufort ≥ 4)
+    // ─────────────────────────────────────────────────────────────────────────
 
-            wavePath.reset()
-            val layerY = seaY + layer * 8f
-            wavePath.moveTo(0f, h)
-            wavePath.lineTo(0f, layerY + waveY(0f, layer, wind, tide))
-            var x = 0f
-            while (x <= w) {
-                wavePath.lineTo(x, layerY + waveY(x, layer, wind, tide))
-                x += 6f
-            }
-            wavePath.lineTo(w, h)
-            wavePath.close()
-            canvas.drawPath(wavePath, wavePaint)
-        }
-    }
-
-    private fun waveY(x: Float, layer: Int, wind: Int, tide: Float): Float {
-        val bftH = BeaufortConverter.waveHeight(wind)
-        val amp  = (3.5f + bftH * 18f - layer * 1.2f) * (0.3f + tide * 0.7f)
-        val freq = (0.022f - layer * 0.003f) * (1f + wind * 0.03f)
-        val ph   = animT * (0.015f + wind * 0.002f - layer * 0.002f) * 1.0f + layer * 1.1f
-
-        var y = sin((x * freq + ph).toDouble()).toFloat() * amp +
-                cos((x * freq * 0.55f + ph * 1.4f).toDouble()).toFloat() * amp * 0.38f
-        if (wind > 4) {
-            y += sin((x * freq * 0.5f + ph * 0.7f).toDouble()).toFloat() * amp * 0.18f
-        }
-        return y
-    }
-
-    private fun drawWhitecaps(canvas: Canvas, w: Float, h: Float, seaY: Float, tide: Float, wind: Int) {
+    private fun drawWhitecaps(canvas: Canvas, w: Float, h: Float, seaY: Float, wind: Int) {
         val count = (wind - 3) * 4
+        val windScale = wind / 12f
         val seed = animT.toLong() / 30
         val r = Random(seed)
         repeat(count) {
             val x = r.nextFloat() * w
-            val y = seaY + waveY(x, 0, wind, tide) - 4f
+            val amp = (1.5f + windScale * windScale * 12f) * (0.3f + windScale * 0.7f)
+            val y = seaY + sin((x * 0.022f + animT * 0.015f).toDouble()).toFloat() * amp - 4f
             canvas.drawOval(x - 18f, y - 5f, x + 18f, y + 5f, whitecapPaint)
         }
     }
 
-    private fun updateAndDrawFoam(canvas: Canvas, w: Float, h: Float, seaY: Float, wind: Int) {
-        val active = (wind * 4).coerceAtMost(foamParticles.size)
-        for (i in 0 until active) {
-            val p = foamParticles[i]
-            p.x += p.vx
-            p.y += p.vy * 0.3f
-            p.life -= 0.012f
-            if (p.life <= 0f || p.x > w || p.x < 0f) {
-                foamParticles[i] = randomFoam(w, seaY)
-                continue
-            }
-            foamPaint.alpha = (p.life / p.maxLife * 200).toInt()
-            canvas.drawCircle(p.x, p.y, p.r, foamPaint)
+    // ─────────────────────────────────────────────────────────────────────────
+    // 윤슬 — Specular path: continuous corridor from light source to foreground
+    // NO individual dots — uses a gradient trapezoid + star-cross sparkles
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private fun drawSpecularPath(canvas: Canvas, w: Float, h: Float, seaY: Float, theme: ThemeConfig) {
+        val windScale = windBeaufort / 12f
+        val intensity = (1f - windScale * 0.6f).coerceIn(0.15f, 1f)
+        if (!theme.hasSunGlitter && windBeaufort > 6) return
+
+        // Sun/moon position — matches drawSunOrMoon (MOON_X constant = w * 0.72f)
+        val lightX = w * 0.72f
+        val lightY = seaY * 0.28f
+
+        // Path width at foreground: 15–40% of screen width depending on wind
+        val bottomHalfW = w * (0.15f + windScale * 0.22f)
+
+        // Draw gradient trapezoid corridor from light source to screen bottom
+        val path = Path()
+        val topW = 6f + windScale * 12f
+        path.moveTo(lightX - topW, lightY + 4f)
+        path.lineTo(lightX + topW, lightY + 4f)
+        path.lineTo(w * 0.5f + bottomHalfW, h)
+        path.lineTo(w * 0.5f - bottomHalfW, h)
+        path.close()
+
+        val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+        val sunR = Color.red(theme.sunColor)
+        val sunG = Color.green(theme.sunColor)
+        val sunB = Color.blue(theme.sunColor)
+        glowPaint.shader = LinearGradient(
+            lightX, lightY, lightX, h,
+            intArrayOf(
+                Color.argb((240 * intensity).toInt(), sunR, sunG, sunB),
+                Color.argb((100 * intensity).toInt(), sunR, sunG, sunB),
+                Color.argb((30  * intensity).toInt(), sunR, sunG, sunB),
+                Color.TRANSPARENT
+            ),
+            floatArrayOf(0f, 0.2f, 0.55f, 1f),
+            Shader.TileMode.CLAMP
+        )
+        canvas.drawPath(path, glowPaint)
+
+        // Star-cross sparkles constrained to the specular corridor
+        drawSparklesCross(canvas, w, h, seaY, lightX, bottomHalfW, intensity, theme)
+    }
+
+    private fun drawSparklesCross(
+        canvas: Canvas, w: Float, h: Float, seaY: Float,
+        lightX: Float, halfW: Float, intensity: Float, theme: ThemeConfig
+    ) {
+        val sPaint = glitterPaint
+        sPaint.strokeWidth = 1.8f
+        sPaint.style = Paint.Style.STROKE
+
+        val sunR = Color.red(theme.sunColor)
+        val sunG = Color.green(theme.sunColor)
+        val sunB = Color.blue(theme.sunColor)
+
+        for (p in glitterPoints) {
+            // Slow rightward drift (vx is a phase multiplier, but also drives position)
+            p.x += p.vx * 0.35f
+            if (p.x > w + 20f) p.x = -20f
+
+            // Only draw sparkles on the sea surface
+            if (p.y < seaY) continue
+
+            // Gate: sparkle must be inside the specular corridor (trapezoid shape)
+            val tRow = (p.y - seaY) / (h - seaY).coerceAtLeast(1f)
+            val corridorW = halfW * tRow + 6f
+            if (abs(p.x - lightX) > corridorW) continue
+
+            // Multi-frequency flicker — vx/vy serve as per-particle phase/frequency values
+            val flicker = ((sin((animT * p.vx * 4f + p.y * 0.03f).toDouble()).toFloat() * 0.6f +
+                            sin((animT * p.vy * 2f + p.x * 0.02f).toDouble()).toFloat() * 0.4f + 1f) / 2f)
+            if (flicker < 0.42f) continue
+
+            val alpha = (flicker * intensity * 220).toInt().coerceIn(0, 220)
+            sPaint.color = Color.argb(alpha, sunR.coerceAtLeast(200), sunG.coerceAtLeast(200), sunB)
+
+            val s = p.r * flicker
+            // Horizontal arm (longer — matches sun-reflection-on-water appearance)
+            canvas.drawLine(p.x - s * 1.9f, p.y, p.x + s * 1.9f, p.y, sPaint)
+            // Vertical arm (shorter)
+            canvas.drawLine(p.x, p.y - s * 0.9f, p.x, p.y + s * 0.9f, sPaint)
         }
     }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Organic foam (replaces circle-particle foam)
+    // Elongated horizontal ellipses with BlurMaskFilter at wave crests
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private fun drawOrganicFoam(canvas: Canvas, w: Float, h: Float, seaY: Float) {
+        if (windBeaufort < 2) return
+        val windScale = windBeaufort / 12f
+        val blurRadius = 5f + windScale * 4f
+        val fPaint = foamPaint
+        fPaint.color = Color.WHITE
+        fPaint.maskFilter = BlurMaskFilter(blurRadius, BlurMaskFilter.Blur.NORMAL)
+
+        // ~8 perspective depth levels
+        val levels = 8
+        for (lv in 0 until levels) {
+            val t = (lv + 1f) / levels
+            if (windBeaufort * t < 1.5f) continue
+
+            val rowY = seaY + (h - seaY) * t * t
+            val rowW = w * (0.15f + 0.85f * t)
+            val xOff = (w - rowW) / 2f
+            val waveAmp = (1.5f + t * t * 10f) * (0.3f + windScale * 0.7f)
+            val count = ((rowW / 32f).toInt()).coerceIn(1, 18)
+
+            for (i in 0..count) {
+                val fx = xOff + (i.toFloat() / count) * rowW
+                val phase = animT * 0.022f + fx * 0.019f + lv * 1.1f
+                val fy = rowY + sin(phase.toDouble()).toFloat() * waveAmp - waveAmp * 0.7f
+                val blobW = (8f + t * 24f + sin((animT * 0.04f + i * 1.3f).toDouble()).toFloat() * 8f).coerceAtLeast(4f)
+                val blobH = (1.8f + t * 2.5f)
+                val opacity = (windScale * 0.9f * (0.4f + t * 0.6f)).coerceIn(0f, 0.85f)
+                fPaint.alpha = (opacity * 210).toInt()
+                canvas.drawOval(fx - blobW, fy - blobH, fx + blobW, fy + blobH, fPaint)
+            }
+        }
+
+        // Clear maskFilter so it doesn't affect subsequent drawing passes
+        fPaint.maskFilter = null
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Spray (Beaufort ≥ 7)
+    // ─────────────────────────────────────────────────────────────────────────
 
     private fun updateAndDrawSpray(canvas: Canvas, h: Float, seaY: Float, wind: Int) {
         val active = ((wind - 6) * 4).coerceAtMost(sprayParticles.size)
@@ -446,58 +628,9 @@ class TideWatchView @JvmOverloads constructor(
         }
     }
 
-    // 윤슬: realistic sun-glitter on water — star-shaped sparkles drifting rightward
-    private fun drawGlitter(canvas: Canvas, w: Float, h: Float, seaY: Float, tide: Float) {
-        val intensity = (1f - windBeaufort * 0.18f).coerceIn(0.1f, 1f)
-        // Sun is at w*0.75, glitter concentrates in that half of the screen
-        val sunX = w * 0.75f
-        for (i in glitterPoints.indices) {
-            val p = glitterPoints[i]
-            // Drift slowly with wind
-            p.x += p.vx * 0.4f
-            if (p.x > w + 20f) p.x = -20f
-
-            // Multi-frequency flicker for natural sparkle
-            val f1 = sin((animT * 0.12f + i * 2.3f).toDouble()).toFloat()
-            val f2 = sin((animT * 0.07f + i * 1.1f).toDouble()).toFloat()
-            val flicker = ((f1 * 0.6f + f2 * 0.4f + 1f) / 2f)
-            if (flicker < 0.45f) continue
-
-            // Brighter closer to the sun's reflection line (x near sunX)
-            val distFactor = (1f - (abs(p.x - sunX) / (w * 0.7f)).coerceIn(0f, 1f)) * 0.7f + 0.3f
-            val alpha = (flicker * intensity * distFactor * 230).toInt().coerceIn(0, 230)
-            glitterPaint.alpha = alpha
-
-            val s = p.r * flicker * distFactor
-            // Horizontal arm (longer — sun reflection on water)
-            canvas.drawLine(p.x - s * 1.6f, p.y, p.x + s * 1.6f, p.y, glitterPaint)
-            // Vertical arm (shorter)
-            canvas.drawLine(p.x, p.y - s, p.x, p.y + s, glitterPaint)
-            // Diagonal sparkle arms for star effect
-            canvas.drawLine(p.x - s * 0.7f, p.y - s * 0.7f, p.x + s * 0.7f, p.y + s * 0.7f, glitterPaint)
-            canvas.drawLine(p.x - s * 0.7f, p.y + s * 0.7f, p.x + s * 0.7f, p.y - s * 0.7f, glitterPaint)
-        }
-    }
-
-    private fun drawSunRays(canvas: Canvas, w: Float, h: Float, seaY: Float, tide: Float) {
-        val sunX = w * 0.75f
-        val sunY = h * 0.15f
-        repeat(6) { i ->
-            val angle = (i * 60f + animT * 0.1f) * (PI / 180f)
-            rayPath.reset()
-            rayPath.moveTo(sunX, sunY)
-            rayPath.lineTo(
-                sunX + cos(angle - 0.1).toFloat() * 300f,
-                sunY + sin(angle - 0.1).toFloat() * 300f
-            )
-            rayPath.lineTo(
-                sunX + cos(angle + 0.1).toFloat() * 300f,
-                sunY + sin(angle + 0.1).toFloat() * 300f
-            )
-            rayPath.close()
-            canvas.drawPath(rayPath, rayPaint)
-        }
-    }
+    // ─────────────────────────────────────────────────────────────────────────
+    // Seagulls
+    // ─────────────────────────────────────────────────────────────────────────
 
     private fun drawSeagulls(canvas: Canvas, w: Float, h: Float, seaY: Float, wind: Int) {
         for (gull in seagulls) {
@@ -513,6 +646,10 @@ class TideWatchView @JvmOverloads constructor(
         }
     }
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // Fog (Beaufort ≥ 8)
+    // ─────────────────────────────────────────────────────────────────────────
+
     private fun drawFog(canvas: Canvas, w: Float, h: Float, seaY: Float, theme: ThemeConfig) {
         fogPaint.color = theme.fogColor
         val layers = 3
@@ -526,6 +663,10 @@ class TideWatchView @JvmOverloads constructor(
         fogPaint.shader = null
     }
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // Rain (Beaufort ≥ 9)
+    // ─────────────────────────────────────────────────────────────────────────
+
     private fun drawRain(canvas: Canvas, w: Float, h: Float, wind: Int) {
         val count = (wind - 8) * 30 + 40
         val angle = 0.3f
@@ -535,6 +676,10 @@ class TideWatchView @JvmOverloads constructor(
             canvas.drawLine(x, y, x + angle * 15f, y + 15f, rainPaint)
         }
     }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Compass UI
+    // ─────────────────────────────────────────────────────────────────────────
 
     private fun drawCompass(canvas: Canvas, w: Float, h: Float, wind: Int) {
         val cx = w - 60f; val cy = h - 60f; val r = 30f
@@ -552,20 +697,24 @@ class TideWatchView @JvmOverloads constructor(
 
         compassTextPaint.color = Color.argb(200, 255, 255, 255)
         val bftName = BeaufortConverter.name(wind)
+        @Suppress("UNUSED_VARIABLE")
         val shortName = if (bftName.length > 4) bftName.take(4) else bftName
         canvas.drawText("${wind}bft", cx, cy + r + 22f, compassTextPaint)
     }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Particle helpers
+    // ─────────────────────────────────────────────────────────────────────────
 
     private fun resetParticles() {
         val w = surfaceW.toFloat()
         val h = surfaceH.toFloat()
         val seaY = h * 0.55f
-        for (i in foamParticles.indices)  foamParticles[i]  = randomFoam(w, seaY)
         for (i in sprayParticles.indices) sprayParticles[i] = randomSpray(w * Random.nextFloat(), seaY)
         for (i in glitterPoints.indices)  glitterPoints[i]  = randomGlitter(w, h)
-        // Spread glitter more toward the sun-reflection half of the screen
+        // Spread glitter into the specular corridor (centered around lightX = w*0.72)
         for (i in glitterPoints.indices step 3) {
-            glitterPoints[i] = glitterPoints[i].copy(x = w * 0.4f + Random.nextFloat() * w * 0.6f)
+            glitterPoints[i] = glitterPoints[i].copy(x = w * 0.3f + Random.nextFloat() * w * 0.6f)
         }
         for ((i, g) in seagulls.withIndex()) {
             g.x = i * (w / 5f) + Random.nextFloat() * 100f
@@ -582,16 +731,6 @@ class TideWatchView @JvmOverloads constructor(
         }
     }
 
-    private fun randomFoam(w: Float = 400f, seaY: Float = 300f) = Particle(
-        x = Random.nextFloat() * w,
-        y = seaY + Random.nextFloat() * 20f,
-        vx = (Random.nextFloat() - 0.5f) * 2f,
-        vy = -Random.nextFloat() * 0.5f,
-        life = Random.nextFloat(),
-        maxLife = 1f,
-        r = 2f + Random.nextFloat() * 4f
-    )
-
     private fun randomSpray(x: Float = 200f, seaY: Float = 300f) = Particle(
         x = x,
         y = seaY,
@@ -602,11 +741,12 @@ class TideWatchView @JvmOverloads constructor(
         r = 1.5f + Random.nextFloat() * 2.5f
     )
 
+    // glitterPoints: vx/vy are phase/frequency values (not actual velocity) for unique per-particle flicker
     private fun randomGlitter(w: Float = 400f, h: Float = 600f) = Particle(
         x = Random.nextFloat() * w,
         y = h * 0.55f + Random.nextFloat() * h * 0.40f,
-        vx = 0.2f + Random.nextFloat() * 0.8f,
-        vy = 0f,
+        vx = 0.2f + Random.nextFloat() * 0.8f,   // phase multiplier for animT (also drives slow x drift)
+        vy = 0.1f + Random.nextFloat() * 0.6f,   // second frequency multiplier for flicker variety
         life = 1f,
         maxLife = 1f,
         r = 4f + Random.nextFloat() * 7f
