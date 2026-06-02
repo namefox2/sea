@@ -154,7 +154,11 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
     }
 
     override fun onDrawFrame(gl: GL10?) {
-        if (!glReady) return
+        if (!glReady) {
+            GLES20.glClearColor(0.05f, 0.05f, 0.05f, 1f)
+            GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
+            return
+        }
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
 
         val t    = (System.currentTimeMillis() - startMs) / 1000f
