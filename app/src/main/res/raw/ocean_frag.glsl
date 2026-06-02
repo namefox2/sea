@@ -3,22 +3,30 @@ varying vec3  v_World;
 varying vec3  v_Normal;
 varying float v_Foam;
 
-uniform vec3  u_LightDir;
-uniform vec3  u_LightColor;
-uniform vec3  u_DeepColor;
-uniform vec3  u_ShallowColor;
-uniform vec3  u_CamPos;
-uniform float u_Roughness;
-uniform float u_WindAmp;
-uniform float u_Time;
-uniform float u_YunseulStr;
-uniform float u_WaterlineZ;
+uniform vec3      u_LightDir;
+uniform vec3      u_LightColor;
+uniform vec3      u_DeepColor;
+uniform vec3      u_ShallowColor;
+uniform vec3      u_CamPos;
+uniform float     u_Roughness;
+uniform float     u_WindAmp;
+uniform float     u_Time;
+uniform float     u_YunseulStr;
+uniform float     u_WaterlineZ;
+uniform sampler2D u_NormalMap;
 
 void main() {
     // Clip ocean where beach is visible (perspective-near side)
     if (v_World.z > u_WaterlineZ + 0.5) discard;
 
-    vec3 N = normalize(v_Normal);
+    // ── Normal map: two UV scrolls blended, perturb Gerstner normal ─────────
+    vec2 uv1   = v_World.xz * 0.15 + u_Time * vec2( 0.012,  0.008);
+    vec2 uv2   = v_World.xz * 0.07 - u_Time * vec2( 0.007,  0.011);
+    vec3 nm1   = texture2D(u_NormalMap, uv1).rgb * 2.0 - 1.0;
+    vec3 nm2   = texture2D(u_NormalMap, uv2).rgb * 2.0 - 1.0;
+    // nm.x → world X perturbation, nm.z → world Z perturbation
+    vec2 perturb = (nm1.xz + nm2.xz) * 0.35 * u_WindAmp;
+    vec3 N = normalize(vec3(v_Normal.x + perturb.x, v_Normal.y, v_Normal.z + perturb.y));
     vec3 V = normalize(u_CamPos - v_World);
     vec3 L = u_LightDir;
 

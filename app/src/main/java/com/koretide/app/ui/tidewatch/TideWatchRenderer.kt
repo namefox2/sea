@@ -6,6 +6,7 @@ import android.opengl.GLSurfaceView
 import android.opengl.Matrix
 import android.util.Log
 import com.koretide.app.R
+import java.nio.ByteBuffer
 import java.util.Calendar
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
@@ -42,7 +43,9 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
     private lateinit var mountain: MountainRenderer
     private lateinit var beach:    BeachRenderer
     private lateinit var ocean:    OceanMesh
+    private lateinit var foam:     ShorelineFoam
 
+    // Ocean program + uniforms
     private var ocProg = 0
     private var oc_aPos         = -1
     private var oc_mvp          = -1
@@ -58,6 +61,10 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
     private var oc_roughness    = -1
     private var oc_yunseulStr   = -1
     private var oc_waterlineZ   = -1
+    private var oc_normalMap    = -1
+
+    // Procedural normal map texture (128×128 RGBA, tiling ripple normals)
+    private var normalMapTex = 0
 
     // Camera: standing on beach, ~6° downward pitch → horizon at ~40% from screen top
     private val eyePos = floatArrayOf(0f, 1.8f, 18f)
@@ -72,14 +79,16 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         GLES20.glDepthFunc(GLES20.GL_LEQUAL)
 
         try {
-            val skyVert = load(R.raw.sky_vert)
-            val skyFrag = load(R.raw.sky_frag)
-            val mtVert  = load(R.raw.mountain_vert)
-            val mtFrag  = load(R.raw.mountain_frag)
-            val ocVert  = load(R.raw.ocean_vert)
-            val ocFrag  = load(R.raw.ocean_frag)
-            val bchVert = load(R.raw.beach_vert)
-            val bchFrag = load(R.raw.beach_frag)
+            val skyVert  = load(R.raw.sky_vert)
+            val skyFrag  = load(R.raw.sky_frag)
+            val mtVert   = load(R.raw.mountain_vert)
+            val mtFrag   = load(R.raw.mountain_frag)
+            val ocVert   = load(R.raw.ocean_vert)
+            val ocFrag   = load(R.raw.ocean_frag)
+            val bchVert  = load(R.raw.beach_vert)
+            val bchFrag  = load(R.raw.beach_frag)
+            val fmVert   = load(R.raw.foam_vert)
+            val fmFrag   = load(R.raw.foam_frag)
 
             sky      = SkyRenderer(link(compile(GLES20.GL_VERTEX_SHADER, skyVert),
                                         compile(GLES20.GL_FRAGMENT_SHADER, skyFrag)))
@@ -87,8 +96,10 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
                                              compile(GLES20.GL_FRAGMENT_SHADER, mtFrag)))
             beach    = BeachRenderer(link(compile(GLES20.GL_VERTEX_SHADER, bchVert),
                                           compile(GLES20.GL_FRAGMENT_SHADER, bchFrag)))
-            ocProg = link(compile(GLES20.GL_VERTEX_SHADER, ocVert),
-                          compile(GLES20.GL_FRAGMENT_SHADER, ocFrag))
+            ocProg   = link(compile(GLES20.GL_VERTEX_SHADER, ocVert),
+                            compile(GLES20.GL_FRAGMENT_SHADER, ocFrag))
+            foam     = ShorelineFoam(link(compile(GLES20.GL_VERTEX_SHADER, fmVert),
+                                          compile(GLES20.GL_FRAGMENT_SHADER, fmFrag)))
 
             oc_aPos         = GLES20.glGetAttribLocation (ocProg, "a_Pos")
             oc_mvp          = GLES20.glGetUniformLocation(ocProg, "u_MVP")
@@ -104,9 +115,11 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
             oc_roughness    = GLES20.glGetUniformLocation(ocProg, "u_Roughness")
             oc_yunseulStr   = GLES20.glGetUniformLocation(ocProg, "u_YunseulStr")
             oc_waterlineZ   = GLES20.glGetUniformLocation(ocProg, "u_WaterlineZ")
+            oc_normalMap    = GLES20.glGetUniformLocation(ocProg, "u_NormalMap")
 
-            ocean = OceanMesh()
+            ocean        = OceanMesh()
             ocean.uploadToGPU()
+            normalMapTex = buildNormalMap()
 
         } catch (e: Exception) {
             Log.e("TideWatchRenderer", "onSurfaceCreated error", e)
@@ -164,23 +177,30 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         // ── Pass 3: Beach ────────────────────────────────────────────────────
         beach.draw(mvp, tide, waterlineZ, sandDry, sandWet, skyHorizon, t)
 
-        // ── Pass 4: Ocean ────────────────────────────────────────────────────
+        // ── Pass 4: Ocean (normal map bound to texture unit 0) ───────────────
+        GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, normalMapTex)
+
         GLES20.glUseProgram(ocProg)
-        GLES20.glUniformMatrix4fv(oc_mvp,         1, false, mvp,          0)
-        GLES20.glUniform1f (oc_time,       t)
-        GLES20.glUniform1f (oc_windAmp,    wAmp)
-        GLES20.glUniform1f (oc_windDir,    wDir)
-        GLES20.glUniform1f (oc_tide,       tide)
-        GLES20.glUniform3fv(oc_lightDir,   1, lightDir,    0)
-        GLES20.glUniform3fv(oc_lightColor, 1, lightColor,  0)
-        GLES20.glUniform3fv(oc_deepColor,  1, deepColor,   0)
+        GLES20.glUniformMatrix4fv(oc_mvp,           1, false, mvp,          0)
+        GLES20.glUniform1f (oc_time,         t)
+        GLES20.glUniform1f (oc_windAmp,      wAmp)
+        GLES20.glUniform1f (oc_windDir,      wDir)
+        GLES20.glUniform1f (oc_tide,         tide)
+        GLES20.glUniform3fv(oc_lightDir,     1, lightDir,    0)
+        GLES20.glUniform3fv(oc_lightColor,   1, lightColor,  0)
+        GLES20.glUniform3fv(oc_deepColor,    1, deepColor,   0)
         GLES20.glUniform3fv(oc_shallowColor, 1, shallowColor, 0)
-        GLES20.glUniform3fv(oc_camPos,     1, eyePos,      0)
-        GLES20.glUniform1f (oc_roughness,  roughness)
-        GLES20.glUniform1f (oc_yunseulStr, yunseulStr)
-        GLES20.glUniform1f (oc_waterlineZ, waterlineZ)
+        GLES20.glUniform3fv(oc_camPos,       1, eyePos,      0)
+        GLES20.glUniform1f (oc_roughness,    roughness)
+        GLES20.glUniform1f (oc_yunseulStr,   yunseulStr)
+        GLES20.glUniform1f (oc_waterlineZ,   waterlineZ)
+        GLES20.glUniform1i (oc_normalMap,    0)  // texture unit 0
 
         ocean.draw(oc_aPos)
+
+        // ── Pass 5: Shoreline foam (alpha-blended, after ocean) ──────────────
+        foam.draw(mvp, waterlineZ, wAmp, t)
     }
 
     private fun computeLightDir(): FloatArray {
@@ -193,6 +213,55 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         val raw = floatArrayOf(azimuth, elevation, -0.6f)
         val len = sqrt((raw[0]*raw[0] + raw[1]*raw[1] + raw[2]*raw[2]).toDouble()).toFloat()
         return floatArrayOf(raw[0]/len, raw[1]/len, raw[2]/len)
+    }
+
+    // ── Normal map ────────────────────────────────────────────────────────────
+
+    // Height field for procedural normal map: multi-frequency sin waves, tiles at 128
+    private fun heightAt(x: Float, y: Float): Float {
+        val s = (2f * PI.toFloat()) / 128f
+        var h = sin(x * s * 3f + y * s * 2f) * 0.50f
+        h    += sin(x * s * 7f - y * s * 5f) * 0.25f
+        h    += sin(y * s * 11f + x * s * 4f) * 0.15f
+        h    += sin((x + y) * s * 17f)         * 0.10f
+        return h
+    }
+
+    // Generate 128×128 RGBA normal map on the GL thread; returns texture ID
+    private fun buildNormalMap(): Int {
+        val size   = 128
+        val pixels = ByteArray(size * size * 4)
+        var i = 0
+        for (row in 0 until size) {
+            for (col in 0 until size) {
+                val h00 = heightAt(col.toFloat(), row.toFloat())
+                val h10 = heightAt((col + 1).toFloat(), row.toFloat())
+                val h01 = heightAt(col.toFloat(), (row + 1).toFloat())
+                val dU  = h10 - h00   // slope in U (→ world X) direction
+                val dV  = h01 - h00   // slope in V (→ world Z) direction
+                val nx  = -dU
+                val ny  = 0.12f       // up component controls flatness
+                val nz  = -dV
+                val len = sqrt((nx*nx + ny*ny + nz*nz).toDouble()).toFloat()
+                pixels[i++] = ((nx/len * 0.5f + 0.5f) * 255f).toInt().coerceIn(0, 255).toByte()
+                pixels[i++] = ((ny/len * 0.5f + 0.5f) * 255f).toInt().coerceIn(0, 255).toByte()
+                pixels[i++] = ((nz/len * 0.5f + 0.5f) * 255f).toInt().coerceIn(0, 255).toByte()
+                pixels[i++] = 255.toByte()
+            }
+        }
+
+        val buf   = ByteBuffer.wrap(pixels)
+        val texId = IntArray(1)
+        GLES20.glGenTextures(1, texId, 0)
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, texId[0])
+        GLES20.glTexImage2D(GLES20.GL_TEXTURE_2D, 0, GLES20.GL_RGBA, size, size, 0,
+                            GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, buf)
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR)
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR)
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_S,     GLES20.GL_REPEAT)
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_T,     GLES20.GL_REPEAT)
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, 0)
+        return texId[0]
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

@@ -61,8 +61,11 @@ void main() {
     baseColor = mix(baseColor, drySand * 0.85, sandRipple * 0.15 * (1.0 - mudflatFactor));
 
     // ── Wet surface sky reflection near waterline ─────────────────────────
-    float reflStr = wetness * 0.38 * (1.0 - u_TidePercent);
-    baseColor = mix(baseColor, u_Horizon * 0.55, reflStr);
+    // Specular-like glint: sun stripe across wet sand
+    float wetSpec = pow(sin(v_World.z * 3.5 + u_Time * 0.4) * 0.5 + 0.5, 5.0)
+                  * pow(sin(v_World.x * 1.8 - u_Time * 0.2) * 0.5 + 0.5, 3.0);
+    float reflStr = wetness * (0.28 + wetSpec * 0.30) * (1.0 - u_TidePercent * 0.5);
+    baseColor = mix(baseColor, u_Horizon * 0.65, reflStr);
 
     // ── Rocky outcrops (간조 only: hash-placed stones) ────────────────────
     float rockFactor = clamp(1.0 - u_TidePercent * 5.0, 0.0, 1.0);
