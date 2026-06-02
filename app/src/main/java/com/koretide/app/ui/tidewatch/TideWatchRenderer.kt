@@ -38,9 +38,10 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
     private val view  = FloatArray(16)
     private val mvp   = FloatArray(16)
 
-    private lateinit var sky:   SkyRenderer
-    private lateinit var beach: BeachRenderer
-    private lateinit var ocean: OceanMesh
+    private lateinit var sky:      SkyRenderer
+    private lateinit var mountain: MountainRenderer
+    private lateinit var beach:    BeachRenderer
+    private lateinit var ocean:    OceanMesh
 
     private var ocProg = 0
     private var oc_aPos         = -1
@@ -58,9 +59,9 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
     private var oc_yunseulStr   = -1
     private var oc_waterlineZ   = -1
 
-    // Fixed camera: standing on beach looking at horizon
+    // Camera: standing on beach, ~6° downward pitch → horizon at ~40% from screen top
     private val eyePos = floatArrayOf(0f, 1.8f, 18f)
-    private val center = floatArrayOf(0f, 0.2f, 0f)
+    private val center = floatArrayOf(0f, -0.3f, 0f)
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -73,15 +74,19 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         try {
             val skyVert = load(R.raw.sky_vert)
             val skyFrag = load(R.raw.sky_frag)
+            val mtVert  = load(R.raw.mountain_vert)
+            val mtFrag  = load(R.raw.mountain_frag)
             val ocVert  = load(R.raw.ocean_vert)
             val ocFrag  = load(R.raw.ocean_frag)
             val bchVert = load(R.raw.beach_vert)
             val bchFrag = load(R.raw.beach_frag)
 
-            sky   = SkyRenderer(link(compile(GLES20.GL_VERTEX_SHADER, skyVert),
-                                     compile(GLES20.GL_FRAGMENT_SHADER, skyFrag)))
-            beach = BeachRenderer(link(compile(GLES20.GL_VERTEX_SHADER, bchVert),
-                                       compile(GLES20.GL_FRAGMENT_SHADER, bchFrag)))
+            sky      = SkyRenderer(link(compile(GLES20.GL_VERTEX_SHADER, skyVert),
+                                        compile(GLES20.GL_FRAGMENT_SHADER, skyFrag)))
+            mountain = MountainRenderer(link(compile(GLES20.GL_VERTEX_SHADER, mtVert),
+                                             compile(GLES20.GL_FRAGMENT_SHADER, mtFrag)))
+            beach    = BeachRenderer(link(compile(GLES20.GL_VERTEX_SHADER, bchVert),
+                                          compile(GLES20.GL_FRAGMENT_SHADER, bchFrag)))
             ocProg = link(compile(GLES20.GL_VERTEX_SHADER, ocVert),
                           compile(GLES20.GL_FRAGMENT_SHADER, ocFrag))
 
@@ -111,7 +116,8 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
         GLES20.glViewport(0, 0, width, height)
         aspect = width.toFloat() / height.toFloat().coerceAtLeast(1f)
-        Matrix.perspectiveM(proj, 0, 60f, aspect, 0.1f, 100f)
+        // far=500 to include mountains at Z=-150; near=0.3 improves depth precision
+        Matrix.perspectiveM(proj, 0, 63f, aspect, 0.3f, 500f)
     }
 
     override fun onDrawFrame(gl: GL10?) {
@@ -152,10 +158,13 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         // ── Pass 1: Sky (no depth write) ────────────────────────────────────
         sky.draw(skyHorizon, skyZenith, lightColor, lightUV, isDark, t)
 
-        // ── Pass 2: Beach ────────────────────────────────────────────────────
+        // ── Pass 2: Mountains (no depth write, far→near, painter's algorithm)
+        mountain.draw(mvp, skyHorizon)
+
+        // ── Pass 3: Beach ────────────────────────────────────────────────────
         beach.draw(mvp, tide, waterlineZ, sandDry, sandWet, skyHorizon, t)
 
-        // ── Pass 3: Ocean ────────────────────────────────────────────────────
+        // ── Pass 4: Ocean ────────────────────────────────────────────────────
         GLES20.glUseProgram(ocProg)
         GLES20.glUniformMatrix4fv(oc_mvp,         1, false, mvp,          0)
         GLES20.glUniform1f (oc_time,       t)
