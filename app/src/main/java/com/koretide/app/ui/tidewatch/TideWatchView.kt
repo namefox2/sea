@@ -10,6 +10,7 @@ import android.graphics.RadialGradient
 import android.graphics.Shader
 import android.os.Handler
 import android.os.HandlerThread
+import android.util.Log
 import android.view.SurfaceHolder
 import android.view.SurfaceView
 import android.content.Context
@@ -91,6 +92,10 @@ class TideWatchView @JvmOverloads constructor(
     private val tidalDetailPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val tidalPoolPaint   = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
 
+    // Cached BlurMaskFilter — only recreated when wind level changes
+    private var cachedBlurWind   = -1
+    private var cachedBlurFilter: BlurMaskFilter? = null
+
     // Marine life
     private val marineLifeSystem = MarineLifeSystem()
     var marineSettings: MarineLifeSettings
@@ -122,6 +127,7 @@ class TideWatchView @JvmOverloads constructor(
     }
 
     override fun surfaceCreated(holder: SurfaceHolder) {
+        Log.d("TideWatchView", "surfaceCreated")
         isRendering = true
         renderThread = HandlerThread("TideWaveRender").apply { start() }
         renderHandler = Handler(renderThread!!.looper)
@@ -176,7 +182,11 @@ class TideWatchView @JvmOverloads constructor(
                     if (animT.toInt() % 60 == 0 && windBeaufort != targetWind) {
                         windBeaufort += if (targetWind > windBeaufort) 1 else -1
                     }
-                    renderFrame(canvas)
+                    try {
+                        renderFrame(canvas)
+                    } catch (e: Throwable) {
+                        Log.e("TideWatchView", "renderFrame error", e)
+                    }
                 } finally {
                     holder.unlockCanvasAndPost(canvas)
                 }
@@ -574,10 +584,14 @@ class TideWatchView @JvmOverloads constructor(
     private fun drawOrganicFoam(canvas: Canvas, w: Float, h: Float, seaY: Float) {
         if (windBeaufort < 2) return
         val windScale = windBeaufort / 12f
-        val blurRadius = 5f + windScale * 4f
+        if (windBeaufort != cachedBlurWind) {
+            val blurRadius = 5f + windScale * 4f
+            cachedBlurFilter = BlurMaskFilter(blurRadius, BlurMaskFilter.Blur.NORMAL)
+            cachedBlurWind = windBeaufort
+        }
         val fPaint = foamPaint
         fPaint.color = Color.WHITE
-        fPaint.maskFilter = BlurMaskFilter(blurRadius, BlurMaskFilter.Blur.NORMAL)
+        fPaint.maskFilter = cachedBlurFilter
 
         // ~8 perspective depth levels
         val levels = 8
