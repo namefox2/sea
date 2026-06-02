@@ -15,7 +15,7 @@ uniform float u_YunseulStr;
 uniform float u_WaterlineZ;
 
 void main() {
-    // Clip ocean where beach is visible
+    // Clip ocean where beach is visible (perspective-near side)
     if (v_World.z > u_WaterlineZ + 0.5) discard;
 
     vec3 N = normalize(v_Normal);
@@ -23,52 +23,58 @@ void main() {
     vec3 L = u_LightDir;
 
     // Depth-based water color
-    float depth = clamp(1.0 - (v_World.y + 1.0) * 0.45, 0.0, 1.0);
-    vec3 water = mix(u_ShallowColor, u_DeepColor, depth);
+    float depth  = clamp(1.0 - (v_World.y + 1.0) * 0.45, 0.0, 1.0);
+    vec3  water  = mix(u_ShallowColor, u_DeepColor, depth);
 
     // Fresnel (Schlick)
     float cosV   = max(dot(N, V), 0.0);
     float fresnel = 0.02 + 0.98 * pow(1.0 - cosV, 5.0);
 
-    // ── 윤슬: specular corridor ───────────────────────────────────────────
+    // ── 윤슬 corridor mask ────────────────────────────────────────────────
+    vec2  lightHorizDir   = normalize(vec2(u_LightDir.x, u_LightDir.z));
+    vec2  toFrag          = v_World.xz - u_CamPos.xz;
+    float distFromCam     = max(length(toFrag), 0.01);
+    vec2  fragToHoriz     = toFrag / distFromCam;
+
+    // Corridor width: narrow at horizon (far), wide at camera (near) — perspective
+    float corridorHalfWidth = mix(0.3, 5.5, clamp(distFromCam / 18.0, 0.0, 1.0));
+    vec2  perp              = vec2(-lightHorizDir.y, lightHorizDir.x);
+    float perpDist          = abs(dot(fragToHoriz * distFromCam, perp));
+    float corridorMask      = smoothstep(corridorHalfWidth, corridorHalfWidth * 0.1, perpDist);
+
+    // ── Hash-based flickering sparkles ───────────────────────────────────
+    // Layer 1: slow large sparkles (~1 Hz)
+    vec2  s1p  = floor(v_World.xz * 3.5 + u_Time * vec2(0.3, 0.8));
+    float s1   = fract(sin(dot(s1p, vec2(127.1, 311.7))) * 43758.5453);
+    float s1t  = fract(s1 * 7.0 + u_Time * (0.8 + s1 * 1.2));
+    float sp1  = pow(max(1.0 - abs(s1t - 0.5) * 4.0, 0.0), 2.0) * step(0.55, s1);
+
+    // Layer 2: medium sparkles (~3 Hz)
+    vec2  s2p  = floor(v_World.xz * 7.0 - u_Time * vec2(0.5, 0.4));
+    float s2   = fract(sin(dot(s2p, vec2(269.5, 183.3))) * 43758.5453);
+    float s2t  = fract(s2 * 5.0 + u_Time * (1.5 + s2 * 2.5));
+    float sp2  = pow(max(1.0 - abs(s2t - 0.5) * 6.0, 0.0), 2.0) * step(0.60, s2);
+
+    // Layer 3: fast micro sparkles (~8 Hz, densest near camera)
+    vec2  s3p  = floor(v_World.xz * 14.0 + u_Time * vec2(1.1, -0.7));
+    float s3   = fract(sin(dot(s3p, vec2(419.2, 371.9))) * 43758.5453);
+    float s3t  = fract(s3 * 3.0 + u_Time * (3.0 + s3 * 4.0));
+    float sp3  = pow(max(1.0 - abs(s3t - 0.5) * 8.0, 0.0), 2.0) * step(0.65, s3);
+
+    // Combine: brighter near camera (perspective)
+    float sparkle = (sp1 * 1.0 + sp2 * 1.8 + sp3 * 2.5)
+                  * (0.5 + clamp(1.0 - distFromCam / 18.0, 0.0, 0.5));
+    sparkle = clamp(sparkle, 0.0, 1.0);
+
+    // ── Broad specular glow under the sparkles ────────────────────────────
     vec3  H         = normalize(L + V);
     float NdotH     = max(dot(N, H), 0.0);
-    float shininess = mix(1200.0, 48.0, u_Roughness);
-    float spec      = pow(NdotH, shininess);
+    float broadSpec = pow(NdotH, mix(180.0, 32.0, u_Roughness)) * corridorMask * 0.6;
 
-    // Project onto horizontal light axis to form the corridor
-    vec2  lightDir2D  = normalize(vec2(u_LightDir.x, u_LightDir.z));
-    vec2  toFrag      = v_World.xz - u_CamPos.xz;
-    float distFromCam = max(length(toFrag), 0.01);
-    vec2  fragDir2D   = toFrag / distFromCam;
-
-    // Width of corridor: narrow at horizon, wide at viewer's feet
-    float corridorHalf = mix(0.8, 6.0, clamp(distFromCam / 20.0, 0.0, 1.0));
-    // Perpendicular component tells us how far off-axis this fragment is
-    vec2  perp        = vec2(-lightDir2D.y, lightDir2D.x);
-    float offAxis     = abs(dot(perp, fragDir2D)) * distFromCam;
-    float corridorMask = smoothstep(corridorHalf, corridorHalf * 0.25, offAxis);
-
-    // Sparkle: high-frequency sine noise simulates micro-facet glints
-    float sparkle = 0.0;
-    vec2 sp = v_World.xz * 8.0 + u_Time * vec2(0.7, 0.5);
-    sparkle += pow(max(sin(sp.x) * cos(sp.y), 0.0), 24.0);
-    sp = v_World.xz * 13.0 - u_Time * vec2(0.4, 0.8);
-    sparkle += pow(max(cos(sp.x) * sin(sp.y), 0.0), 28.0);
-    sp = v_World.xz * 19.0 + u_Time * vec2(0.9, -0.3);
-    sparkle += pow(max(sin(sp.x + sp.y), 0.0), 32.0);
-    sparkle = clamp(sparkle, 0.0, 1.0);
-    float sparkleMasked = sparkle * corridorMask * (1.0 - u_Roughness * 0.8);
-
-    // Combine into 윤슬 intensity
-    float yunseul  = spec * corridorMask
-                   + sparkleMasked * 3.5
-                   + corridorMask * 0.12;
-    yunseul *= u_YunseulStr;
-
-    vec3 specColor = u_LightColor * yunseul
-                   * mix(2.5, 0.8, u_Roughness)
-                   * (0.6 + fresnel * 0.4);
+    // ── Combine 윤슬 ──────────────────────────────────────────────────────
+    vec3 yunseulColor = u_LightColor
+                      * (broadSpec + sparkle * corridorMask * 3.5)
+                      * u_YunseulStr;
 
     // Subsurface scatter at wave tips
     float sss    = pow(max(dot(L, -V), 0.0), 3.0) * max(v_World.y, 0.0) * 0.5;
@@ -80,7 +86,10 @@ void main() {
 
     float NdotL  = max(dot(N, L), 0.0);
     vec3  diffuse = water * (NdotL * 0.65 + 0.35);
-    vec3  col     = mix(diffuse + sssCol + specColor, foamCol, foamFactor);
+    vec3  col     = mix(diffuse + sssCol, foamCol, foamFactor);
+
+    // 윤슬 added on top — visible even at low sun angle (most dramatic at dawn/dusk)
+    col += yunseulColor * (0.5 + fresnel * 0.5);
 
     // Atmospheric fog
     float fogD = length(v_World - u_CamPos);

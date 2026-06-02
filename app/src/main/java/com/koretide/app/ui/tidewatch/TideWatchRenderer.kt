@@ -142,9 +142,11 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         val roughness  = (wAmp * wAmp * 0.40f + 0.04f).coerceAtMost(0.40f)
         val yunseulStr = (1f - wAmp * 0.9f).coerceIn(0f, 1f)
 
-        // Waterline Z: where ocean meets beach (breathing with wave rhythm)
-        val baseWaterlineZ = 2.0f + (1.0f - tide) * 14.0f
-        val shoreBreath    = sin(t * 0.4f) * wAmp * 0.3f
+        // Waterline Z: where ocean meets beach
+        // tide=1.0(만조) → waterlineZ=16 → ocean fills view, thin beach strip near camera
+        // tide=0.0(간조) → waterlineZ=2  → ocean at horizon, wide beach/갯벌 exposed
+        val baseWaterlineZ = 2.0f + tide * 14.0f
+        val shoreBreath    = sin(t * 0.4f) * wAmp * 0.5f
         val waterlineZ     = (baseWaterlineZ + shoreBreath).coerceIn(1.5f, 16.5f)
 
         // ── Pass 1: Sky (no depth write) ────────────────────────────────────

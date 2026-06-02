@@ -17,39 +17,66 @@ void main() {
     float wetness = clamp(1.0 - distToWater / 4.0, 0.0, 1.0);
     wetness = wetness * wetness;
 
-    vec3 sandColor = mix(u_SandDry, u_SandWet, wetness);
+    // ── 갯벌 color palette (Korean tidal flat) ────────────────────────────
+    vec3 drySand        = vec3(0.76, 0.68, 0.52);   // warm tan dry sand
+    vec3 wetSand        = vec3(0.42, 0.36, 0.26);   // dark tan, recently wet
+    vec3 mudflatShallow = vec3(0.28, 0.24, 0.18);   // gray-brown mud
+    vec3 mudflatDeep    = vec3(0.18, 0.15, 0.11);   // very dark wet mud
+    vec3 tidalPool      = vec3(0.12, 0.16, 0.22);   // dark blue-gray standing water
 
-    // Wet sand reflects sky near waterline
-    float reflStr = wetness * 0.32 * (1.0 - u_TidePercent * 0.6);
-    sandColor = mix(sandColor, u_Horizon * 0.7, reflStr);
+    // Blend theme sand color with hardcoded palette (theme can tint dry sand)
+    drySand = mix(drySand, u_SandDry, 0.35);
+    wetSand = mix(wetSand, u_SandWet, 0.25);
 
-    // ── 갯벌 features (간조 only) ─────────────────────────────────────────
-    float mudflatFactor = clamp(1.0 - u_TidePercent * 4.0, 0.0, 1.0);
+    // mudflatFactor: 1.0 at tide=0 (full갯벌), 0.0 above tide=0.28
+    float mudflatFactor = clamp(1.0 - u_TidePercent * 3.5, 0.0, 1.0);
 
-    // Tidal pools: elongated oval shapes scattered on mudflat
-    vec2  pUV   = v_World.xz * 0.4;
-    vec2  pFrac = fract(pUV) - 0.5;
-    float pool  = smoothstep(0.38, 0.30, length(vec2(pFrac.x, pFrac.y * 0.55)));
+    vec3 baseColor = drySand;
+    baseColor = mix(baseColor, wetSand,         wetness);
+    baseColor = mix(baseColor, mudflatShallow,  mudflatFactor * 0.6);
+    baseColor = mix(baseColor, mudflatDeep,     mudflatFactor * wetness);
 
-    vec2  pUV2   = v_World.xz * vec2(0.3, 0.7) + vec2(2.3, 1.7);
-    vec2  pFrac2 = fract(pUV2) - 0.5;
-    float pool2  = smoothstep(0.38, 0.30, length(vec2(pFrac2.x * 0.7, pFrac2.y)));
+    // ── Tidal pool puddles (irregular oval) ──────────────────────────────
+    float px1  = fract(v_World.x * 0.18 + 0.3);
+    float pz1  = fract(v_World.z * 0.22 + 0.1);
+    float pool1 = smoothstep(0.38, 0.30,
+                     length(vec2(px1 - 0.5, (pz1 - 0.5) * 1.6)));
 
-    float poolMask = max(pool, pool2) * mudflatFactor;
-    sandColor = mix(sandColor, u_Horizon * 0.45, poolMask * 0.7);
+    float px2  = fract(v_World.x * 0.28 - 0.7);
+    float pz2  = fract(v_World.z * 0.14 + 0.5);
+    float pool2 = smoothstep(0.35, 0.27,
+                     length(vec2((px2 - 0.5) * 1.4, pz2 - 0.5)));
 
-    // Sand ripple marks (tidal channels)
-    float ripple = sin(v_World.z * 12.0 + v_World.x * 0.8) * 0.5 + 0.5;
-    ripple = pow(ripple, 8.0) * 0.18 * mudflatFactor;
-    sandColor = mix(sandColor, u_SandWet * 0.7, ripple);
+    float poolMask = max(pool1, pool2) * mudflatFactor;
+    vec3  poolReflect = mix(tidalPool, u_Horizon * 0.4, 0.5);
+    baseColor = mix(baseColor, poolReflect, poolMask * 0.85);
+
+    // ── Mud/sand ripple texture ───────────────────────────────────────────
+    // Tidal ripple marks on mudflat
+    float ripple = pow(sin(v_World.z * 9.0 + v_World.x * 1.2) * 0.5 + 0.5, 6.0)
+                 * pow(sin(v_World.z * 14.0 - v_World.x * 0.7) * 0.5 + 0.5, 4.0);
+    baseColor = mix(baseColor, mudflatDeep, ripple * 0.22 * mudflatFactor);
+    // Subtle dry sand ripples
+    float sandRipple = pow(sin(v_World.z * 6.0 + v_World.x * 2.0) * 0.5 + 0.5, 8.0);
+    baseColor = mix(baseColor, drySand * 0.85, sandRipple * 0.15 * (1.0 - mudflatFactor));
+
+    // ── Wet surface sky reflection near waterline ─────────────────────────
+    float reflStr = wetness * 0.38 * (1.0 - u_TidePercent);
+    baseColor = mix(baseColor, u_Horizon * 0.55, reflStr);
+
+    // ── Rocky outcrops (간조 only: hash-placed stones) ────────────────────
+    float rockFactor = clamp(1.0 - u_TidePercent * 5.0, 0.0, 1.0);
+    vec3  rockColor  = vec3(0.22, 0.20, 0.18);
+    float rockNoise  = step(0.72,
+        fract(sin(dot(floor(v_World.xz * 0.4), vec2(127.1, 311.7))) * 43758.5));
+    baseColor = mix(baseColor, rockColor, rockNoise * rockFactor * 0.7);
 
     // ── Animated waterline foam strip ─────────────────────────────────────
     float waveEdge = sin(v_World.x * 3.0 + u_Time * 2.2) * 0.3
                    + cos(v_World.x * 5.0 - u_Time * 1.8) * 0.15;
     float foamEdge = clamp(1.0 - (distToWater - waveEdge) / 0.8, 0.0, 1.0);
-    // Fade right at the hard discard edge to avoid clipping artifact
     foamEdge *= smoothstep(-0.5, 0.0, distToWater);
-    sandColor = mix(sandColor, vec3(0.95, 0.97, 1.0), foamEdge * 0.85);
+    baseColor = mix(baseColor, vec3(0.95, 0.97, 1.0), foamEdge * 0.85);
 
-    gl_FragColor = vec4(sandColor, 1.0);
+    gl_FragColor = vec4(baseColor, 1.0);
 }
