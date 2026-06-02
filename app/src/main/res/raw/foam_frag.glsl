@@ -1,4 +1,8 @@
+#if GL_FRAGMENT_PRECISION_HIGH
+precision highp float;
+#else
 precision mediump float;
+#endif
 varying vec2  v_UV;
 varying float v_Alpha;
 uniform float u_Time;
