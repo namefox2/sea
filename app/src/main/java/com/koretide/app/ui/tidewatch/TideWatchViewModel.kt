@@ -6,7 +6,6 @@ import com.koretide.app.domain.model.TideData
 import com.koretide.app.domain.model.WindData
 import com.koretide.app.domain.usecase.GetTideUseCase
 import com.koretide.app.domain.usecase.GetWindUseCase
-import com.koretide.app.util.Result
 import dagger.hilt.android.lifecycle.HiltViewModel
 import android.util.Log
 import kotlinx.coroutines.Job

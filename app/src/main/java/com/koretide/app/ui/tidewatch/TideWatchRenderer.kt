@@ -21,8 +21,7 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
     @Volatile var tidePercent  = 0.5f
     @Volatile var windAmp      = 0.25f
     @Volatile var windDirRad   = 3.93f
-    // Sky colors overridden by time-of-day LUT in onDrawFrame
-    @Volatile var isDark       = 0f
+    // Sky colors (horizon/zenith/light/isDark) are driven by the time-of-day LUT in onDrawFrame
     @Volatile var deepColor    = floatArrayOf(0.04f, 0.22f, 0.58f)
     @Volatile var shallowColor = floatArrayOf(0.16f, 0.56f, 0.82f)
     @Volatile var sandDry      = floatArrayOf(0.92f, 0.86f, 0.68f)

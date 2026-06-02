@@ -29,16 +29,12 @@ class TideWatchView @JvmOverloads constructor(
                 queueEvent {
                     renderer.deepColor    = floatArrayOf(theme.seaBottomColor.r(), theme.seaBottomColor.g(), theme.seaBottomColor.b())
                     renderer.shallowColor = floatArrayOf(theme.seaTopColor.r(),    theme.seaTopColor.g(),    theme.seaTopColor.b())
-                    renderer.skyHorizon   = floatArrayOf(theme.skyBottomColor.r(), theme.skyBottomColor.g(), theme.skyBottomColor.b())
-                    renderer.skyZenith    = floatArrayOf(theme.skyTopColor.r(),    theme.skyTopColor.g(),    theme.skyTopColor.b())
-                    renderer.lightColor   = floatArrayOf(theme.sunColor.r(),       theme.sunColor.g(),       theme.sunColor.b())
                     val flat = theme.tidalFlatColor
                     renderer.sandDry  = floatArrayOf(
                         (flat.r() * 0.85f + 0.15f).coerceAtMost(1f),
                         (flat.g() * 0.85f + 0.12f).coerceAtMost(1f),
                         (flat.b() * 0.80f + 0.08f).coerceAtMost(1f))
                     renderer.sandWet  = floatArrayOf(flat.r(), flat.g(), flat.b())
-                    renderer.isDark   = if (theme.isDark) 1f else 0f
                 }
             }
         }
