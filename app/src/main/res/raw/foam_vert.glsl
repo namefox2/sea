@@ -1,3 +1,8 @@
+#if GL_FRAGMENT_PRECISION_HIGH
+precision highp float;
+#else
+precision mediump float;
+#endif
 attribute vec2 a_Pos; // x: -1..1, y: -0.5..0.5 (local Z offset)
 uniform mat4  u_MVP;
 uniform float u_WaterlineZ;

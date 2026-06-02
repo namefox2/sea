@@ -1,4 +1,8 @@
+#if GL_FRAGMENT_PRECISION_HIGH
 precision highp float;
+#else
+precision mediump float;
+#endif
 attribute vec3 a_Pos;
 uniform mat4 u_MVP;
 uniform float u_Time;
