@@ -21,13 +21,10 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
     @Volatile var tidePercent  = 0.5f
     @Volatile var windAmp      = 0.25f
     @Volatile var windDirRad   = 3.93f
+    // Sky colors overridden by time-of-day LUT in onDrawFrame
     @Volatile var isDark       = 0f
-
     @Volatile var deepColor    = floatArrayOf(0.04f, 0.22f, 0.58f)
     @Volatile var shallowColor = floatArrayOf(0.16f, 0.56f, 0.82f)
-    @Volatile var skyHorizon   = floatArrayOf(0.72f, 0.90f, 1.00f)
-    @Volatile var skyZenith    = floatArrayOf(0.28f, 0.58f, 0.92f)
-    @Volatile var lightColor   = floatArrayOf(1.00f, 0.96f, 0.82f)
     @Volatile var sandDry      = floatArrayOf(0.92f, 0.86f, 0.68f)
     @Volatile var sandWet      = floatArrayOf(0.68f, 0.60f, 0.44f)
 
@@ -44,6 +41,7 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
     private lateinit var beach:    BeachRenderer
     private lateinit var ocean:    OceanMesh
     private lateinit var foam:     ShorelineFoam
+    private lateinit var spray:    SprayParticles
 
     // Ocean program + uniforms
     private var ocProg = 0
@@ -70,6 +68,22 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
     private val eyePos = floatArrayOf(0f, 1.8f, 18f)
     private val center = floatArrayOf(0f, -0.3f, 0f)
 
+    // ── Sky LUT: keyframes [hr, hg, hb, zr, zg, zb, lr, lg, lb, isDark] ─────
+    // Index 0 is the hour (0-24), remaining 10 fields are color+dark values
+    private val SKY_LUT = arrayOf(
+        // hour  horizon-RGB               zenith-RGB                light-RGB               dark
+        floatArrayOf( 0f, 0.02f,0.03f,0.10f,  0.01f,0.01f,0.06f,  0.15f,0.18f,0.30f, 1.0f), // midnight
+        floatArrayOf( 5f, 0.18f,0.08f,0.12f,  0.04f,0.05f,0.15f,  0.40f,0.25f,0.20f, 0.6f), // pre-dawn
+        floatArrayOf( 6f, 0.92f,0.42f,0.18f,  0.18f,0.28f,0.55f,  1.00f,0.65f,0.35f, 0.0f), // sunrise
+        floatArrayOf( 9f, 0.72f,0.88f,1.00f,  0.25f,0.52f,0.88f,  1.00f,0.95f,0.82f, 0.0f), // morning
+        floatArrayOf(12f, 0.65f,0.84f,1.00f,  0.14f,0.40f,0.82f,  1.00f,0.98f,0.92f, 0.0f), // noon
+        floatArrayOf(15f, 0.72f,0.88f,1.00f,  0.18f,0.45f,0.86f,  1.00f,0.93f,0.78f, 0.0f), // afternoon
+        floatArrayOf(18f, 0.95f,0.40f,0.12f,  0.18f,0.22f,0.52f,  1.00f,0.58f,0.28f, 0.0f), // sunset
+        floatArrayOf(19f, 0.28f,0.12f,0.18f,  0.06f,0.06f,0.18f,  0.45f,0.22f,0.32f, 0.4f), // dusk
+        floatArrayOf(22f, 0.02f,0.03f,0.10f,  0.01f,0.01f,0.06f,  0.15f,0.18f,0.30f, 1.0f), // night
+        floatArrayOf(24f, 0.02f,0.03f,0.10f,  0.01f,0.01f,0.06f,  0.15f,0.18f,0.30f, 1.0f), // wrap
+    )
+
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
@@ -89,6 +103,8 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
             val bchFrag  = load(R.raw.beach_frag)
             val fmVert   = load(R.raw.foam_vert)
             val fmFrag   = load(R.raw.foam_frag)
+            val spVert   = load(R.raw.spray_vert)
+            val spFrag   = load(R.raw.spray_frag)
 
             sky      = SkyRenderer(link(compile(GLES20.GL_VERTEX_SHADER, skyVert),
                                         compile(GLES20.GL_FRAGMENT_SHADER, skyFrag)))
@@ -100,6 +116,8 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
                             compile(GLES20.GL_FRAGMENT_SHADER, ocFrag))
             foam     = ShorelineFoam(link(compile(GLES20.GL_VERTEX_SHADER, fmVert),
                                           compile(GLES20.GL_FRAGMENT_SHADER, fmFrag)))
+            spray    = SprayParticles(link(compile(GLES20.GL_VERTEX_SHADER, spVert),
+                                           compile(GLES20.GL_FRAGMENT_SHADER, spFrag)))
 
             oc_aPos         = GLES20.glGetAttribLocation (ocProg, "a_Pos")
             oc_mvp          = GLES20.glGetUniformLocation(ocProg, "u_MVP")
@@ -148,8 +166,15 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
             0f, 1f, 0f)
         Matrix.multiplyMM(mvp, 0, proj, 0, view, 0)
 
-        // ── Sun/moon direction from real time of day ──────────────────────────
-        val lightDir = computeLightDir()
+        // ── Time of day: light direction + sky LUT ────────────────────────────
+        val cal  = Calendar.getInstance()
+        val hour = cal.get(Calendar.HOUR_OF_DAY) + cal.get(Calendar.MINUTE) / 60f
+        val lightDir = computeLightDir(hour)
+        val lut      = sampleSkyLut(hour)
+        val lutHorizon = floatArrayOf(lut[0], lut[1], lut[2])
+        val lutZenith  = floatArrayOf(lut[3], lut[4], lut[5])
+        val lutLight   = floatArrayOf(lut[6], lut[7], lut[8])
+        val lutIsDark  = lut[9]
 
         // Sky UV: map 3D light dir to approximate 2D screen position
         val lightUV = floatArrayOf(
@@ -168,16 +193,16 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         val shoreBreath    = sin(t * 0.4f) * wAmp * 0.5f
         val waterlineZ     = (baseWaterlineZ + shoreBreath).coerceIn(1.5f, 16.5f)
 
-        // ── Pass 1: Sky (no depth write) ────────────────────────────────────
-        sky.draw(skyHorizon, skyZenith, lightColor, lightUV, isDark, t)
+        // ── Pass 1: Sky (no depth write) ─────────────────────────────────────
+        sky.draw(lutHorizon, lutZenith, lutLight, lightUV, lutIsDark, t)
 
-        // ── Pass 2: Mountains (no depth write, far→near, painter's algorithm)
-        mountain.draw(mvp, skyHorizon)
+        // ── Pass 2: Mountains (no depth write, far→near, painter's algorithm) ─
+        mountain.draw(mvp, lutHorizon)
 
-        // ── Pass 3: Beach ────────────────────────────────────────────────────
-        beach.draw(mvp, tide, waterlineZ, sandDry, sandWet, skyHorizon, t)
+        // ── Pass 3: Beach ─────────────────────────────────────────────────────
+        beach.draw(mvp, tide, waterlineZ, sandDry, sandWet, lutHorizon, t)
 
-        // ── Pass 4: Ocean (normal map bound to texture unit 0) ───────────────
+        // ── Pass 4: Ocean (normal map bound to texture unit 0) ────────────────
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
         GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, normalMapTex)
 
@@ -187,25 +212,40 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         GLES20.glUniform1f (oc_windAmp,      wAmp)
         GLES20.glUniform1f (oc_windDir,      wDir)
         GLES20.glUniform1f (oc_tide,         tide)
-        GLES20.glUniform3fv(oc_lightDir,     1, lightDir,    0)
-        GLES20.glUniform3fv(oc_lightColor,   1, lightColor,  0)
-        GLES20.glUniform3fv(oc_deepColor,    1, deepColor,   0)
+        GLES20.glUniform3fv(oc_lightDir,     1, lightDir,     0)
+        GLES20.glUniform3fv(oc_lightColor,   1, lutLight,     0)
+        GLES20.glUniform3fv(oc_deepColor,    1, deepColor,    0)
         GLES20.glUniform3fv(oc_shallowColor, 1, shallowColor, 0)
-        GLES20.glUniform3fv(oc_camPos,       1, eyePos,      0)
+        GLES20.glUniform3fv(oc_camPos,       1, eyePos,       0)
         GLES20.glUniform1f (oc_roughness,    roughness)
         GLES20.glUniform1f (oc_yunseulStr,   yunseulStr)
         GLES20.glUniform1f (oc_waterlineZ,   waterlineZ)
-        GLES20.glUniform1i (oc_normalMap,    0)  // texture unit 0
+        GLES20.glUniform1i (oc_normalMap,    0)
 
         ocean.draw(oc_aPos)
 
-        // ── Pass 5: Shoreline foam (alpha-blended, after ocean) ──────────────
+        // ── Pass 5: Shoreline foam (alpha-blended) ────────────────────────────
         foam.draw(mvp, waterlineZ, wAmp, t)
+
+        // ── Pass 6: Spray particles (GL_POINTS, alpha-blended) ────────────────
+        spray.draw(mvp, t, wAmp, wDir, tide)
     }
 
-    private fun computeLightDir(): FloatArray {
-        val cal   = Calendar.getInstance()
-        val hour  = cal.get(Calendar.HOUR_OF_DAY) + cal.get(Calendar.MINUTE) / 60f
+    // ── Sky LUT helpers ───────────────────────────────────────────────────────
+
+    // Interpolate sky LUT: returns [hr,hg,hb, zr,zg,zb, lr,lg,lb, isDark]
+    private fun sampleSkyLut(hour: Float): FloatArray {
+        var i = 0
+        while (i < SKY_LUT.size - 2 && SKY_LUT[i + 1][0] <= hour) i++
+        val a = SKY_LUT[i]
+        val b = SKY_LUT[i + 1]
+        val span = b[0] - a[0]
+        val tf   = if (span < 0.001f) 0f else (hour - a[0]) / span
+        // indices 1..10 are the color/dark fields (skip [0] which is hour)
+        return FloatArray(10) { j -> a[j + 1] + (b[j + 1] - a[j + 1]) * tf }
+    }
+
+    private fun computeLightDir(hour: Float): FloatArray {
         // Sun arc: rises at 6am, peaks at noon, sets at 6pm
         val hourAngle = ((hour - 6f) / 12f) * PI.toFloat()
         val elevation = (sin(hourAngle.toDouble()).toFloat() * 0.8f + 0.1f).coerceAtLeast(0.05f)
@@ -217,7 +257,6 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
 
     // ── Normal map ────────────────────────────────────────────────────────────
 
-    // Height field for procedural normal map: multi-frequency sin waves, tiles at 128
     private fun heightAt(x: Float, y: Float): Float {
         val s = (2f * PI.toFloat()) / 128f
         var h = sin(x * s * 3f + y * s * 2f) * 0.50f
@@ -227,7 +266,6 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         return h
     }
 
-    // Generate 128×128 RGBA normal map on the GL thread; returns texture ID
     private fun buildNormalMap(): Int {
         val size   = 128
         val pixels = ByteArray(size * size * 4)
@@ -237,10 +275,10 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
                 val h00 = heightAt(col.toFloat(), row.toFloat())
                 val h10 = heightAt((col + 1).toFloat(), row.toFloat())
                 val h01 = heightAt(col.toFloat(), (row + 1).toFloat())
-                val dU  = h10 - h00   // slope in U (→ world X) direction
-                val dV  = h01 - h00   // slope in V (→ world Z) direction
+                val dU  = h10 - h00
+                val dV  = h01 - h00
                 val nx  = -dU
-                val ny  = 0.12f       // up component controls flatness
+                val ny  = 0.12f
                 val nz  = -dV
                 val len = sqrt((nx*nx + ny*ny + nz*nz).toDouble()).toFloat()
                 pixels[i++] = ((nx/len * 0.5f + 0.5f) * 255f).toInt().coerceIn(0, 255).toByte()
@@ -249,7 +287,6 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
                 pixels[i++] = 255.toByte()
             }
         }
-
         val buf   = ByteBuffer.wrap(pixels)
         val texId = IntArray(1)
         GLES20.glGenTextures(1, texId, 0)
