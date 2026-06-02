@@ -1,93 +1,56 @@
 precision highp float;
+varying vec3 v_World;
+varying vec3 v_Normal;
+varying float v_Foam;
 
-uniform vec3  uCamPos;
-uniform vec3  uSunDir;       // normalized, world-space toward light
-uniform vec3  uSkyTop;
-uniform vec3  uSkyBot;
-uniform vec3  uSeaDeep;
-uniform vec3  uSeaShallow;
-uniform vec3  uSunColor;
-uniform float uTime;
-uniform float uWind;
-uniform float uDark;         // 0=day, 1=night
-
-varying vec3  vWorldPos;
-varying vec3  vNorm;
-varying float vDepth;        // 0=deep, 1=shallow
-varying float vFoam;
-
-// ── Noise for sub-vertex ripple perturbation ──────────────────────────────────
-float hash(vec2 p) {
-    p = fract(p * vec2(234.34, 435.345));
-    p += dot(p, p + 34.23);
-    return fract(p.x * p.y);
-}
-float noise(vec2 p) {
-    vec2 i = floor(p), f = fract(p);
-    f = f * f * (3.0 - 2.0 * f);
-    return mix(mix(hash(i),                      hash(i + vec2(1.0, 0.0)), f.x),
-               mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), f.x), f.y);
-}
+uniform vec3  u_LightDir;
+uniform vec3  u_LightColor;
+uniform vec3  u_DeepColor;
+uniform vec3  u_ShallowColor;
+uniform vec3  u_CamPos;
+uniform float u_Roughness;
+uniform float u_WindAmp;
 
 void main() {
-    vec3 V = normalize(uCamPos - vWorldPos);
+    vec3 N = normalize(v_Normal);
+    vec3 V = normalize(u_CamPos - v_World);
+    vec3 L = u_LightDir;
+    vec3 H = normalize(L + V);
 
-    // Sub-vertex micro-normal from noise (high-freq ripples)
-    float mAmp = 0.055 + uWind * 0.007;
-    vec2  mUV  = vWorldPos.xz * 3.8 + uTime * 0.14;
-    float nx   = noise(mUV)               * 2.0 - 1.0;
-    float nz   = noise(mUV + vec2(1.7, 3.1)) * 2.0 - 1.0;
-    vec3  N    = normalize(vNorm + vec3(nx * mAmp, 0.0, nz * mAmp));
+    // Depth-based water color
+    float depth = clamp(1.0 - (v_World.y + 1.0) * 0.45, 0.0, 1.0);
+    vec3 water = mix(u_ShallowColor, u_DeepColor, depth);
 
-    // ── Fresnel reflection (Schlick, F0=0.02 for water) ──────────────────────
-    float cosV   = max(0.0, dot(N, V));
+    // Fresnel (Schlick)
+    float cosV   = max(dot(N, V), 0.0);
     float fresnel = 0.02 + 0.98 * pow(1.0 - cosV, 5.0);
 
-    // ── Sky reflection colour ─────────────────────────────────────────────────
-    vec3  R     = reflect(-V, N);
-    float skyT  = clamp(R.y * 2.0 + 0.25, 0.0, 1.0);
-    vec3  refl  = mix(uSkyBot, uSkyTop, skyT * skyT);
+    // Specular (윤슬 corridor)
+    float sh   = mix(400.0, 25.0, u_Roughness);
+    float spec = pow(max(dot(N, H), 0.0), sh);
+    // Elongate along sun direction on water surface
+    vec3 viewDir     = normalize(v_World - u_CamPos);
+    vec3 sunHoriz    = normalize(vec3(L.x, 0.0, L.z) + vec3(0.001, 0.0, 0.0));
+    float corridor   = abs(dot(viewDir, sunHoriz));
+    float specPath   = spec * (1.0 + 2.5 * corridor * corridor);
+    vec3  specColor  = u_LightColor * specPath * fresnel;
 
-    // ── Water base colour (depth + shore blend) ───────────────────────────────
-    vec3 waterCol = mix(uSeaDeep, uSeaShallow, vDepth * 0.65);
+    // Subsurface scatter at wave tips
+    float sss = pow(max(dot(L, -V), 0.0), 3.0) * max(v_World.y, 0.0) * 0.5;
+    vec3  sssCol = vec3(0.05, 0.70, 0.45) * sss;
 
-    // ── Blinn-Phong specular ──────────────────────────────────────────────────
-    vec3  H        = normalize(V + uSunDir);
-    float NdotH    = max(0.0, dot(N, H));
-    float shininess = uDark > 0.5 ? 130.0 : 90.0;
-    float sunVis   = max(0.0, dot(N, uSunDir));
-    float spec     = pow(NdotH, shininess) * sunVis;
-    float specStr  = uDark > 0.5 ? 1.30 : 1.90;
-    vec3 specular  = uSunColor * spec * specStr;
+    // Foam
+    float foamFactor = smoothstep(0.35, 0.65, v_Foam) * clamp(u_WindAmp * 2.5, 0.0, 1.0);
+    vec3  foamCol    = vec3(0.95, 0.97, 1.00);
 
-    // ── Moon glitter sparkles (night only) ────────────────────────────────────
-    float glitter = 0.0;
-    if (uDark > 0.5) {
-        float gHash = hash(floor(vWorldPos.xz * 20.0 + uTime * 0.9));
-        float gTw   = 0.5 + 0.5 * sin(uTime * gHash * 5.0 + gHash * 6.28);
-        glitter = step(0.90, gHash) * gTw * sunVis * 2.8;
-    }
+    float NdotL  = max(dot(N, L), 0.0);
+    vec3  diffuse = water * (NdotL * 0.65 + 0.35);
+    vec3  col     = mix(diffuse + sssCol + specColor, foamCol, foamFactor);
 
-    // ── Ambient ───────────────────────────────────────────────────────────────
-    float ambStr = uDark > 0.5 ? 0.16 : 0.32;
-    vec3 ambient = waterCol * ambStr;
+    // Atmospheric fog
+    float fogD = length(v_World - u_CamPos);
+    float fog  = clamp((fogD - 6.0) / 28.0, 0.0, 0.6);
+    col = mix(col, u_LightColor * 0.38, fog);
 
-    // ── Combine via Fresnel ───────────────────────────────────────────────────
-    vec3 col = mix(waterCol + ambient, refl, fresnel * 0.88);
-    col += specular;
-    col += uSunColor * glitter * 0.55;
-
-    // ── Foam ──────────────────────────────────────────────────────────────────
-    float foamNoise = noise(vWorldPos.xz * 5.5 + uTime * 0.20);
-    float foamAmt   = clamp(vFoam + foamNoise * 0.28 - 0.18, 0.0, 1.0);
-    vec3  foamCol   = mix(vec3(0.86, 0.93, 1.0), vec3(1.0), foamAmt);
-    col = mix(col, foamCol, foamAmt * foamAmt);
-
-    // ── Atmospheric distance fog ──────────────────────────────────────────────
-    float dist   = length(vWorldPos - uCamPos);
-    float fogFac = 1.0 - exp(-dist * 0.011);
-    vec3  fogCol = mix(uSkyBot, uSkyTop, 0.30);
-    col = mix(col, fogCol, clamp(fogFac, 0.0, 0.90));
-
-    gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
+    gl_FragColor = vec4(col, 1.0);
 }

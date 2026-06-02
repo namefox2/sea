@@ -1,9 +1,6 @@
-attribute vec2 aPos;
-varying   vec2 vUV;
-
+attribute vec2 a_Pos;
+varying vec2 v_UV;
 void main() {
-    // vUV: (0,0)=bottom-left  (1,1)=top-right
-    vUV = aPos * 0.5 + 0.5;
-    // Depth 0 — sky always behind ocean mesh (depth test ALWAYS during sky pass)
-    gl_Position = vec4(aPos, 0.0, 1.0);
+    v_UV = a_Pos * 0.5 + 0.5;
+    gl_Position = vec4(a_Pos, 0.9999, 1.0);
 }
