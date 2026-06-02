@@ -6,7 +6,12 @@ import java.nio.ByteOrder
 import java.nio.FloatBuffer
 import java.nio.ShortBuffer
 
-class OceanMesh(private val cols: Int = 128, private val rows: Int = 128) {
+// To upgrade resolution: change both constants to 128.
+// Safety: (128+1)²=16641 vertices, max index 16640 < 32767 — GL_UNSIGNED_SHORT is safe.
+private const val OCEAN_GRID_COLS = 64
+private const val OCEAN_GRID_ROWS = 64
+
+class OceanMesh(private val cols: Int = OCEAN_GRID_COLS, private val rows: Int = OCEAN_GRID_ROWS) {
 
     private val vertexCount = (cols + 1) * (rows + 1)
     private val indexCount  = cols * rows * 6
