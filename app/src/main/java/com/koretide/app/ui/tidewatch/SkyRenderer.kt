@@ -19,6 +19,7 @@ class SkyRenderer(private val program: Int) {
     private val uLightUV  = GLES20.glGetUniformLocation(program, "u_LightUV")
     private val uIsDark   = GLES20.glGetUniformLocation(program, "u_IsDark")
     private val uTime     = GLES20.glGetUniformLocation(program, "u_Time")
+    private val uAspect   = GLES20.glGetUniformLocation(program, "u_Aspect")
 
     init {
         val ids = IntArray(1)
@@ -38,7 +39,7 @@ class SkyRenderer(private val program: Int) {
 
     fun draw(
         horizon: FloatArray, zenith: FloatArray, lightColor: FloatArray,
-        lightUV: FloatArray, isDark: Float, time: Float
+        lightUV: FloatArray, isDark: Float, time: Float, aspect: Float
     ) {
         GLES20.glUseProgram(program)
         GLES20.glDisable(GLES20.GL_DEPTH_TEST)
@@ -50,6 +51,7 @@ class SkyRenderer(private val program: Int) {
         GLES20.glUniform2fv(uLightUV,   1, lightUV,   0)
         GLES20.glUniform1f (uIsDark,    isDark)
         GLES20.glUniform1f (uTime,      time)
+        GLES20.glUniform1f (uAspect,    aspect)
 
         GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, vbo)
         GLES20.glEnableVertexAttribArray(aPos)

@@ -28,6 +28,7 @@ class TideWatchView @JvmOverloads constructor(
                 fun Int.g() = Color.green(this) / 255f
                 fun Int.b() = Color.blue(this) / 255f
                 queueEvent {
+                    // Ocean colors
                     renderer.deepColor    = floatArrayOf(theme.seaBottomColor.r(), theme.seaBottomColor.g(), theme.seaBottomColor.b())
                     renderer.shallowColor = floatArrayOf(theme.seaTopColor.r(),    theme.seaTopColor.g(),    theme.seaTopColor.b())
                     val flat = theme.tidalFlatColor
@@ -36,6 +37,10 @@ class TideWatchView @JvmOverloads constructor(
                         (flat.g() * 0.85f + 0.12f).coerceAtMost(1f),
                         (flat.b() * 0.80f + 0.08f).coerceAtMost(1f))
                     renderer.sandWet  = floatArrayOf(flat.r(), flat.g(), flat.b())
+                    // Sky / sun theme tints (blended into time-of-day LUT)
+                    renderer.skyHorizonTheme = floatArrayOf(theme.skyBottomColor.r(), theme.skyBottomColor.g(), theme.skyBottomColor.b())
+                    renderer.skyZenithTheme  = floatArrayOf(theme.skyTopColor.r(),    theme.skyTopColor.g(),    theme.skyTopColor.b())
+                    renderer.sunColorTheme   = floatArrayOf(theme.sunColor.r(),       theme.sunColor.g(),       theme.sunColor.b())
                 }
             }
         }

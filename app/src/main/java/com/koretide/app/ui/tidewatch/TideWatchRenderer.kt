@@ -22,11 +22,15 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
     @Volatile var tidePercent  = 0.5f
     @Volatile var windAmp      = 0.25f
     @Volatile var windDirRad   = 3.93f
-    // Sky colors (horizon/zenith/light/isDark) are driven by the time-of-day LUT in onDrawFrame
+    // Ocean colors — theme-driven
     @Volatile var deepColor    = floatArrayOf(0.04f, 0.22f, 0.58f)
     @Volatile var shallowColor = floatArrayOf(0.16f, 0.56f, 0.82f)
     @Volatile var sandDry      = floatArrayOf(0.92f, 0.86f, 0.68f)
     @Volatile var sandWet      = floatArrayOf(0.68f, 0.60f, 0.44f)
+    // Sky/sun theme tints — blended into the time-of-day LUT each frame
+    @Volatile var skyHorizonTheme = floatArrayOf(0.65f, 0.84f, 1.00f)
+    @Volatile var skyZenithTheme  = floatArrayOf(0.14f, 0.40f, 0.82f)
+    @Volatile var sunColorTheme   = floatArrayOf(1.00f, 0.95f, 0.85f)
 
     // ── GL state ──────────────────────────────────────────────────────────────
     private var startMs = 0L
@@ -178,6 +182,17 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         val hour = cal.get(Calendar.HOUR_OF_DAY) + cal.get(Calendar.MINUTE) / 60f
         computeLightDir(hour)   // writes into lightDir member
         sampleSkyLut(hour)      // writes into lutHorizon/Zenith/Light/Ambient/isDark members
+
+        // Blend theme seasonal tint into LUT result (LUT drives time-of-day, theme adds seasonal flavor)
+        val tint = 0.25f
+        val tintInv = 1f - tint
+        val sh = skyHorizonTheme; val sz = skyZenithTheme; val sc = sunColorTheme
+        for (j in 0..2) {
+            lutHorizon[j] = lutHorizon[j] * tintInv + sh[j] * tint
+            lutZenith[j]  = lutZenith[j]  * tintInv + sz[j] * tint
+            lutLight[j]   = lutLight[j]   * tintInv + sc[j] * tint
+        }
+
         lightUV[0] = (lightDir[0] * 0.4f + 0.5f).coerceIn(0.05f, 0.95f)
         lightUV[1] = (lightDir[1] * 0.4f + 0.72f).coerceIn(0.52f, 0.96f)
 
@@ -204,7 +219,7 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         val waterlineZ     = (baseWaterlineZ + shoreBreath).coerceIn(1.5f, 16.5f)
 
         // ── Pass 1: Sky (no depth write) ─────────────────────────────────────
-        sky.draw(lutHorizon, lutZenith, lutLight, lightUV, lutIsDark, t)
+        sky.draw(lutHorizon, lutZenith, lutLight, lightUV, lutIsDark, t, aspect)
 
         // ── Pass 2: Beach ─────────────────────────────────────────────────────
         beach.draw(mvp, tide, waterlineZ, sandDry, sandWet, lutHorizon, lightDir, eyePos, lutAmbient, t)

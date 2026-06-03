@@ -56,7 +56,8 @@ void main() {
     drySand = mix(drySand, u_SandDry, 0.35);
     wetSand = mix(wetSand, u_SandWet, 0.25);
 
-    float mudflatFactor = clamp(1.0 - u_TidePercent * 3.5, 0.0, 1.0);
+    // Mudflat starts appearing at ~50% tide (real West Sea tidal flat behaviour)
+    float mudflatFactor = clamp(1.0 - u_TidePercent * 2.0, 0.0, 1.0);
 
     // ── Base color: sand → wet sand → mudflat ─────────────────────────────
     vec3 baseColor = drySand;

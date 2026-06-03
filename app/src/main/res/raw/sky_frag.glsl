@@ -1,17 +1,17 @@
 precision mediump float;
-varying vec2 v_UV;
-uniform vec3 u_Horizon;
-uniform vec3 u_Zenith;
-uniform vec3 u_LightColor;
-uniform vec2 u_LightUV;   // sun/moon position in UV space
-uniform float u_IsDark;   // 0=day 1=night
+varying vec2  v_UV;
+uniform vec3  u_Horizon;
+uniform vec3  u_Zenith;
+uniform vec3  u_LightColor;
+uniform vec2  u_LightUV;    // sun/moon position in UV space
+uniform float u_IsDark;     // 0=day 1=night
 uniform float u_Time;
+uniform float u_Aspect;     // width/height — corrects sun disc to a true circle
 
 float hash(vec2 p) {
     return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
 }
 
-// Bilinear noise for FBM clouds
 float noise2(vec2 p) {
     vec2 i = floor(p); vec2 f = fract(p);
     f = f * f * (3.0 - 2.0 * f);
@@ -30,15 +30,13 @@ void main() {
     vec3 sky = mix(u_Horizon, u_Zenith, pow(v_UV.y, 0.7));
 
     // ── FBM clouds ────────────────────────────────────────────────────────
-    // Map UV to a slowly drifting cloud plane
     vec2  cUV    = vec2(v_UV.x * 3.2 + u_Time * 0.0035, (v_UV.y - 0.25) * 2.2);
     float cNoise = cloudFBM(cUV);
     float cloud  = smoothstep(0.52, 0.74, cNoise)
-                 * smoothstep(0.22, 0.48, v_UV.y)   // fade near horizon
+                 * smoothstep(0.22, 0.48, v_UV.y)
                  * clamp(1.0 - u_IsDark * 1.3, 0.0, 1.0);
     cloud = clamp(cloud, 0.0, 1.0);
 
-    // Cloud color: bright white on sun-facing side, shaded on opposite
     vec2  toSun     = normalize(u_LightUV - v_UV + vec2(0.0, 0.001));
     float sunFacing = dot(toSun, vec2(0.0, 1.0)) * 0.5 + 0.5;
     vec3  cloudBright = mix(vec3(1.0), u_LightColor * 1.10, 0.25);
@@ -46,7 +44,10 @@ void main() {
     sky = mix(sky, mix(cloudShade, cloudBright, sunFacing), cloud * 0.88);
 
     // ── Sun/moon disc + glow + bloom ─────────────────────────────────────
-    float d    = length(v_UV - u_LightUV);
+    // Correct for aspect ratio so the disc is a true pixel-space circle
+    vec2 sunDelta = v_UV - u_LightUV;
+    sunDelta.x   *= u_Aspect;
+    float d    = length(sunDelta);
     float body = smoothstep(0.032, 0.028, d);
     float glow = smoothstep(0.22, 0.0, d) * mix(0.45, 0.20, u_IsDark);
     float bloom = smoothstep(0.55, 0.0, d) * 0.12
