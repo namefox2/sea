@@ -210,7 +210,7 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         mountain.draw(mvp, lutHorizon)
 
         // ── Pass 3: Beach ─────────────────────────────────────────────────────
-        beach.draw(mvp, tide, waterlineZ, sandDry, sandWet, lutHorizon, t)
+        beach.draw(mvp, tide, waterlineZ, sandDry, sandWet, lutHorizon, lightDir, t)
 
         // ── Pass 4: Ocean (normal map bound to texture unit 0) ────────────────
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
