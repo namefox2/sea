@@ -29,38 +29,57 @@ class TideRepositoryImpl @Inject constructor(
         return try {
             val date = SimpleDateFormat("yyyyMMdd", Locale.KOREA).format(Date())
             val current = khoaApi.getCurrentTide(apiKey, stationCode, date)
-            val table = khoaApi.getTideTable(apiKey, stationCode, date)
+            val table   = khoaApi.getTideTable(apiKey, stationCode, date)
 
-            val currentLevel = current.result?.data?.lastOrNull()?.tideLevel ?: 300
-            val tableItems = table.result?.data ?: emptyList()
-            val highItem = tableItems.firstOrNull { it.hlCode == "HH" }
-            val lowItem = tableItems.firstOrNull { it.hlCode == "LL" }
-            val maxLevel = highItem?.tphLevel ?: 600
-            val minLevel = lowItem?.tphLevel ?: 50
-            val range = (maxLevel - minLevel).toFloat()
+            val dataItems  = current.result?.data ?: emptyList()
+            val tableItems = table.result?.data   ?: emptyList()
+
+            val currentLevel = dataItems.lastOrNull()?.tideLevel ?: 300
+
+            // Use full day's table to get actual tidal range (multiple HH/LL events per day)
+            val allHigh  = tableItems.filter { it.hlCode == "HH" }
+            val allLow   = tableItems.filter { it.hlCode == "LL" }
+            val maxLevel = allHigh.mapNotNull { it.tphLevel }.maxOrNull() ?: 600
+            val minLevel = allLow.mapNotNull  { it.tphLevel }.minOrNull() ?: 50
+            val range    = (maxLevel - minLevel).toFloat()
             val tidePercent = if (range > 0f)
                 ((currentLevel - minLevel).toFloat() / range).coerceIn(0f, 1f)
             else 0.5f
 
-            val records = current.result?.data?.map { item ->
+            // Rising/falling: compare last two hourly readings for an unambiguous trend
+            val prevLevel = if (dataItems.size >= 2)
+                dataItems[dataItems.size - 2].tideLevel ?: currentLevel
+            else currentLevel
+            val tideStatus = when {
+                tidePercent > 0.92f             -> TideStatus.HIGH_TIDE
+                tidePercent < 0.08f             -> TideStatus.LOW_TIDE
+                currentLevel >= prevLevel       -> TideStatus.RISING
+                else                            -> TideStatus.FALLING
+            }
+
+            // Next upcoming high/low tide after current time (fall back to last of day)
+            val nowTime  = SimpleDateFormat("HH:mm", Locale.KOREA).format(Date())
+            val highItem = allHigh.firstOrNull { it.tphTime.orEmpty() >= nowTime } ?: allHigh.lastOrNull()
+            val lowItem  = allLow.firstOrNull  { it.tphTime.orEmpty() >= nowTime } ?: allLow.lastOrNull()
+
+            val records = dataItems.map { item ->
                 val ts = parseDateToMillis(item.recordTime ?: date)
                 TideRecordEntity(stationCode = stationCode, timestamp = ts, waterLevel = item.tideLevel ?: 0)
-            } ?: emptyList()
+            }
 
             tideRecordDao.insertAll(records)
-            // 30일 초과 기록 자동 삭제 — 개인정보 최소 보관 원칙
             tideRecordDao.deleteOlderThan(System.currentTimeMillis() - 30L * 24 * 3_600_000)
 
             TideData(
-                stationCode = stationCode,
+                stationCode  = stationCode,
                 currentLevel = currentLevel,
-                maxLevel = maxLevel,
-                minLevel = minLevel,
-                tidePercent = tidePercent,
-                tideStatus = TideStatus.RISING,
+                maxLevel     = maxLevel,
+                minLevel     = minLevel,
+                tidePercent  = tidePercent,
+                tideStatus   = tideStatus,
                 highTideTime = highItem?.tphTime,
-                lowTideTime = lowItem?.tphTime,
-                records = records.map { it.toDomain() }
+                lowTideTime  = lowItem?.tphTime,
+                records      = records.map { it.toDomain() }
             )
         } catch (e: Exception) {
             MockDataSource.mockTideData(stationCode)
