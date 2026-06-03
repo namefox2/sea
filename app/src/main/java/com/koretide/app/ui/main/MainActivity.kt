@@ -38,7 +38,11 @@ class MainActivity : AppCompatActivity() {
     private fun observeTabNavigation() {
         collectFlow(sharedViewModel.navigateToTab) { tabId ->
             if (tabId != null) {
-                binding.bottomNavigation.selectedItemId = tabId
+                try {
+                    binding.bottomNavigation.selectedItemId = tabId
+                } catch (e: Exception) {
+                    android.util.Log.w("MainActivity", "Tab navigation failed: $tabId", e)
+                }
                 sharedViewModel.onTabNavigated()
             }
         }

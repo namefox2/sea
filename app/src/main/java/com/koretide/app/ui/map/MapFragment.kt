@@ -28,7 +28,8 @@ class MapFragment : Fragment() {
     private var _binding: FragmentMapBinding? = null
     private val binding get() = _binding!!
     private var mapLayoutListener: ViewTreeObserver.OnGlobalLayoutListener? = null
-    private var activitySpotNearestStation: Station? = null  // 상세보기 클릭 시점에만 sharedVM에 전달
+    private var activitySpotNearestStation: Station? = null
+    private var navigating = false  // guard against double-tap navigation crash
 
     private val viewModel: MapViewModel by viewModels()
     private val sharedViewModel: SharedViewModel by activityViewModels()
@@ -85,7 +86,25 @@ class MapFragment : Fragment() {
         binding.tooltipCard.visibility = View.GONE
         binding.koreaMapView.clearSelection()
         activitySpotNearestStation = null
+        navigating = false
         viewModel.clearPin()
+    }
+
+    private fun navigateToDetail() {
+        if (navigating) return
+        navigating = true
+        try {
+            findNavController().navigate(R.id.action_global_to_detail)
+        } catch (e: Exception) {
+            android.util.Log.w("MapFragment", "navigateToDetail failed", e)
+            navigating = false
+        }
+    }
+
+    private fun navigateToWatch() {
+        if (navigating) return
+        navigating = true
+        sharedViewModel.requestTabNavigation(R.id.navigation_watch)
     }
 
     private fun setupActivityChips() {
@@ -136,13 +155,9 @@ class MapFragment : Fragment() {
         binding.tvTooltipName.text = station.name
         binding.tvTooltipRegion.text = station.region.displayName
         binding.btnViewDetail.visibility = View.VISIBLE
-        binding.btnViewDetail.setOnClickListener {
-            findNavController().navigate(R.id.action_global_to_detail)
-        }
+        binding.btnViewDetail.setOnClickListener { navigateToDetail() }
         binding.btnGoWatch.visibility = View.VISIBLE
-        binding.btnGoWatch.setOnClickListener {
-            sharedViewModel.requestTabNavigation(R.id.navigation_watch)
-        }
+        binding.btnGoWatch.setOnClickListener { navigateToWatch() }
     }
 
     private fun onActivityPinSelected(spot: ActivitySpot) {
@@ -161,9 +176,8 @@ class MapFragment : Fragment() {
         if (nearest != null) {
             binding.btnViewDetail.visibility = View.VISIBLE
             binding.btnViewDetail.setOnClickListener {
-                // 상세보기 클릭 시점에 인근 관측소 선택 → Detail이 수위·바람 표시
                 sharedViewModel.selectStation(nearest)
-                findNavController().navigate(R.id.action_global_to_detail)
+                navigateToDetail()
             }
         } else {
             binding.btnViewDetail.visibility = View.GONE
@@ -171,12 +185,16 @@ class MapFragment : Fragment() {
         binding.btnGoWatch.visibility = View.VISIBLE
         binding.btnGoWatch.setOnClickListener {
             activitySpotNearestStation?.let { sharedViewModel.selectStation(it) }
-            sharedViewModel.requestTabNavigation(R.id.navigation_watch)
+            navigateToWatch()
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        navigating = false
+    }
+
     override fun onDestroyView() {
-        // 레이아웃 리스너가 아직 등록돼 있으면 제거 (Fragment 누수 방지)
         mapLayoutListener?.let { binding.mapImage.viewTreeObserver.removeOnGlobalLayoutListener(it) }
         mapLayoutListener = null
         binding.adViewMap.destroy()

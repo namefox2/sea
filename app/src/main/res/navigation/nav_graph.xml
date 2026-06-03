@@ -9,8 +9,6 @@
     <action
         android:id="@+id/action_global_to_detail"
         app:destination="@id/navigation_detail"
-        app:popUpTo="@id/nav_graph"
-        app:popUpToInclusive="false"
         app:launchSingleTop="true" />
 
     <fragment
