@@ -43,6 +43,11 @@ class SprayParticles(private val program: Int) {
         GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, 0)
     }
 
+    fun release() {
+        GLES20.glDeleteBuffers(1, intArrayOf(vbo), 0)
+        GLES20.glDeleteProgram(program)
+    }
+
     fun draw(mvp: FloatArray, time: Float, windAmp: Float, windDir: Float, tide: Float, lightColor: FloatArray) {
         if (windAmp < 0.12f) return  // no spray in calm wind
 

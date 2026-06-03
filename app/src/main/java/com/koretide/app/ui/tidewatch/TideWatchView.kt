@@ -15,6 +15,7 @@ class TideWatchView @JvmOverloads constructor(
     init {
         setEGLContextClientVersion(2)
         setEGLConfigChooser(8, 8, 8, 8, 16, 0)
+        setPreserveEGLContextOnPause(true)  // prevent shader recompile on every navigation
         setRenderer(renderer)
         renderMode = RENDERMODE_CONTINUOUSLY
     }
@@ -49,6 +50,11 @@ class TideWatchView @JvmOverloads constructor(
     fun setWind(bft: Int)        { queueEvent { renderer.windAmp = (bft.coerceIn(0, 12) / 12f) } }
 
     val initError: String? get() = renderer.initError
+
+    // Called from Fragment.onDestroyView to free GPU resources while context is still alive
+    fun release() {
+        queueEvent { renderer.release() }
+    }
 
     // onPause() / onResume() are inherited from GLSurfaceView — TideWatchFragment calls them directly
 }

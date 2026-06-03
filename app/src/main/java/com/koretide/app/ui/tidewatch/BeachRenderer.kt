@@ -71,6 +71,11 @@ class BeachRenderer(private val program: Int) {
         GLES20.glBindBuffer(GLES20.GL_ELEMENT_ARRAY_BUFFER, 0)
     }
 
+    fun release() {
+        GLES20.glDeleteBuffers(2, intArrayOf(vbo, ibo), 0)
+        GLES20.glDeleteProgram(program)
+    }
+
     fun draw(mvp: FloatArray, tidePercent: Float, waterlineZ: Float,
              sandDry: FloatArray, sandWet: FloatArray, horizon: FloatArray,
              lightDir: FloatArray, camPos: FloatArray, ambientColor: FloatArray, time: Float) {

@@ -31,6 +31,11 @@ class SkyRenderer(private val program: Int) {
         GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, 0)
     }
 
+    fun release() {
+        GLES20.glDeleteBuffers(1, intArrayOf(vbo), 0)
+        GLES20.glDeleteProgram(program)
+    }
+
     fun draw(
         horizon: FloatArray, zenith: FloatArray, lightColor: FloatArray,
         lightUV: FloatArray, isDark: Float, time: Float

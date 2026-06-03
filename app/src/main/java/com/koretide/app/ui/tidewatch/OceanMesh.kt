@@ -78,6 +78,10 @@ class OceanMesh(private val cols: Int = OCEAN_GRID_COLS, private val rows: Int =
         GLES20.glBindBuffer(GLES20.GL_ELEMENT_ARRAY_BUFFER, 0)
     }
 
+    fun release() {
+        GLES20.glDeleteBuffers(2, intArrayOf(vbo, ibo), 0)
+    }
+
     fun draw(aPosLocation: Int) {
         GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, vbo)
         GLES20.glEnableVertexAttribArray(aPosLocation)

@@ -70,6 +70,15 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
     private val eyePos = floatArrayOf(0f, 1.8f, 18f)
     private val center = floatArrayOf(0f, -0.3f, 0f)
 
+    // Pre-allocated — never replaced in onDrawFrame to avoid per-frame GC pressure
+    private val lightDir   = FloatArray(3)
+    private val lightUV    = FloatArray(2)
+    private val lutHorizon = FloatArray(3)
+    private val lutZenith  = FloatArray(3)
+    private val lutLight   = FloatArray(3)
+    private val lutAmbient = FloatArray(3)
+    private var lutIsDark  = 0f
+
     // ── Sky LUT: keyframes [hr,hg,hb, zr,zg,zb, lr,lg,lb, isDark, ar,ag,ab] ──
     // Index 0 = hour; fields 1-3=horizon, 4-6=zenith, 7-9=light, 10=dark, 11-13=ambient(보색)
     private val SKY_LUT = arrayOf(
@@ -167,13 +176,10 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         // ── Time of day: compute LUT first so clear color matches sky ─────────
         val cal  = Calendar.getInstance()
         val hour = cal.get(Calendar.HOUR_OF_DAY) + cal.get(Calendar.MINUTE) / 60f
-        val lightDir = computeLightDir(hour)
-        val lut      = sampleSkyLut(hour)
-        val lutHorizon  = floatArrayOf(lut[0], lut[1], lut[2])
-        val lutZenith   = floatArrayOf(lut[3], lut[4], lut[5])
-        val lutLight    = floatArrayOf(lut[6], lut[7], lut[8])
-        val lutIsDark   = lut[9]
-        val lutAmbient  = floatArrayOf(lut[10], lut[11], lut[12])
+        computeLightDir(hour)   // writes into lightDir member
+        sampleSkyLut(hour)      // writes into lutHorizon/Zenith/Light/Ambient/isDark members
+        lightUV[0] = (lightDir[0] * 0.4f + 0.5f).coerceIn(0.05f, 0.95f)
+        lightUV[1] = (lightDir[1] * 0.4f + 0.72f).coerceIn(0.52f, 0.96f)
 
         // Clear with horizon-matched color → any rendering gap shows sky color, not black
         GLES20.glClearColor(lutHorizon[0] * 0.55f, lutHorizon[1] * 0.55f, lutHorizon[2] * 0.55f, 1f)
@@ -185,12 +191,6 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
             center[0], center[1], center[2],
             0f, 1f, 0f)
         Matrix.multiplyMM(mvp, 0, proj, 0, view, 0)
-
-        // Sky UV: map 3D light dir to approximate 2D screen position
-        val lightUV = floatArrayOf(
-            (lightDir[0] * 0.4f + 0.5f).coerceIn(0.05f, 0.95f),
-            (lightDir[1] * 0.4f + 0.72f).coerceIn(0.52f, 0.96f)
-        )
 
         // Roughness and 윤슬 strength
         val roughness  = (wAmp * wAmp * 0.40f + 0.04f).coerceAtMost(0.40f)
@@ -241,26 +241,27 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
 
     // ── Sky LUT helpers ───────────────────────────────────────────────────────
 
-    // Interpolate sky LUT: returns [hr,hg,hb, zr,zg,zb, lr,lg,lb, isDark]
-    private fun sampleSkyLut(hour: Float): FloatArray {
+    // Interpolate sky LUT into pre-allocated member arrays (no heap allocation)
+    private fun sampleSkyLut(hour: Float) {
         var i = 0
         while (i < SKY_LUT.size - 2 && SKY_LUT[i + 1][0] <= hour) i++
-        val a = SKY_LUT[i]
-        val b = SKY_LUT[i + 1]
+        val a = SKY_LUT[i]; val b = SKY_LUT[i + 1]
         val span = b[0] - a[0]
         val tf   = if (span < 0.001f) 0f else (hour - a[0]) / span
-        // indices 1..13 are the color/dark/ambient fields (skip [0] which is hour)
-        return FloatArray(13) { j -> a[j + 1] + (b[j + 1] - a[j + 1]) * tf }
+        for (j in 0..2) lutHorizon[j] = a[j + 1]  + (b[j + 1]  - a[j + 1])  * tf
+        for (j in 0..2) lutZenith[j]  = a[j + 4]  + (b[j + 4]  - a[j + 4])  * tf
+        for (j in 0..2) lutLight[j]   = a[j + 7]  + (b[j + 7]  - a[j + 7])  * tf
+        lutIsDark                      = a[10]      + (b[10]      - a[10])      * tf
+        for (j in 0..2) lutAmbient[j] = a[j + 11] + (b[j + 11] - a[j + 11]) * tf
     }
 
-    private fun computeLightDir(hour: Float): FloatArray {
-        // Sun arc: rises at 6am, peaks at noon, sets at 6pm
+    // Write sun direction into pre-allocated lightDir member (no heap allocation)
+    private fun computeLightDir(hour: Float) {
         val hourAngle = ((hour - 6f) / 12f) * PI.toFloat()
         val elevation = (sin(hourAngle.toDouble()).toFloat() * 0.8f + 0.1f).coerceAtLeast(0.05f)
         val azimuth   = cos(hourAngle.toDouble()).toFloat()
-        val raw = floatArrayOf(azimuth, elevation, -0.6f)
-        val len = sqrt((raw[0]*raw[0] + raw[1]*raw[1] + raw[2]*raw[2]).toDouble()).toFloat()
-        return floatArrayOf(raw[0]/len, raw[1]/len, raw[2]/len)
+        val len = sqrt((azimuth * azimuth + elevation * elevation + 0.36f).toDouble()).toFloat()
+        lightDir[0] = azimuth / len; lightDir[1] = elevation / len; lightDir[2] = -0.6f / len
     }
 
     // ── Normal map ────────────────────────────────────────────────────────────
@@ -309,6 +310,20 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_T,     GLES20.GL_REPEAT)
         GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, 0)
         return texId[0]
+    }
+
+    // ── Resource cleanup (called from GL thread via TideWatchView.release()) ──
+
+    fun release() {
+        if (!glReady) return
+        glReady = false
+        if (::sky.isInitialized)   sky.release()
+        if (::beach.isInitialized) beach.release()
+        if (::foam.isInitialized)  foam.release()
+        if (::spray.isInitialized) spray.release()
+        if (::ocean.isInitialized) ocean.release()
+        if (ocProg != 0)           { GLES20.glDeleteProgram(ocProg); ocProg = 0 }
+        if (normalMapTex != 0)     { GLES20.glDeleteTextures(1, intArrayOf(normalMapTex), 0); normalMapTex = 0 }
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

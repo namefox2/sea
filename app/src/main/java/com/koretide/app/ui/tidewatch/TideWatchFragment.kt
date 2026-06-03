@@ -68,9 +68,10 @@ class TideWatchFragment : Fragment() {
 
     private fun scheduleGlErrorCheck() {
         Handler(Looper.getMainLooper()).postDelayed({
-            val b = _binding ?: return@postDelayed
+            val b   = _binding ?: return@postDelayed
             val err = b.tideWatchView.initError ?: return@postDelayed
-            android.widget.Toast.makeText(requireContext(), "GL오류: $err", android.widget.Toast.LENGTH_LONG).show()
+            val ctx = context ?: return@postDelayed
+            android.widget.Toast.makeText(ctx, "GL오류: $err", android.widget.Toast.LENGTH_LONG).show()
         }, 3000L)
     }
 
@@ -167,8 +168,9 @@ class TideWatchFragment : Fragment() {
     }
 
     override fun onDestroyView() {
-        super.onDestroyView()
         sharedViewModel.setWatchImmersive(false)
+        _binding?.tideWatchView?.release()  // free GL resources before losing reference
+        super.onDestroyView()
         _binding = null
     }
 }

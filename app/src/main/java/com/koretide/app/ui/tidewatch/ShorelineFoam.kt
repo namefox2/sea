@@ -68,6 +68,11 @@ class ShorelineFoam(private val program: Int) {
         GLES20.glBindBuffer(GLES20.GL_ELEMENT_ARRAY_BUFFER, 0)
     }
 
+    fun release() {
+        GLES20.glDeleteBuffers(2, intArrayOf(vbo, ibo), 0)
+        GLES20.glDeleteProgram(program)
+    }
+
     fun draw(mvp: FloatArray, waterlineZ: Float, windAmp: Float, time: Float, lightColor: FloatArray) {
         GLES20.glUseProgram(program)
         GLES20.glEnable(GLES20.GL_BLEND)
