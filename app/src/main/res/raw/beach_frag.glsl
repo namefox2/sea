@@ -155,12 +155,14 @@ void main() {
         // Sandy/silty seafloor color, darkens with depth
         vec3 seafloor  = mix(wetSand * 0.65, mudflatShallow * 0.7, shallowFactor * 0.6);
         // Water column tint (teal shallow → deep blue)
-        vec3 waterTint = mix(vec3(0.12, 0.42, 0.36), vec3(0.06, 0.18, 0.30), shallowFactor);
+        vec3 waterTint = mix(vec3(0.14, 0.44, 0.38), vec3(0.06, 0.18, 0.30), shallowFactor);
         // Caustic shimmer
         float caust = sin(v_World.x * 3.8 + u_Time * 1.4) * sin(v_World.z * 4.3 - u_Time * 1.1);
         caust = pow(max(caust * 0.5 + 0.62, 0.0), 3.0) * 0.06;
-        vec3 shallowColor = mix(seafloor, waterTint, shallowFactor * 0.55) + waterTint * caust;
-        baseColor = mix(baseColor, shallowColor, shallowFactor * 0.90);
+        vec3 shallowColor = mix(seafloor, waterTint, shallowFactor * 0.72) + waterTint * caust;
+        // Ramp very fast: even slightly underwater looks like water, not sand
+        float shallowBlend = smoothstep(0.0, 0.30, shallowFactor) * 0.98;
+        baseColor = mix(baseColor, shallowColor, shallowBlend);
     }
 
     // ── Waterline transition: Runup → Foam → Wet Sand ─────────────────────

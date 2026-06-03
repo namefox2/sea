@@ -18,7 +18,7 @@ vec3 gerstner(vec2 xz0, vec2 dir, float amp, float L, float speed, float t, inou
     float k     = 6.28318 / L;
     float phase = k * dot(dir, xz0) - speed * t;
     float C = cos(phase); float S = sin(phase);
-    float Q = 0.60;
+    float Q = 0.30;
     vec3 d;
     d.x = Q * amp * dir.x * C;
     d.y = amp * S;
@@ -43,6 +43,9 @@ void main() {
     // Tide shifts the entire ocean surface
     float tideY = u_Tide * 1.4 - 0.7;
     p.y += tideY;
+
+    // Floor: prevent troughs from punching through and exposing beach below
+    p.y = max(p.y, tideY - amp * 1.2);
 
     // Foam mask: wave crests above tide+amp threshold
     v_Foam   = clamp((p.y - (tideY + amp * 0.75)) * 5.0, 0.0, 1.0);
