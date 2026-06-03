@@ -13,12 +13,13 @@ class SprayParticles(private val program: Int) {
     private val count = GRID * GRID
     private var vbo   = 0
 
-    private val aXZ      = GLES20.glGetAttribLocation (program, "a_XZ")
-    private val uMVP     = GLES20.glGetUniformLocation(program, "u_MVP")
-    private val uTime    = GLES20.glGetUniformLocation(program, "u_Time")
-    private val uWindAmp = GLES20.glGetUniformLocation(program, "u_WindAmp")
-    private val uWindDir = GLES20.glGetUniformLocation(program, "u_WindDir")
-    private val uTide    = GLES20.glGetUniformLocation(program, "u_Tide")
+    private val aXZ        = GLES20.glGetAttribLocation (program, "a_XZ")
+    private val uMVP       = GLES20.glGetUniformLocation(program, "u_MVP")
+    private val uTime      = GLES20.glGetUniformLocation(program, "u_Time")
+    private val uWindAmp   = GLES20.glGetUniformLocation(program, "u_WindAmp")
+    private val uWindDir   = GLES20.glGetUniformLocation(program, "u_WindDir")
+    private val uTide      = GLES20.glGetUniformLocation(program, "u_Tide")
+    private val uLightColor= GLES20.glGetUniformLocation(program, "u_LightColor")
 
     init {
         val pts = FloatArray(count * 2)
@@ -42,7 +43,7 @@ class SprayParticles(private val program: Int) {
         GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, 0)
     }
 
-    fun draw(mvp: FloatArray, time: Float, windAmp: Float, windDir: Float, tide: Float) {
+    fun draw(mvp: FloatArray, time: Float, windAmp: Float, windDir: Float, tide: Float, lightColor: FloatArray) {
         if (windAmp < 0.12f) return  // no spray in calm wind
 
         GLES20.glUseProgram(program)
@@ -50,11 +51,12 @@ class SprayParticles(private val program: Int) {
         GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA)
         GLES20.glDepthMask(false)
 
-        GLES20.glUniformMatrix4fv(uMVP,     1, false, mvp, 0)
-        GLES20.glUniform1f(uTime,    time)
-        GLES20.glUniform1f(uWindAmp, windAmp)
-        GLES20.glUniform1f(uWindDir, windDir)
-        GLES20.glUniform1f(uTide,    tide)
+        GLES20.glUniformMatrix4fv(uMVP,        1, false, mvp, 0)
+        GLES20.glUniform1f (uTime,     time)
+        GLES20.glUniform1f (uWindAmp,  windAmp)
+        GLES20.glUniform1f (uWindDir,  windDir)
+        GLES20.glUniform1f (uTide,     tide)
+        GLES20.glUniform3fv(uLightColor, 1, lightColor, 0)
 
         GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, vbo)
         GLES20.glEnableVertexAttribArray(aXZ)

@@ -4,6 +4,7 @@ precision highp float;
 precision mediump float;
 #endif
 uniform float u_WindAmp;
+uniform vec3  u_LightColor;
 
 void main() {
     // Circular soft droplet using gl_PointCoord
@@ -12,5 +13,6 @@ void main() {
                 * clamp(u_WindAmp * 3.5, 0.0, 1.0)
                 * 0.55;
     if (alpha < 0.02) discard;
-    gl_FragColor = vec4(0.93, 0.96, 1.0, alpha);
+    vec3 sprayBase = mix(vec3(0.93, 0.96, 1.0), u_LightColor, 0.15);
+    gl_FragColor = vec4(sprayBase, alpha);
 }

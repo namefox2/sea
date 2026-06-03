@@ -7,6 +7,8 @@ uniform vec3  u_LightDir;
 uniform float u_Time;
 uniform float u_TidePercent;
 uniform float u_WaterlineZ;
+uniform vec3  u_CamPos;
+uniform vec3  u_AmbientColor;
 
 // Smooth value noise: bilinear hash interpolation (no grid artifacts)
 float bN(vec2 p) {
@@ -70,10 +72,18 @@ void main() {
     float sandRipple = pow(sin(v_World.z * 6.0 + v_World.x * 2.0) * 0.5 + 0.5, 8.0);
     baseColor = mix(baseColor, drySand * 0.85, sandRipple * 0.15 * (1.0 - mudflatFactor));
 
-    // ── Wet surface sky reflection ────────────────────────────────────────
+    // ── Wet surface sky reflection with light corridor ────────────────────
+    vec2  lhDir    = normalize(vec2(u_LightDir.x, u_LightDir.z));
+    vec2  toFragXZ = v_World.xz - u_CamPos.xz;
+    float dCam     = max(length(toFragXZ), 0.01);
+    vec2  perp2    = vec2(-lhDir.y, lhDir.x);
+    float pDist    = abs(dot(toFragXZ, perp2));
+    float corrW    = mix(0.5, 6.0, clamp(dCam / 18.0, 0.0, 1.0));
+    float corrMask = exp(-pDist * pDist / (corrW * corrW));
+
     float wetSpec = pow(sin(v_World.z * 3.5 + u_Time * 0.4) * 0.5 + 0.5, 5.0)
                   * pow(sin(v_World.x * 1.8 - u_Time * 0.2) * 0.5 + 0.5, 3.0);
-    float reflStr = wetness * (0.28 + wetSpec * 0.30) * (1.0 - u_TidePercent * 0.5);
+    float reflStr = wetness * (0.12 + wetSpec * 0.30 * corrMask) * (1.0 - u_TidePercent * 0.5);
     baseColor = mix(baseColor, u_Horizon * 0.65, reflStr);
 
     // ── Rocky outcrops ────────────────────────────────────────────────────
@@ -94,6 +104,8 @@ void main() {
     // 갯벌(간조)일수록 그림자가 강하게, 마른 모래는 부드럽게
     float shadowStr = mix(0.38, 0.65, mudflatFactor);
     baseColor *= NdotL * shadowStr + (1.0 - shadowStr);
+    // Ambient color tints shadow areas (보색 ambient: golden hour → cool shadow, etc.)
+    baseColor += u_AmbientColor * (1.0 - NdotL) * shadowStr * 0.18;
 
     // ── Waterline foam strip ──────────────────────────────────────────────
     float waveEdge = sin(v_World.x * 3.0 + u_Time * 2.2) * 0.3

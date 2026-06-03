@@ -49,35 +49,19 @@ void main() {
     float distFromCam     = max(length(toFrag), 0.01);
     vec2  fragToHoriz     = toFrag / distFromCam;
 
-    // Corridor width: narrow at horizon (far), wide at camera (near) — perspective
+    // Corridor: Gaussian falloff — smooth natural edge (vs sharp smoothstep)
     float corridorHalfWidth = mix(0.3, 5.5, clamp(distFromCam / 18.0, 0.0, 1.0));
     vec2  perp              = vec2(-lightHorizDir.y, lightHorizDir.x);
     float perpDist          = abs(dot(fragToHoriz * distFromCam, perp));
-    float corridorMask      = smoothstep(corridorHalfWidth, corridorHalfWidth * 0.1, perpDist);
+    float corridorMask      = exp(-perpDist * perpDist / (corridorHalfWidth * corridorHalfWidth));
 
-    // ── Hash-based flickering sparkles ───────────────────────────────────
-    // Layer 1: slow large sparkles (~1 Hz)
-    vec2  s1p  = floor(v_World.xz * 3.5 + u_Time * vec2(0.3, 0.8));
-    float s1   = fract(sin(dot(s1p, vec2(127.1, 311.7))) * 43758.5453);
-    float s1t  = fract(s1 * 7.0 + u_Time * (0.8 + s1 * 1.2));
-    float sp1  = pow(max(1.0 - abs(s1t - 0.5) * 4.0, 0.0), 2.0) * step(0.55, s1);
-
-    // Layer 2: medium sparkles (~3 Hz)
-    vec2  s2p  = floor(v_World.xz * 7.0 - u_Time * vec2(0.5, 0.4));
-    float s2   = fract(sin(dot(s2p, vec2(269.5, 183.3))) * 43758.5453);
-    float s2t  = fract(s2 * 5.0 + u_Time * (1.5 + s2 * 2.5));
-    float sp2  = pow(max(1.0 - abs(s2t - 0.5) * 6.0, 0.0), 2.0) * step(0.60, s2);
-
-    // Layer 3: fast micro sparkles (~8 Hz, densest near camera)
-    vec2  s3p  = floor(v_World.xz * 14.0 + u_Time * vec2(1.1, -0.7));
-    float s3   = fract(sin(dot(s3p, vec2(419.2, 371.9))) * 43758.5453);
-    float s3t  = fract(s3 * 3.0 + u_Time * (3.0 + s3 * 4.0));
-    float sp3  = pow(max(1.0 - abs(s3t - 0.5) * 8.0, 0.0), 2.0) * step(0.65, s3);
-
-    // Combine: brighter near camera (perspective)
-    float sparkle = (sp1 * 1.0 + sp2 * 1.8 + sp3 * 2.5)
-                  * (0.5 + clamp(1.0 - distFromCam / 18.0, 0.0, 0.5));
-    sparkle = clamp(sparkle, 0.0, 1.0);
+    // ── Sin-interference sparkle pattern (no grid artifacts) ─────────────
+    float w1 = sin(v_World.x *  8.3 + v_World.z *  5.7 + u_Time * 2.1);
+    float w2 = sin(v_World.x * 13.1 - v_World.z *  9.3 + u_Time * 3.4);
+    float w3 = sin(v_World.x * 21.7 + v_World.z * 14.9 - u_Time * 1.8);
+    float w4 = sin(v_World.x *  5.2 - v_World.z * 18.6 + u_Time * 4.2);
+    float sparkle = pow(clamp(w1 * w2 * w3 * w4 * 2.0 + 0.5, 0.0, 1.0), 6.0);
+    sparkle *= 0.5 + clamp(1.0 - distFromCam / 18.0, 0.0, 0.5);
 
     // ── Broad specular glow under the sparkles ────────────────────────────
     vec3  H         = normalize(L + V);

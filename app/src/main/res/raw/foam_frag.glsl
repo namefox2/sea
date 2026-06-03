@@ -6,6 +6,7 @@ precision mediump float;
 varying vec2  v_UV;
 varying float v_Alpha;
 uniform float u_Time;
+uniform vec3  u_LightColor;
 
 float hash21(vec2 p) {
     return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
@@ -31,5 +32,6 @@ void main() {
     float foam  = clamp(bubble * 1.6 + fine * 0.25, 0.0, 1.0);
     float alpha = v_Alpha * foam;
     if (alpha < 0.02) discard;
-    gl_FragColor = vec4(0.93, 0.96, 1.0, alpha);
+    vec3 foamBase = mix(vec3(0.93, 0.96, 1.0), u_LightColor, 0.18);
+    gl_FragColor = vec4(foamBase, alpha);
 }

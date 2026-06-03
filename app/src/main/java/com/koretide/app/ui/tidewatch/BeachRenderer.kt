@@ -22,6 +22,8 @@ class BeachRenderer(private val program: Int) {
     private val uSandWet     = GLES20.glGetUniformLocation(program, "u_SandWet")
     private val uHorizon     = GLES20.glGetUniformLocation(program, "u_Horizon")
     private val uLightDir    = GLES20.glGetUniformLocation(program, "u_LightDir")
+    private val uCamPos      = GLES20.glGetUniformLocation(program, "u_CamPos")
+    private val uAmbientColor= GLES20.glGetUniformLocation(program, "u_AmbientColor")
     private val uTime        = GLES20.glGetUniformLocation(program, "u_Time")
 
     init { uploadToGPU() }
@@ -71,16 +73,18 @@ class BeachRenderer(private val program: Int) {
 
     fun draw(mvp: FloatArray, tidePercent: Float, waterlineZ: Float,
              sandDry: FloatArray, sandWet: FloatArray, horizon: FloatArray,
-             lightDir: FloatArray, time: Float) {
+             lightDir: FloatArray, camPos: FloatArray, ambientColor: FloatArray, time: Float) {
         GLES20.glUseProgram(program)
-        GLES20.glUniformMatrix4fv(uMVP,         1, false, mvp,       0)
-        GLES20.glUniform1f (uTidePercent, tidePercent)
-        GLES20.glUniform1f (uWaterlineZ,  waterlineZ)
-        GLES20.glUniform3fv(uSandDry,     1, sandDry,   0)
-        GLES20.glUniform3fv(uSandWet,     1, sandWet,   0)
-        GLES20.glUniform3fv(uHorizon,     1, horizon,   0)
-        GLES20.glUniform3fv(uLightDir,    1, lightDir,  0)
-        GLES20.glUniform1f (uTime,        time)
+        GLES20.glUniformMatrix4fv(uMVP,          1, false, mvp,          0)
+        GLES20.glUniform1f (uTidePercent,  tidePercent)
+        GLES20.glUniform1f (uWaterlineZ,   waterlineZ)
+        GLES20.glUniform3fv(uSandDry,      1, sandDry,      0)
+        GLES20.glUniform3fv(uSandWet,      1, sandWet,      0)
+        GLES20.glUniform3fv(uHorizon,      1, horizon,      0)
+        GLES20.glUniform3fv(uLightDir,     1, lightDir,     0)
+        GLES20.glUniform3fv(uCamPos,       1, camPos,       0)
+        GLES20.glUniform3fv(uAmbientColor, 1, ambientColor, 0)
+        GLES20.glUniform1f (uTime,         time)
 
         GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, vbo)
         GLES20.glEnableVertexAttribArray(aPos)
