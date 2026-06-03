@@ -36,12 +36,11 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
     private val view  = FloatArray(16)
     private val mvp   = FloatArray(16)
 
-    private lateinit var sky:      SkyRenderer
-    private lateinit var mountain: MountainRenderer
-    private lateinit var beach:    BeachRenderer
-    private lateinit var ocean:    OceanMesh
-    private lateinit var foam:     ShorelineFoam
-    private lateinit var spray:    SprayParticles
+    private lateinit var sky:   SkyRenderer
+    private lateinit var beach: BeachRenderer
+    private lateinit var ocean: OceanMesh
+    private lateinit var foam:  ShorelineFoam
+    private lateinit var spray: SprayParticles
 
     // Ocean program + uniforms
     private var ocProg = 0
@@ -98,8 +97,6 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         try {
             val skyVert  = load(R.raw.sky_vert)
             val skyFrag  = load(R.raw.sky_frag)
-            val mtVert   = load(R.raw.mountain_vert)
-            val mtFrag   = load(R.raw.mountain_frag)
             val ocVert   = load(R.raw.ocean_vert)
             val ocFrag   = load(R.raw.ocean_frag)
             val bchVert  = load(R.raw.beach_vert)
@@ -109,12 +106,10 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
             val spVert   = load(R.raw.spray_vert)
             val spFrag   = load(R.raw.spray_frag)
 
-            sky      = SkyRenderer(link(compile(GLES20.GL_VERTEX_SHADER, skyVert),
-                                        compile(GLES20.GL_FRAGMENT_SHADER, skyFrag)))
-            mountain = MountainRenderer(link(compile(GLES20.GL_VERTEX_SHADER, mtVert),
-                                             compile(GLES20.GL_FRAGMENT_SHADER, mtFrag)))
-            beach    = BeachRenderer(link(compile(GLES20.GL_VERTEX_SHADER, bchVert),
-                                          compile(GLES20.GL_FRAGMENT_SHADER, bchFrag)))
+            sky   = SkyRenderer(link(compile(GLES20.GL_VERTEX_SHADER, skyVert),
+                                     compile(GLES20.GL_FRAGMENT_SHADER, skyFrag)))
+            beach = BeachRenderer(link(compile(GLES20.GL_VERTEX_SHADER, bchVert),
+                                       compile(GLES20.GL_FRAGMENT_SHADER, bchFrag)))
             ocProg   = link(compile(GLES20.GL_VERTEX_SHADER, ocVert),
                             compile(GLES20.GL_FRAGMENT_SHADER, ocFrag))
             foam     = ShorelineFoam(link(compile(GLES20.GL_VERTEX_SHADER, fmVert),
@@ -153,8 +148,8 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
         GLES20.glViewport(0, 0, width, height)
         aspect = width.toFloat() / height.toFloat().coerceAtLeast(1f)
-        // far=500 to include mountains at Z=-150; near=0.3 improves depth precision
-        Matrix.perspectiveM(proj, 0, 63f, aspect, 0.3f, 500f)
+        // far=200 covers ocean to Z=-60; near=0.3 improves depth precision
+        Matrix.perspectiveM(proj, 0, 63f, aspect, 0.3f, 200f)
     }
 
     override fun onDrawFrame(gl: GL10?) {
@@ -164,21 +159,12 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
             GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
             return
         }
-        GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
-
         val t    = (System.currentTimeMillis() - startMs) / 1000f
         val tide = tidePercent
         val wAmp = windAmp
         val wDir = windDirRad
 
-        // View matrix
-        Matrix.setLookAtM(view, 0,
-            eyePos[0], eyePos[1], eyePos[2],
-            center[0], center[1], center[2],
-            0f, 1f, 0f)
-        Matrix.multiplyMM(mvp, 0, proj, 0, view, 0)
-
-        // ── Time of day: light direction + sky LUT ────────────────────────────
+        // ── Time of day: compute LUT first so clear color matches sky ─────────
         val cal  = Calendar.getInstance()
         val hour = cal.get(Calendar.HOUR_OF_DAY) + cal.get(Calendar.MINUTE) / 60f
         val lightDir = computeLightDir(hour)
@@ -188,6 +174,17 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         val lutLight    = floatArrayOf(lut[6], lut[7], lut[8])
         val lutIsDark   = lut[9]
         val lutAmbient  = floatArrayOf(lut[10], lut[11], lut[12])
+
+        // Clear with horizon-matched color → any rendering gap shows sky color, not black
+        GLES20.glClearColor(lutHorizon[0] * 0.55f, lutHorizon[1] * 0.55f, lutHorizon[2] * 0.55f, 1f)
+        GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
+
+        // View matrix
+        Matrix.setLookAtM(view, 0,
+            eyePos[0], eyePos[1], eyePos[2],
+            center[0], center[1], center[2],
+            0f, 1f, 0f)
+        Matrix.multiplyMM(mvp, 0, proj, 0, view, 0)
 
         // Sky UV: map 3D light dir to approximate 2D screen position
         val lightUV = floatArrayOf(
@@ -209,10 +206,7 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         // ── Pass 1: Sky (no depth write) ─────────────────────────────────────
         sky.draw(lutHorizon, lutZenith, lutLight, lightUV, lutIsDark, t)
 
-        // ── Pass 2: Mountains (no depth write, far→near, painter's algorithm) ─
-        mountain.draw(mvp, lutHorizon, lightDir, lutAmbient)
-
-        // ── Pass 3: Beach ─────────────────────────────────────────────────────
+        // ── Pass 2: Beach ─────────────────────────────────────────────────────
         beach.draw(mvp, tide, waterlineZ, sandDry, sandWet, lutHorizon, lightDir, eyePos, lutAmbient, t)
 
         // ── Pass 4: Ocean (normal map bound to texture unit 0) ────────────────

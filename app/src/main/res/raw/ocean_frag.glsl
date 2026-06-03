@@ -93,11 +93,10 @@ void main() {
     // 윤슬 added on top — visible even at low sun angle (most dramatic at dawn/dusk)
     col += yunseulColor * (0.5 + fresnel * 0.5);
 
-    // ── Exponential² atmospheric fog ─────────────────────────────────────────
-    float fogD    = length(v_World - u_CamPos);
-    float fogFact = clamp(1.0 - exp(-0.002 * fogD * fogD), 0.0, 0.92);
-    vec3  fogCol  = mix(u_ShallowColor * 0.3, u_HorizonColor, 0.70);
-    col = mix(col, fogCol, fogFact);
+    // ── Z-distance fog: ocean fades fully into horizon at -60 ─────────────
+    float fogZ    = max(u_CamPos.z - v_World.z, 0.0);
+    float fogFact = clamp(1.0 - exp(-0.002 * fogZ * fogZ), 0.0, 1.0);
+    col = mix(col, u_HorizonColor, fogFact);
 
     gl_FragColor = vec4(col, 1.0);
 }

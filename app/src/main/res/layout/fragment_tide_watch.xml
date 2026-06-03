@@ -120,7 +120,7 @@
                 <TextView
                     android:layout_width="52dp"
                     android:layout_height="wrap_content"
-                    android:text="바다세기"
+                    android:text="바람세기"
                     android:textColor="#CCFFFFFF"
                     android:textSize="12sp" />
 
