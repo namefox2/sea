@@ -60,6 +60,7 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
     private var oc_yunseulStr   = -1
     private var oc_waterlineZ   = -1
     private var oc_normalMap    = -1
+    private var oc_horizonColor = -1
 
     // Procedural normal map texture (128×128 RGBA, tiling ripple normals)
     private var normalMapTex = 0
@@ -136,6 +137,7 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
             oc_yunseulStr   = GLES20.glGetUniformLocation(ocProg, "u_YunseulStr")
             oc_waterlineZ   = GLES20.glGetUniformLocation(ocProg, "u_WaterlineZ")
             oc_normalMap    = GLES20.glGetUniformLocation(ocProg, "u_NormalMap")
+            oc_horizonColor = GLES20.glGetUniformLocation(ocProg, "u_HorizonColor")
 
             ocean        = OceanMesh()
             ocean.uploadToGPU()
@@ -231,6 +233,7 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         GLES20.glUniform1f (oc_yunseulStr,   yunseulStr)
         GLES20.glUniform1f (oc_waterlineZ,   waterlineZ)
         GLES20.glUniform1i (oc_normalMap,    0)
+        GLES20.glUniform3fv(oc_horizonColor, 1, lutHorizon, 0)
 
         ocean.draw(oc_aPos)
 

@@ -18,6 +18,7 @@ uniform float     u_Time;
 uniform float     u_YunseulStr;
 uniform float     u_WaterlineZ;
 uniform sampler2D u_NormalMap;
+uniform vec3      u_HorizonColor;
 
 void main() {
     // Clip ocean where beach is visible (perspective-near side)
@@ -102,7 +103,7 @@ void main() {
 
     // ── Sky reflection (Fresnel-weighted, suppressed under foam) ─────────────
     // At grazing angles Fresnel→1: water acts as mirror → reflect horizon sky
-    vec3 skyReflColor = mix(u_ShallowColor * 0.5, vec3(0.72, 0.88, 1.0), 0.55);
+    vec3 skyReflColor = mix(u_ShallowColor * 0.5, u_HorizonColor, 0.55);
     col = mix(col, skyReflColor * 0.88, fresnel * 0.62 * (1.0 - foamFactor));
 
     // 윤슬 added on top — visible even at low sun angle (most dramatic at dawn/dusk)
@@ -110,8 +111,8 @@ void main() {
 
     // ── Exponential² atmospheric fog ─────────────────────────────────────────
     float fogD    = length(v_World - u_CamPos);
-    float fogFact = clamp(1.0 - exp(-0.002 * fogD * fogD), 0.0, 0.72);
-    vec3  fogCol  = mix(u_ShallowColor * 0.4, vec3(0.72, 0.88, 1.0), 0.50);
+    float fogFact = clamp(1.0 - exp(-0.002 * fogD * fogD), 0.0, 0.92);
+    vec3  fogCol  = mix(u_ShallowColor * 0.3, u_HorizonColor, 0.70);
     col = mix(col, fogCol, fogFact);
 
     gl_FragColor = vec4(col, 1.0);
