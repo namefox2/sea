@@ -23,8 +23,8 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
     @Volatile var windAmp      = 0.25f
     @Volatile var windDirRad   = 3.93f
     // Ocean colors — theme-driven
-    @Volatile var deepColor    = floatArrayOf(0.04f, 0.22f, 0.58f)
-    @Volatile var shallowColor = floatArrayOf(0.16f, 0.56f, 0.82f)
+    @Volatile var deepColor    = floatArrayOf(0.02f, 0.09f, 0.22f)  // far/horizon dark navy
+    @Volatile var shallowColor = floatArrayOf(0.08f, 0.62f, 0.68f) // near camera bright teal
     @Volatile var sandDry      = floatArrayOf(0.92f, 0.86f, 0.68f)
     @Volatile var sandWet      = floatArrayOf(0.68f, 0.60f, 0.44f)
     // Sky/sun theme tints — blended into the time-of-day LUT each frame

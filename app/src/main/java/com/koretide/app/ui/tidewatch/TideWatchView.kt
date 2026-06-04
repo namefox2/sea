@@ -29,8 +29,10 @@ class TideWatchView @JvmOverloads constructor(
                 fun Int.b() = Color.blue(this) / 255f
                 queueEvent {
                     // Ocean colors
-                    renderer.deepColor    = floatArrayOf(theme.seaBottomColor.r(), theme.seaBottomColor.g(), theme.seaBottomColor.b())
-                    renderer.shallowColor = floatArrayOf(theme.seaTopColor.r(),    theme.seaTopColor.g(),    theme.seaTopColor.b())
+                    // seaTopColor = top of view = horizon = far → deepColor
+                    // seaBottomColor = bottom of view = near camera = shallow → shallowColor
+                    renderer.deepColor    = floatArrayOf(theme.seaTopColor.r(),    theme.seaTopColor.g(),    theme.seaTopColor.b())
+                    renderer.shallowColor = floatArrayOf(theme.seaBottomColor.r(), theme.seaBottomColor.g(), theme.seaBottomColor.b())
                     val flat = theme.tidalFlatColor
                     renderer.sandDry  = floatArrayOf(
                         (flat.r() * 0.85f + 0.15f).coerceAtMost(1f),
