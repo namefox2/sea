@@ -31,7 +31,7 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:gravity="center"
-            android:text="Korea Tide — 실시간 조위 정보 앱"
+            android:text="오늘바다 — 실시간 조위 정보 앱"
             android:textSize="13sp"
             android:textColor="#555555" />
     </FrameLayout>

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Korea Tide</string>
+    <string name="app_name">오늘바다</string>
 
     <!-- Bottom nav -->
     <string name="nav_search">검색</string>
