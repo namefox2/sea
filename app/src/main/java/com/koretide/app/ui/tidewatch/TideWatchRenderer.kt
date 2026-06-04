@@ -19,10 +19,11 @@ import kotlin.math.sqrt
 class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Renderer {
 
     // ── State (written from UI thread via queueEvent, read on GL thread) ──────
-    @Volatile var tidePercent  = 0.5f
-    @Volatile var windAmp      = 0.25f
-    @Volatile var windDirRad   = 3.93f
-    @Volatile var useDefaultSun = true  // true → noon sun when no station selected
+    @Volatile var tidePercent   = 0.5f
+    @Volatile var windAmp       = 0.25f
+    @Volatile var windDirRad    = 3.93f
+    @Volatile var useDefaultSun = true   // true → use defaultHour; false → actual local time
+    @Volatile var defaultHour   = 12.0f  // hour used when useDefaultSun=true (set by theme)
     // Ocean colors — theme-driven
     @Volatile var deepColor    = floatArrayOf(0.02f, 0.09f, 0.22f)  // far/horizon dark navy
     @Volatile var shallowColor = floatArrayOf(0.08f, 0.62f, 0.68f) // near camera bright teal
@@ -186,7 +187,7 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         val cal  = Calendar.getInstance()
         // When no station is selected, use noon (12h) so the sun is centered in
         // the sky by default rather than at a random time-of-day position.
-        val hour = if (useDefaultSun) 12.0f
+        val hour = if (useDefaultSun) defaultHour
                    else cal.get(Calendar.HOUR_OF_DAY) + cal.get(Calendar.MINUTE) / 60f
         computeLightDir(hour)   // writes into lightDir member
         sampleSkyLut(hour)      // writes into lutHorizon/Zenith/Light/Ambient/isDark members

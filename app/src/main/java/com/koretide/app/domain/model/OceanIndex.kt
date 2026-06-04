@@ -20,12 +20,12 @@ enum class IndexType(val displayName: String, val emoji: String) {
     SEA_TRAVEL("바다여행", "🚢")
 }
 
-enum class IndexGrade(val label: String) {
-    VERY_GOOD("매우좋음"),
-    GOOD("좋음"),
-    FAIR("보통"),
-    BAD("나쁨"),
-    VERY_BAD("매우나쁨");
+enum class IndexGrade(val label: String, val level: Int, val emoji: String) {
+    VERY_GOOD("매우좋음", 1, "🟢"),
+    GOOD("좋음",         2, "🔵"),
+    FAIR("보통",         3, "🟡"),
+    BAD("나쁨",          4, "🟠"),
+    VERY_BAD("매우나쁨", 5, "🔴");
 
     companion object {
         fun fromString(s: String?): IndexGrade? = when (s?.trim()?.uppercase()) {

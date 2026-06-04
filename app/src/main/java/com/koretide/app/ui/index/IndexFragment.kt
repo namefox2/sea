@@ -6,6 +6,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
@@ -38,6 +39,8 @@ class IndexFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+
+        binding.btnIndexInfo.setOnClickListener { showIndexInfoDialog() }
 
         collectFlow(sharedViewModel.selectedStation) { station ->
             val region   = station?.regionShort()
@@ -99,7 +102,7 @@ class IndexFragment : Fragment() {
         if (index.isAvailable && index.grade != null) {
             tvGrade.isVisible = true
             tvPending.isVisible = false
-            tvGrade.text = index.gradeLabel ?: index.grade.label
+            tvGrade.text = "${index.grade.emoji} Lv.${index.grade.level}  ${index.gradeLabel ?: index.grade.label}"
             tvGrade.setTextColor(ContextCompat.getColor(requireContext(), gradeTextColor(index.grade)))
             tvGrade.setBackgroundResource(gradeBg(index.grade))
 
@@ -141,6 +144,20 @@ class IndexFragment : Fragment() {
         }
 
         return card
+    }
+
+    private fun showIndexInfoDialog() {
+        AlertDialog.Builder(requireContext())
+            .setTitle("해양활동지수 레벨 안내")
+            .setMessage(
+                "🟢 Lv.1 매우좋음 — 해양활동 최적\n" +
+                "🔵 Lv.2 좋음    — 해양활동 양호\n" +
+                "🟡 Lv.3 보통    — 해양활동 주의\n" +
+                "🟠 Lv.4 나쁨    — 해양활동 자제\n" +
+                "🔴 Lv.5 매우나쁨 — 해양활동 위험"
+            )
+            .setPositiveButton("확인", null)
+            .show()
     }
 
     private fun gradeTextColor(grade: IndexGrade): Int = when (grade) {

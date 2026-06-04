@@ -43,16 +43,31 @@ void main() {
     vec3  cloudShade  = mix(u_Horizon * 0.65, vec3(0.82, 0.85, 0.90), 0.45);
     sky = mix(sky, mix(cloudShade, cloudBright, sunFacing), cloud * 0.88);
 
-    // ── Sun/moon disc + glow + bloom ─────────────────────────────────────
-    // Correct for aspect ratio so the disc is a true pixel-space circle
+    // ── Sun disc (day) / Moon crescent (night) ───────────────────────────
     vec2 sunDelta = v_UV - u_LightUV;
     sunDelta.x   *= u_Aspect;
-    float d    = length(sunDelta);
-    float body = smoothstep(0.032, 0.028, d);
-    float glow = smoothstep(0.22, 0.0, d) * mix(0.45, 0.20, u_IsDark);
-    float bloom = smoothstep(0.55, 0.0, d) * 0.12
-                * clamp(1.0 - u_IsDark * 1.5, 0.0, 1.0);
-    sky += u_LightColor * (body * 2.5 + glow + bloom);
+    float d = length(sunDelta);
+
+    float body, glow, bloom;
+    if (u_IsDark < 0.5) {
+        // ── Sun: solid disc + warm glow + wide bloom ─────────────────────
+        body  = smoothstep(0.032, 0.028, d);
+        glow  = smoothstep(0.22, 0.0, d) * 0.45;
+        bloom = smoothstep(0.55, 0.0, d) * 0.12;
+        sky += u_LightColor * (body * 2.5 + glow + bloom);
+    } else {
+        // ── Moon: crescent formed by subtracting an offset shadow disc ───
+        // Main disc
+        body = smoothstep(0.030, 0.026, d);
+        // Shadow disc offset slightly: creates the crescent sliver
+        vec2 shadowDelta = sunDelta - vec2(0.018, 0.010);
+        float shadow = smoothstep(0.026, 0.022, length(shadowDelta));
+        float crescent = clamp(body - shadow, 0.0, 1.0);
+        // Soft silver-blue moonlight glow
+        glow = smoothstep(0.14, 0.0, d) * 0.18;
+        vec3 moonColor = vec3(0.85, 0.90, 1.00);
+        sky += moonColor * (crescent * 2.2 + glow);
+    }
 
     // Stars at night
     if (u_IsDark > 0.5) {
