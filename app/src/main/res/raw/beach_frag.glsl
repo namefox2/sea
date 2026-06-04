@@ -32,15 +32,15 @@ float tidalH(vec2 p) {
 void main() {
     float distToWater = v_World.z - u_WaterlineZ;
 
-    // Extended clip: -3.5 below waterline → shallow water zone rendered by beach
-    if (distToWater < -3.5) discard;
+    // Extended clip: 6 units into water — beach covers the full shore-depth transition
+    if (distToWater < -6.0) discard;
 
     // Camera distance for LOD and light corridor
     vec2  toFragXZ = v_World.xz - u_CamPos.xz;
     float dCam     = max(length(toFragXZ), 0.01);
 
-    // Shallow water factor: 0 at waterline, 1 at -3.5 below
-    float shallowFactor = clamp(-distToWater / 3.0, 0.0, 1.0);
+    // Shallow water factor: 0 at waterline, 1 at -2m (full 4-zone gradient in 2 meters)
+    float shallowFactor = clamp(-distToWater / 2.0, 0.0, 1.0);
 
     // Wetness: 0 far above waterline, 1 right at waterline
     float wetness = clamp(1.0 - distToWater / 4.0, 0.0, 1.0);
@@ -150,20 +150,38 @@ void main() {
         baseColor += u_AmbientColor * (1.0 - NdotL) * shadowStr * 0.18 * shadowBlend;
     }
 
-    // ── Shallow water zone: silty floor visible through ocean wave troughs ─
-    // (distToWater < 0: beach renders as seafloor under shallow water)
+    // ── Shore Depth: Deep Water → Shallow → Wet Sand → Beach ────────────────
+    // Ocean clips at waterlineZ-3 so this 3-unit strip is rendered by beach alone,
+    // creating an unobstructed 4-zone depth gradient visible at the shoreline.
     if (shallowFactor > 0.001) {
-        // Sandy/silty seafloor color, darkens with depth
-        vec3 seafloor  = mix(wetSand * 0.65, mudflatShallow * 0.7, shallowFactor * 0.6);
-        // Water column tint (teal shallow → deep blue)
-        vec3 waterTint = mix(vec3(0.14, 0.44, 0.38), vec3(0.06, 0.18, 0.30), shallowFactor);
-        // Caustic shimmer
+        // Zone anchor colors (shore entry → shallow → mid → deep-shore)
+        vec3 zEntry   = mix(wetSand * 0.88, vec3(0.26, 0.54, 0.48), 0.50); // sandy teal
+        vec3 zShallow = vec3(0.12, 0.48, 0.42);  // clear teal — sand visible below
+        vec3 zMid     = vec3(0.07, 0.30, 0.46);  // green-blue transition
+        vec3 zDeep    = vec3(0.04, 0.17, 0.38);  // near-shore deep blue
+
+        // 4-zone smooth gradient driven by shallowFactor (0=waterline, 1=6m depth)
+        float t1 = smoothstep(0.00, 0.28, shallowFactor);
+        float t2 = smoothstep(0.28, 0.56, shallowFactor);
+        float t3 = smoothstep(0.56, 0.86, shallowFactor);
+        vec3 waterTint = zEntry;
+        waterTint = mix(waterTint, zShallow, t1);
+        waterTint = mix(waterTint, zMid,     t2);
+        waterTint = mix(waterTint, zDeep,    t3);
+
+        // Seafloor visibility: transparent near surface, opaque with depth
+        float seabedVis  = exp(-shallowFactor * 5.0);
+        vec3  seafloor   = mix(wetSand * 0.65, mudflatShallow * 0.7, shallowFactor * 0.6);
+        vec3  shallowCol = mix(waterTint, seafloor, seabedVis * 0.52);
+
+        // Caustic shimmer (only in very shallow zone, fades with depth)
         float caust = sin(v_World.x * 3.8 + u_Time * 1.4) * sin(v_World.z * 4.3 - u_Time * 1.1);
-        caust = pow(max(caust * 0.5 + 0.62, 0.0), 3.0) * 0.06;
-        vec3 shallowColor = mix(seafloor, waterTint, shallowFactor * 0.72) + waterTint * caust;
-        // Ramp very fast: even slightly underwater looks like water, not sand
-        float shallowBlend = smoothstep(0.0, 0.30, shallowFactor) * 0.98;
-        baseColor = mix(baseColor, shallowColor, shallowBlend);
+        caust = pow(max(caust * 0.5 + 0.62, 0.0), 3.0) * (1.0 - shallowFactor * 0.85) * 0.10;
+        shallowCol += waterTint * caust;
+
+        // Fast entry ramp: looks like water immediately, even at 0.9 units depth
+        float shallowBlend = smoothstep(0.0, 0.15, shallowFactor) * 0.97;
+        baseColor = mix(baseColor, shallowCol, shallowBlend);
     }
 
     // ── Waterline transition: Runup → Foam → Wet Sand ─────────────────────

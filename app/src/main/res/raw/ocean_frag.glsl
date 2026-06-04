@@ -21,8 +21,8 @@ uniform sampler2D u_NormalMap;
 uniform vec3      u_HorizonColor;
 
 void main() {
-    // Clip ocean where beach is visible (perspective-near side)
-    if (v_World.z > u_WaterlineZ + 0.5) discard;
+    // Push ocean edge back 2 units so beach's shore-depth gradient is unobstructed
+    if (v_World.z > u_WaterlineZ - 2.0) discard;
 
     // ── Z-distance: shared by fog and depth color ─────────────────────────────
     float fogZ    = max(u_CamPos.z - v_World.z, 0.0);
@@ -81,9 +81,9 @@ void main() {
                       * (broadSpec + sparkle * corridorMask * 3.5)
                       * u_YunseulStr;
 
-    // Subsurface scatter at wave tips
-    float sss    = pow(max(dot(L, -V), 0.0), 3.0) * max(v_World.y, 0.0) * 0.5;
-    vec3  sssCol = vec3(0.05, 0.70, 0.45) * sss;
+    // Subsurface scatter: backlit crests glow cyan-green — shows wave has volume
+    float sss    = pow(max(dot(L, -V), 0.0), 3.0) * max(v_World.y, 0.0) * 0.9;
+    vec3  sssCol = vec3(0.04, 0.72, 0.48) * sss;
 
     // Foam
     float foamFactor = smoothstep(0.35, 0.65, v_Foam) * clamp(u_WindAmp * 2.5, 0.0, 1.0);
