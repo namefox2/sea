@@ -59,7 +59,7 @@ void main() {
     float waveH  = clamp((v_World.y - tideY) / (minAmp * 1.4), -1.0, 1.0);
 
     water = mix(water, water * 1.26 + vec3(0.00, 0.04, 0.03), max(waveH, 0.0) * 0.55); // crest
-    water = mix(water, u_DeepColor * 0.42, max(-waveH, 0.0) * 0.60);                    // trough
+    water = mix(water, u_DeepColor * 0.55, max(-waveH, 0.0) * 0.38);                    // trough
 
     // ── Normal maps (3 scales → no visible tiling, near + far detail) ────────
     vec2 uv1 = v_World.xz * 0.12 + u_Time * vec2( 0.011,  0.007);
@@ -86,32 +86,43 @@ void main() {
     float sss = pow(max(dot(L, -V), 0.0), 5.0) * max(waveH, 0.0) * 0.9;
     col += vec3(0.01, 0.32, 0.22) * sss;
 
-    // ── 5. Sun light-corridor + 윤슬 ─────────────────────────────────────────
-    // Reflection path runs sun → horizon → camera. It is BRIGHTEST near the
-    // horizon (grazing reflection) and carries the most sparkle.
+    // ── 5. 윤슬 — physically based sun reflection corridor ───────────────────
+    // The glitter band is defined by the sun direction projected onto the water
+    // plane. Constant world-space width → perspective naturally makes it appear
+    // narrower at the horizon (correct optics), wider near the camera.
     vec2  lhDir    = normalize(vec2(L.x, L.z));
     vec2  toFrag   = v_World.xz - u_CamPos.xz;
     vec2  perpXZ   = vec2(-lhDir.y, lhDir.x);
     float perpDist = abs(dot(toFrag, perpXZ));
-    float corrHalf = mix(8.0, 5.5, distNorm);          // stays broad to the horizon
+
+    // Fixed world-space corridor half-width (perspective does the rest).
+    float corrHalf = 4.2;
     float corrMask = exp(-perpDist * perpDist / (corrHalf * corrHalf));
 
-    // Lighten the water along the path — strongest at the horizon.
-    float pathLight = corrMask * (0.30 + 0.85 * distNorm);
-    col = mix(col, mix(col, u_LightColor, 0.75), clamp(pathLight, 0.0, 0.82));
+    // Path brightening: water inside the corridor appears lighter (not blown out).
+    float pathLight = corrMask * 0.52;
+    col = mix(col, mix(col, u_LightColor, 0.62), clamp(pathLight, 0.0, 0.74));
 
-    // Specular sparkle: broad sheen + tight micro-glints (pure specular, no grid).
-    vec3  H       = normalize(L + V);
-    float sheen   = pow(max(dot(N,  H), 0.0), mix(50.0, 20.0, u_Roughness));
-    float expFine = mix(160.0, 600.0, distNorm);       // big glints near, fine far
-    float glints  = pow(max(dot(Nf, H), 0.0), expFine);
-    glints *= 0.6 + 0.4 * max(waveH, 0.0);             // favour wave crests
-    float sparkle = sheen * 0.28 + glints * 2.4;
+    // Half-vector for Blinn-Phong specular.
+    vec3  H = normalize(L + V);
 
-    // Baseline everywhere (near water always sparkles); much denser in the path,
-    // and the path's sparkle grows toward the horizon.
-    float corridorBoost = 0.22 + corrMask * (1.5 + distNorm * 1.6);
-    vec3  yunseul = u_LightColor * u_YunseulStr * sparkle * corridorBoost;
+    // Near glints: large, individual — broad lobe from wave macro-normal N.
+    float sheenExp = mix(20.0, 9.0, u_Roughness);
+    float sheen    = pow(max(dot(N, H), 0.0), sheenExp);
+
+    // Far micro-glints: dense, fine — tight lobe from detailed normal Nf.
+    float fineExp  = mix(280.0, 100.0, u_Roughness);
+    float glints   = pow(max(dot(Nf, H), 0.0), fineExp);
+    glints *= 0.5 + 0.5 * max(waveH, 0.0);  // favour crests
+
+    // Blend: large glints dominate near camera; micro-glints dominate at horizon.
+    float sparkle = sheen  * (0.65 - distNorm * 0.50) +
+                    glints * (0.35 + distNorm * 3.00);
+
+    // Corridor multiplier: very strong inside, faint outside.
+    // Baseline 0.06 keeps ocean alive even outside the corridor.
+    float corrBoost = 0.06 + corrMask * 2.0;
+    vec3  yunseul   = u_LightColor * u_YunseulStr * sparkle * corrBoost;
 
     // ── 6. Wave-crest foam (whitecaps grow with wind) ────────────────────────
     float foam = smoothstep(0.40, 0.78, v_Foam) * clamp(u_WindAmp * 2.2, 0.0, 1.0);

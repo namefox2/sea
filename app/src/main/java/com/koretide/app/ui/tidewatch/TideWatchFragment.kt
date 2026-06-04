@@ -143,6 +143,7 @@ class TideWatchFragment : Fragment() {
         }
         collectFlow(sharedViewModel.selectedStation) { station ->
             val b = _binding ?: return@collectFlow
+            b.tideWatchView.setHasStation(station != null)
             if (station == null) {
                 if (uiVisible) b.bannerNoStation.visible()
             } else {

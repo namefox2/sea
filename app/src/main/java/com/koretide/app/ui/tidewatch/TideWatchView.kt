@@ -55,6 +55,7 @@ class TideWatchView @JvmOverloads constructor(
 
     fun setTide(percent: Float)  { queueEvent { renderer.tidePercent = percent.coerceIn(0f, 1f) } }
     fun setWind(bft: Int)        { queueEvent { renderer.windAmp = (bft.coerceIn(0, 12) / 12f) } }
+    fun setHasStation(has: Boolean) { queueEvent { renderer.useDefaultSun = !has } }
 
     val initError: String? get() = renderer.initError
 
