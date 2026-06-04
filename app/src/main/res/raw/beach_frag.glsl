@@ -32,18 +32,19 @@ float tidalH(vec2 p) {
 void main() {
     float distToWater = v_World.z - u_WaterlineZ;
 
-    // Beach extends 2 units below waterline for wet sand / narrow shore transition
-    if (distToWater < -2.0) discard;
+    // Beach renders up to 3 units seaward of the waterline for the shallow entry zone.
+    if (distToWater < -3.0) discard;
 
     // Camera distance for LOD and light corridor
     vec2  toFragXZ = v_World.xz - u_CamPos.xz;
     float dCam     = max(length(toFragXZ), 0.01);
 
-    // Shallow water factor: 0 at waterline, 1 at -2m (full 4-zone gradient in 2 meters)
-    float shallowFactor = clamp(-distToWater / 2.0, 0.0, 1.0);
+    // Shallow water factor: 0 at waterline, 1 at -3m
+    float shallowFactor = clamp(-distToWater / 3.0, 0.0, 1.0);
 
-    // Wetness: 0 far above waterline, 1 right at waterline
-    float wetness = clamp(1.0 - distToWater / 4.0, 0.0, 1.0);
+    // Wetness: strongest at waterline, fades over 12m of exposed tidal flat.
+    // The freshly-exposed mudflat stays dark/wet; drier further from the water.
+    float wetness = clamp(1.0 - distToWater / 12.0, 0.0, 1.0);
     wetness = wetness * wetness;
 
     // ── Color palette ─────────────────────────────────────────────────────
@@ -108,7 +109,9 @@ void main() {
     float px2   = fract(v_World.x * 0.28 - 0.7);
     float pz2   = fract(v_World.z * 0.14 + 0.5);
     float pool2 = smoothstep(0.35, 0.27, length(vec2((px2 - 0.5) * 1.4, pz2 - 0.5)));
-    float poolMask    = max(pool1, pool2) * mudflatFactor;
+    // Tidal pools concentrated near the waterline (just exposed) and fade out on dry flat
+    float poolNear  = clamp(1.0 - distToWater / 20.0, 0.0, 1.0);
+    float poolMask  = max(pool1, pool2) * mudflatFactor * poolNear;
     vec3  poolReflect = mix(tidalPool, u_Horizon * 0.4, 0.5);
     baseColor = mix(baseColor, poolReflect, poolMask * 0.85);
 
@@ -151,15 +154,12 @@ void main() {
     }
 
     // ── Shoaling water entry — matches ocean shader's shoreAqua exactly ─────
-    // The ocean renders 2 units past the waterline, so this zone is already
-    // covered by ocean on top. The matching colour here ensures depth-test
-    // fights never expose a colour seam on the rare frame where beach wins.
     if (shallowFactor > 0.001) {
         vec3 waterTint = vec3(0.45, 0.74, 0.72);
         float caust = sin(v_World.x * 3.8 + u_Time * 1.4) * sin(v_World.z * 4.3 - u_Time * 1.1);
         caust = pow(max(caust * 0.5 + 0.62, 0.0), 3.0) * (1.0 - shallowFactor * 0.85) * 0.14;
         waterTint += waterTint * caust;
-        float shallowBlend = smoothstep(0.0, 0.18, shallowFactor) * 0.95;
+        float shallowBlend = smoothstep(0.0, 0.25, shallowFactor) * 0.95;
         baseColor = mix(baseColor, waterTint, shallowBlend);
     }
 
@@ -173,9 +173,9 @@ void main() {
     foamEdge *= smoothstep(-0.8, 0.15, distToWater);  // fade out below waterline
     baseColor = mix(baseColor, vec3(0.95, 0.97, 1.0), foamEdge * 0.88);
 
-    // ── Atmospheric fog ───────────────────────────────────────────────────
+    // ── Atmospheric fog — linear exponential, scales to 100m depth ───────
     float fogZ    = max(18.0 - v_World.z, 0.0);
-    float fogFact = clamp(1.0 - exp(-0.006 * fogZ * fogZ), 0.0, 0.50);
+    float fogFact = clamp(1.0 - exp(-fogZ * 0.008), 0.0, 0.45);
     baseColor = mix(baseColor, u_Horizon * 0.82, fogFact);
 
     gl_FragColor = vec4(baseColor, 1.0);

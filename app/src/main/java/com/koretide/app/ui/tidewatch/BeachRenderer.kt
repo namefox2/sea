@@ -3,11 +3,14 @@ package com.koretide.app.ui.tidewatch
 import android.opengl.GLES20
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import kotlin.math.sqrt
 
 class BeachRenderer(private val program: Int) {
 
-    private val cols = 64
-    private val rows = 16
+    // Match ocean mesh extent so there are no visible gaps.
+    // Dense rows near camera (sqrt distribution), sparse at the horizon.
+    private val cols = 80
+    private val rows = 48
     private val vertCount  = (cols + 1) * (rows + 1)
     private val indexCount = cols * rows * 6
 
@@ -29,16 +32,21 @@ class BeachRenderer(private val program: Int) {
     init { uploadToGPU() }
 
     private fun uploadToGPU() {
-        // Beach vertices: Y slopes from -0.5 at Z=0 (horizon) to +0.3 at Z=20 (viewer feet)
+        // Terrain grid: X -120..+120, Z -80..+22, same bounds as OceanMesh.
+        // Sqrt Z distribution: dense rows near camera (Z≈22), sparse at horizon (Z≈-80).
+        // Y gentle slope: -0.2 at the far horizon, +0.30 at viewer's feet.
+        val zFar = -80f; val zNear = 22f
         val verts = FloatArray(vertCount * 3)
         var vi = 0
         for (row in 0..rows) {
-            val t = row.toFloat() / rows
-            val y = t * 0.8f - 0.5f
+            val tLin  = row.toFloat() / rows
+            val tSqrt = sqrt(tLin.toDouble()).toFloat()
+            val z     = zFar + (zNear - zFar) * tSqrt
+            val y     = tLin * 0.50f - 0.20f
             for (col in 0..cols) {
-                verts[vi++] = (col.toFloat() / cols) * 20f - 10f
+                verts[vi++] = (col.toFloat() / cols) * 240f - 120f
                 verts[vi++] = y
-                verts[vi++] = (row.toFloat() / rows) * 20f
+                verts[vi++] = z
             }
         }
 
@@ -48,8 +56,8 @@ class BeachRenderer(private val program: Int) {
             for (col in 0 until cols) {
                 val tl = row * (cols + 1) + col
                 val bl = tl + (cols + 1)
-                idx[ii++] = tl.toShort();    idx[ii++] = bl.toShort();    idx[ii++] = (tl+1).toShort()
-                idx[ii++] = (tl+1).toShort(); idx[ii++] = bl.toShort();   idx[ii++] = (bl+1).toShort()
+                idx[ii++] = tl.toShort();     idx[ii++] = bl.toShort();     idx[ii++] = (tl+1).toShort()
+                idx[ii++] = (tl+1).toShort(); idx[ii++] = bl.toShort();     idx[ii++] = (bl+1).toShort()
             }
         }
 
