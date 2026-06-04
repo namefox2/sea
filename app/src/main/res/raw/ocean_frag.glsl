@@ -24,6 +24,18 @@ void main() {
     // Clip ocean where beach is visible (perspective-near side)
     if (v_World.z > u_WaterlineZ + 0.5) discard;
 
+    // ── Z-distance: shared by fog and depth color ─────────────────────────────
+    float fogZ    = max(u_CamPos.z - v_World.z, 0.0);
+    float fogFact = clamp(1.0 - exp(-0.002 * fogZ * fogZ), 0.0, 1.0);
+
+    // Depth color: near camera = deep saturated blue, far = hazy/shallow then fog
+    // zDepth: 1.0 right under camera, fades toward 0 at horizon
+    float zDepth = exp(-fogZ * 0.018);
+    // yDepth: troughs = deeper, crests = shallower (wave-scale micro-variation)
+    float yDepth = clamp(1.0 - (v_World.y + 0.5) * 0.5, 0.0, 1.0);
+    float depth  = clamp(zDepth * 0.70 + yDepth * 0.30, 0.0, 1.0);
+    vec3  water  = mix(u_ShallowColor, u_DeepColor, depth);
+
     // ── Normal map: two UV scrolls blended, perturb Gerstner normal ─────────
     vec2 uv1   = v_World.xz * 0.15 + u_Time * vec2( 0.012,  0.008);
     vec2 uv2   = v_World.xz * 0.07 - u_Time * vec2( 0.007,  0.011);
@@ -34,10 +46,6 @@ void main() {
     vec3 N = normalize(vec3(v_Normal.x + perturb.x, v_Normal.y, v_Normal.z + perturb.y));
     vec3 V = normalize(u_CamPos - v_World);
     vec3 L = u_LightDir;
-
-    // Depth-based water color
-    float depth  = clamp(1.0 - (v_World.y + 1.0) * 0.45, 0.0, 1.0);
-    vec3  water  = mix(u_ShallowColor, u_DeepColor, depth);
 
     // Fresnel (Schlick)
     float cosV   = max(dot(N, V), 0.0);
@@ -94,8 +102,6 @@ void main() {
     col += yunseulColor * (0.5 + fresnel * 0.5);
 
     // ── Z-distance fog: ocean fades fully into horizon at -60 ─────────────
-    float fogZ    = max(u_CamPos.z - v_World.z, 0.0);
-    float fogFact = clamp(1.0 - exp(-0.002 * fogZ * fogZ), 0.0, 1.0);
     col = mix(col, u_HorizonColor, fogFact);
 
     gl_FragColor = vec4(col, 1.0);

@@ -25,7 +25,7 @@ class OceanMesh(private val cols: Int = OCEAN_GRID_COLS, private val rows: Int =
             var vi = 0
             for (row in 0..rows) {
                 for (col in 0..cols) {
-                    buf[vi++] = (col.toFloat() / cols) * 20f - 10f  // X: -10..10
+                    buf[vi++] = (col.toFloat() / cols) * 160f - 80f // X: -80..80
                     buf[vi++] = 0f                                    // Y: flat, deformed by shader
                     buf[vi++] = (row.toFloat() / rows) * 80f - 60f  // Z: -60..20
                 }
