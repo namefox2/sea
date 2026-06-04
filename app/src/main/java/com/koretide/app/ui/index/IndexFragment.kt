@@ -14,6 +14,7 @@ import androidx.fragment.app.activityViewModels
 import androidx.fragment.app.viewModels
 import com.koretide.app.R
 import com.koretide.app.databinding.FragmentIndexBinding
+import com.koretide.app.domain.model.DayForecast
 import com.koretide.app.domain.model.IndexGrade
 import com.koretide.app.domain.model.OceanIndex
 import com.koretide.app.domain.model.Station
@@ -41,6 +42,9 @@ class IndexFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
 
         binding.btnIndexInfo.setOnClickListener { showIndexInfoDialog() }
+        binding.btnGoWatch.setOnClickListener {
+            sharedViewModel.requestTabNavigation(R.id.navigation_watch)
+        }
 
         collectFlow(sharedViewModel.selectedStation) { station ->
             val region   = station?.regionShort()
@@ -62,13 +66,19 @@ class IndexFragment : Fragment() {
         binding.progressBar.isVisible = true
         binding.tvError.isVisible     = false
         binding.containerCards.isVisible = false
+        binding.tvForecastTitle.isVisible = false
+        binding.scrollForecast.isVisible  = false
+        binding.btnGoWatch.isVisible      = false
     }
 
     private fun showError(msg: String) {
         binding.progressBar.isVisible = false
         binding.tvError.isVisible     = true
         binding.tvError.text          = msg
-        binding.containerCards.isVisible = false
+        binding.containerCards.isVisible  = false
+        binding.tvForecastTitle.isVisible = false
+        binding.scrollForecast.isVisible  = false
+        binding.btnGoWatch.isVisible      = false
     }
 
     private fun showSuccess(state: IndexUiState.Success) {
@@ -79,10 +89,39 @@ class IndexFragment : Fragment() {
         val stationText = state.stationName?.let { "📍 $it 기준" } ?: "관측소를 선택하면 해당 지역 지수를 표시합니다"
         binding.tvStationHint.text = stationText
 
+        // 7-day forecast
+        if (state.forecast.isNotEmpty()) {
+            binding.tvForecastTitle.isVisible = true
+            binding.scrollForecast.isVisible  = true
+            binding.btnGoWatch.isVisible      = true
+            renderForecast(state.forecast)
+        } else {
+            binding.tvForecastTitle.isVisible = false
+            binding.scrollForecast.isVisible  = false
+            binding.btnGoWatch.isVisible      = false
+        }
+
         binding.containerCards.removeAllViews()
         state.indices.forEach { index ->
             val card = buildIndexCard(index)
             binding.containerCards.addView(card)
+        }
+    }
+
+    private fun renderForecast(days: List<DayForecast>) {
+        val container = binding.containerForecast
+        container.removeAllViews()
+        val inflater = LayoutInflater.from(requireContext())
+        days.forEach { day ->
+            val card = inflater.inflate(R.layout.item_forecast_day, container, false)
+            card.findViewById<TextView>(R.id.tvDayLabel).text  = day.label
+            card.findViewById<TextView>(R.id.tvWaterTemp).text =
+                day.waterTemp?.let { "%.1f°C".format(it) } ?: "-"
+            card.findViewById<TextView>(R.id.tvWaveHeight).text =
+                day.waveHeight?.let { "%.1fm".format(it) } ?: "-"
+            card.findViewById<TextView>(R.id.tvWindSpeed).text =
+                day.windSpeed?.let { "%.1fm/s".format(it) } ?: "-"
+            container.addView(card)
         }
     }
 
@@ -124,7 +163,6 @@ class IndexFragment : Fragment() {
                 containerStats.addView(tv)
             }
         } else if (!index.isAvailable && index.grade != null) {
-            // Mock data state (API key blank but mock shown)
             tvGrade.isVisible = true
             tvPending.isVisible = false
             tvGrade.text = "${index.grade.label} (샘플)"
@@ -135,7 +173,6 @@ class IndexFragment : Fragment() {
             tvDate.isVisible  = false
             containerStats.isVisible = false
         } else {
-            // Placeholder — API key not yet registered
             tvGrade.isVisible   = false
             tvPending.isVisible = true
             tvBeach.isVisible   = false
