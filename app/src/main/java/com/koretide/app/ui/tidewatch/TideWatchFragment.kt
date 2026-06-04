@@ -23,6 +23,8 @@ import javax.inject.Inject
 
 private const val PREFS_THEME = "theme_prefs"
 private const val KEY_THEME_ID = "selected_theme_id"
+private const val PREFS_WATCH = "watch_prefs"
+private const val KEY_WAVE_SOUND = "wave_sound_enabled"
 
 @AndroidEntryPoint
 class TideWatchFragment : Fragment() {
@@ -36,6 +38,9 @@ class TideWatchFragment : Fragment() {
     private val sharedViewModel: SharedViewModel by activityViewModels()
 
     private var uiVisible = true
+
+    private val oceanSound = OceanSoundPlayer()
+    private var soundEnabled = false
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
@@ -59,6 +64,7 @@ class TideWatchFragment : Fragment() {
         binding.tideWatchView.themeConfig = theme
 
         setupSliders()
+        setupSound()
 
         // Tap background to toggle immersive; slider panel consumes its own touches
         binding.root.setOnClickListener { toggleImmersive() }
@@ -84,6 +90,7 @@ class TideWatchFragment : Fragment() {
             override fun onProgressChanged(sb: SeekBar, progress: Int, fromUser: Boolean) {
                 binding.tvWindBft.text = "$progress bft"
                 binding.tideWatchView.setWind(progress)
+                oceanSound.setIntensity(progress.coerceIn(0, 12) / 12f)
             }
             override fun onStartTrackingTouch(sb: SeekBar) {}
             override fun onStopTrackingTouch(sb: SeekBar) {}
@@ -97,6 +104,23 @@ class TideWatchFragment : Fragment() {
             override fun onStartTrackingTouch(sb: SeekBar) {}
             override fun onStopTrackingTouch(sb: SeekBar) {}
         })
+    }
+
+    private fun setupSound() {
+        soundEnabled = requireContext()
+            .getSharedPreferences(PREFS_WATCH, Context.MODE_PRIVATE)
+            .getBoolean(KEY_WAVE_SOUND, false)
+        binding.switchSound.isChecked = soundEnabled
+        oceanSound.setIntensity(binding.seekWind.progress.coerceIn(0, 12) / 12f)
+        if (soundEnabled) oceanSound.start()
+
+        binding.switchSound.setOnCheckedChangeListener { _, isChecked ->
+            soundEnabled = isChecked
+            requireContext()
+                .getSharedPreferences(PREFS_WATCH, Context.MODE_PRIVATE)
+                .edit().putBoolean(KEY_WAVE_SOUND, isChecked).apply()
+            if (isChecked) oceanSound.start() else oceanSound.stop()
+        }
     }
 
     private fun toggleImmersive() {
@@ -144,6 +168,7 @@ class TideWatchFragment : Fragment() {
             if (data != null) {
                 b.seekWind.progress = data.beaufort
                 b.tideWatchView.windDirectionDeg = data.directionDeg
+                oceanSound.setIntensity(data.beaufort.coerceIn(0, 12) / 12f)
                 sharedViewModel.updateWindData(data)
                 b.tvWindInfo.text = "${data.beaufortName} (${data.beaufort}bft, ${data.speedMs}m/s)"
             }
@@ -168,6 +193,7 @@ class TideWatchFragment : Fragment() {
     override fun onPause() {
         super.onPause()
         binding.tideWatchView.onPause()
+        oceanSound.stop()
         viewModel.stopPolling()
         if (!uiVisible) {
             uiVisible = true
@@ -178,6 +204,7 @@ class TideWatchFragment : Fragment() {
     override fun onResume() {
         super.onResume()
         binding.tideWatchView.onResume()
+        if (soundEnabled) oceanSound.start()
         val station = sharedViewModel.selectedStation.value
         if (station != null) {
             viewModel.startPolling(station.code, station.lat, station.lng)
@@ -186,6 +213,7 @@ class TideWatchFragment : Fragment() {
 
     override fun onDestroyView() {
         sharedViewModel.setWatchImmersive(false)
+        oceanSound.stop()
         _binding?.tideWatchView?.release()  // free GL resources before losing reference
         super.onDestroyView()
         _binding = null

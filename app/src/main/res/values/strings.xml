@@ -48,6 +48,7 @@
     <!-- Watch -->
     <string name="select_station_banner">상단 검색 또는 지도에서 관측소를 선택하면 물멍이 시작됩니다</string>
     <string name="go_to_search">검색으로 이동</string>
+    <string name="wave_sound_label">🔊 파도 소리</string>
 
     <!-- Map -->
     <string name="tooltip_view_detail">상세 보기</string>
