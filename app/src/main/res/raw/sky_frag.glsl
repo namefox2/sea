@@ -68,5 +68,15 @@ void main() {
     vec3  hazeCol = mix(u_Horizon * 1.20, mix(u_Horizon, vec3(1.0), 0.30) * 1.25, 1.0 - u_IsDark);
     sky = mix(sky, hazeCol, haze);
 
+    // Sun column — the sky directly above the sunlit water is markedly brighter
+    // from forward atmospheric scattering. Strongest along the sun's vertical
+    // column and toward the horizon; daytime only.
+    float colDist   = abs(v_UV.x - u_LightUV.x);
+    float sunColumn = exp(-colDist * colDist / 0.060)
+                    * pow(1.0 - v_UV.y, 1.3)
+                    * clamp(1.0 - u_IsDark * 1.5, 0.0, 1.0);
+    vec3  columnCol = mix(u_LightColor, vec3(1.0), 0.55) * 1.18;
+    sky = mix(sky, columnCol, clamp(sunColumn * 0.80, 0.0, 0.80));
+
     gl_FragColor = vec4(sky, 1.0);
 }

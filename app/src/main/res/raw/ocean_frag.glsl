@@ -96,12 +96,14 @@ void main() {
     float perpDist = abs(dot(toFrag, perpXZ));
 
     // Fixed world-space corridor half-width (perspective does the rest).
-    float corrHalf = 4.2;
+    float corrHalf = 6.0;
     float corrMask = exp(-perpDist * perpDist / (corrHalf * corrHalf));
 
-    // Path brightening: water inside the corridor appears lighter (not blown out).
-    float pathLight = corrMask * 0.52;
-    col = mix(col, mix(col, u_LightColor, 0.62), clamp(pathLight, 0.0, 0.74));
+    // Path brightening: water inside the corridor appears lighter — and grows
+    // toward the horizon where the sun's reflection bunches up (near-white glitter).
+    float pathLight = corrMask * (0.50 + 0.45 * distNorm);
+    vec3  pathTint  = mix(u_LightColor, vec3(1.0), 0.30 * distNorm);
+    col = mix(col, mix(col, pathTint, 0.72), clamp(pathLight, 0.0, 0.85));
 
     // Half-vector for Blinn-Phong specular.
     vec3  H = normalize(L + V);
@@ -119,9 +121,9 @@ void main() {
     float sparkle = sheen  * (0.65 - distNorm * 0.50) +
                     glints * (0.35 + distNorm * 3.00);
 
-    // Corridor multiplier: very strong inside, faint outside.
-    // Baseline 0.06 keeps ocean alive even outside the corridor.
-    float corrBoost = 0.06 + corrMask * 2.0;
+    // Corridor multiplier: very strong inside, faint outside; intensifies toward
+    // the horizon so the glitter reads as a brilliant band under the sun.
+    float corrBoost = 0.08 + corrMask * (2.2 + distNorm * 2.6);
     vec3  yunseul   = u_LightColor * u_YunseulStr * sparkle * corrBoost;
 
     // ── 6. Wave-crest foam (whitecaps grow with wind) ────────────────────────
@@ -144,9 +146,11 @@ void main() {
                  * (0.45 + 0.55 * vnoise(v_World.xz * 2.8 + u_Time * 0.55));
     col = mix(col, vec3(0.94, 0.97, 1.00), fringe * 0.42);
 
-    // ── 8. Horizon atmospheric seam — suppressed inside the bright sun path ───
-    float seam = smoothstep(0.92, 1.0, distNorm) * (1.0 - corrMask * 0.7);
-    col = mix(col, u_HorizonColor * 0.55, seam * 0.5);
+    // ── 8. Horizon atmospheric seam — distant water meets the bright sky ──────
+    // Blend toward a bright horizon tone so the far edge dissolves into the sky
+    // rather than forming a dark line; still suppressed inside the sun path.
+    float seam = smoothstep(0.92, 1.0, distNorm) * (1.0 - corrMask * 0.6);
+    col = mix(col, u_HorizonColor * 0.85, seam * 0.55);
 
     gl_FragColor = vec4(col, 1.0);
 }
