@@ -63,9 +63,10 @@ void main() {
         sky += vec3(0.85, 0.90, 1.00) * star;
     }
 
-    // Horizon haze
-    float haze = pow(1.0 - v_UV.y, 3.0) * 0.35;
-    sky = mix(sky, u_Horizon * 1.3, haze);
+    // Horizon haze — sky becomes lighter toward the bottom (horizon)
+    float haze = pow(1.0 - v_UV.y, 2.2) * 0.55;
+    vec3  hazeCol = mix(u_Horizon * 1.20, mix(u_Horizon, vec3(1.0), 0.30) * 1.25, 1.0 - u_IsDark);
+    sky = mix(sky, hazeCol, haze);
 
     gl_FragColor = vec4(sky, 1.0);
 }

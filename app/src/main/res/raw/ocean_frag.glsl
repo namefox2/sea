@@ -21,7 +21,6 @@ uniform float     u_Tide;
 uniform sampler2D u_NormalMap;
 uniform vec3      u_HorizonColor;
 
-// ── Irregular value noise — used for sun-glitter so it is NOT a regular grid ──
 float hash21(vec2 p) {
     p = fract(p * vec2(123.34, 345.45));
     p += dot(p, p + 34.345);
@@ -38,10 +37,22 @@ float vnoise(vec2 p) {
     return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
 }
 
+// One layer of discrete, twinkling glints (sparse points — reads as sparkle,
+// NOT a foam wash). density = fraction of cells lit, radius = glint size.
+float glintLayer(vec2 p, float t, float density, float radius) {
+    vec2  cell = floor(p);
+    vec2  f    = fract(p) - 0.5;
+    float rnd  = hash21(cell);
+    float on   = step(1.0 - density, rnd);
+    vec2  off  = (vec2(hash21(cell + 3.1), hash21(cell + 6.7)) - 0.5) * 0.7;
+    float d    = length(f - off);
+    float tw   = 0.45 + 0.55 * sin(t * 4.5 + rnd * 60.0);   // per-glint twinkle
+    return on * smoothstep(radius, 0.0, d) * max(tw, 0.0);
+}
+
 void main() {
     if (v_World.z > u_WaterlineZ - 0.5) discard;
 
-    // Horizontal distance from camera drives the colour depth gradient.
     float dist     = length(v_World.xz - u_CamPos.xz);
     float distNorm = clamp(dist / 70.0, 0.0, 1.0);
 
@@ -55,15 +66,20 @@ void main() {
     float depthT = pow(distNorm, 0.85);
     vec3  water  = mix(u_ShallowColor, u_DeepColor, depthT);
 
+    // ── Gentle rolling swell shading — gives 3D volume even at low wind so the
+    //    mid/far ocean never looks like a flat painted band. ──────────────────
+    vec2  swellDir = normalize(vec2(0.35, 1.0));
+    float swell  = sin(dot(v_World.xz, swellDir) * 0.55 - u_Time * 0.8) * 0.5 + 0.5;
+    swell = mix(swell, vnoise(v_World.xz * 0.45 - u_Time * 0.05), 0.5);
+    water *= 0.86 + 0.26 * swell;
+
     // ── 2. Trough darkening (relative to the tide-shifted mean level) ─────────
     float tideY  = u_Tide * 1.4 - 0.7;
-    float waveH  = v_World.y - tideY;            // + crest, − trough
+    float waveH  = v_World.y - tideY;
     float trough = clamp(-waveH * 1.4, 0.0, 1.0);
-    water = mix(water, u_DeepColor * 0.60, trough * 0.45);
+    water = mix(water, u_DeepColor * 0.60, trough * 0.40);
 
-    // ── Surface normal ───────────────────────────────────────────────────────
-    // Keep a small baseline perturbation even at 0 wind so the low-poly mesh
-    // facets never read as a checkerboard on flat water.
+    // ── Surface normal (baseline detail even at 0 wind → no faceted grid) ─────
     vec2 uv1   = v_World.xz * 0.15 + u_Time * vec2( 0.012,  0.008);
     vec2 uv2   = v_World.xz * 0.07 - u_Time * vec2( 0.007,  0.011);
     vec3 nm1   = texture2D(u_NormalMap, uv1).rgb * 2.0 - 1.0;
@@ -73,47 +89,55 @@ void main() {
     vec3 V = normalize(u_CamPos - v_World);
     vec3 L = u_LightDir;
 
-    // Diffuse body shading — gives the surface its 3D volume.
     float NdotL = max(dot(N, L), 0.0);
     vec3  col   = water * (NdotL * 0.40 + 0.60);
 
-    // ── 3. 윤슬 — natural sun-glitter corridor with IRREGULAR sparkle ─────────
-    // The sun-reflection path narrows toward the horizon (perspective). Sparkle
-    // is concentrated in that corridor and is subtle/irregular elsewhere.
+    // ── Sun/moon reflection corridor ─────────────────────────────────────────
     vec2  lhDir    = normalize(vec2(L.x, L.z));
     vec2  toFrag   = v_World.xz - u_CamPos.xz;
     vec2  perp     = vec2(-lhDir.y, lhDir.x);
     float perpDist = abs(dot(toFrag, perp));
-    float corrHalf = mix(9.0, 4.0, distNorm);                  // wide near, tight far
+    float corrHalf = mix(8.0, 3.5, distNorm);                 // wide near, tight far
     float corrMask = exp(-perpDist * perpDist / (corrHalf * corrHalf));
 
-    // Irregular glitter: product of two animated noise layers, sparse threshold.
-    // Cells are larger near the camera (big glints) and finer toward the horizon.
-    float glScale = mix(3.0, 11.0, distNorm);
-    vec2  gp      = v_World.xz * glScale;
-    float n1      = vnoise(gp + vec2(u_Time * 0.70, -u_Time * 0.50));
-    float n2      = vnoise(gp * 1.6 - vec2(u_Time * 0.45,  u_Time * 0.65));
-    float glint   = smoothstep(0.66, 0.98, n1 * n2 * 1.7);
+    // The reflected-light band of water is lighter (sun/moon path on the sea).
+    vec3 litWater = mix(col, mix(col, u_LightColor, 0.6), 0.55);
+    col = mix(col, litWater, corrMask);
 
-    // Smooth specular sheen — the soft bright glow that underlies the sparkles.
+    // ── 3. 윤슬 — discrete twinkling glints, brighter/larger near the camera ──
+    float density = 0.05 + corrMask * 0.30;                   // denser in the corridor
+    float gA = glintLayer(v_World.xz * mix(1.5, 4.5, distNorm),        u_Time,       density,        mix(0.34, 0.16, distNorm));
+    float gB = glintLayer(v_World.xz * mix(2.8, 8.0, distNorm) + 17.0, u_Time * 1.3, density * 0.8,  mix(0.24, 0.10, distNorm));
+    float glints = max(gA, gB);
+    float glintBright = mix(1.6, 0.7, distNorm);              // bright near, alive far
+
+    // Smooth specular sheen riding the corridor (soft glow under the glints).
     vec3  H    = normalize(L + V);
-    float spec = pow(max(dot(N, H), 0.0), mix(120.0, 28.0, u_Roughness));
+    float spec = pow(max(dot(N, H), 0.0), mix(110.0, 30.0, u_Roughness)) * corrMask;
 
-    // Concentrate in the corridor; keep a faint sparkle on the calm sides.
-    float corridor   = 0.12 + corrMask * 0.88;
-    float glitterAmt = glint * corridor * mix(1.0, 0.5, distNorm);
-    vec3  yunseul    = u_LightColor * u_YunseulStr * (glitterAmt * 0.85 + spec * corrMask * 0.55);
+    vec3 yunseul = u_LightColor * u_YunseulStr * (glints * glintBright + spec * 0.35);
 
-    // ── Foam on wind-driven crests ───────────────────────────────────────────
-    float foam = smoothstep(0.4, 0.7, v_Foam) * clamp(u_WindAmp * 2.5, 0.0, 1.0);
-    col = mix(col, vec3(0.95, 0.97, 1.00), foam);
+    // ── Foam on wind-driven crests (subtle — not a wash) ─────────────────────
+    float foam = smoothstep(0.45, 0.75, v_Foam) * clamp(u_WindAmp * 1.8, 0.0, 1.0);
+    col = mix(col, vec3(0.95, 0.97, 1.00), foam * 0.7);
 
     // Near wet sheen (Fresnel) — restricted to near water so far stays deep.
-    float fres   = pow(1.0 - max(dot(N, V), 0.0), 5.0);
-    vec3  sheen  = mix(u_ShallowColor, u_HorizonColor, 0.5) * 0.7;
-    col = mix(col, sheen, fres * 0.16 * (1.0 - distNorm) * (1.0 - foam));
+    float fres  = pow(1.0 - max(dot(N, V), 0.0), 5.0);
+    vec3  sheen = mix(u_ShallowColor, u_HorizonColor, 0.5) * 0.7;
+    col = mix(col, sheen, fres * 0.14 * (1.0 - distNorm) * (1.0 - foam));
 
     col += yunseul * (1.0 - foam);
+
+    // ── Shoreward shoaling: soften the ocean→beach edge into a gradient ───────
+    // As the surface nears the waterline it shallows: lightens to a pale aqua
+    // and grows a soft foam fringe, so there is no hard teal/sand boundary.
+    float shoreProx = clamp(1.0 - (u_WaterlineZ - v_World.z) / 7.0, 0.0, 1.0);
+    shoreProx = pow(shoreProx, 1.4);
+    vec3  paleAqua  = mix(u_ShallowColor, vec3(0.55, 0.80, 0.78), 0.55);
+    col = mix(col, paleAqua, shoreProx * 0.55);
+    float fringe = smoothstep(0.72, 1.0, shoreProx)
+                 * (0.45 + 0.55 * vnoise(v_World.xz * 3.0 + u_Time * 0.6));
+    col = mix(col, vec3(0.95, 0.97, 1.0), fringe * 0.35);
 
     // ── Thin atmospheric haze at the horizon line only ───────────────────────
     float seam = smoothstep(0.90, 1.0, distNorm);
