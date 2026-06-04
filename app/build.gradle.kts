@@ -129,6 +129,9 @@ dependencies {
     // AdMob
     implementation(libs.play.services.ads)
 
+    // Naver Maps
+    implementation(libs.naver.map.sdk)
+
     // Test
     testImplementation(libs.junit.jupiter.api)
     testRuntimeOnly(libs.junit.jupiter.engine)

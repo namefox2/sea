@@ -3,20 +3,20 @@
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:background="@color/korea_sea">
+    android:layout_height="match_parent">
 
+    <!-- Filter chips row -->
     <HorizontalScrollView
         android:id="@+id/scrollActivityChips"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:scrollbars="none"
-        android:paddingHorizontal="@dimen/spacing_md"
+        android:paddingStart="@dimen/spacing_md"
         android:paddingVertical="@dimen/spacing_sm"
         android:background="?android:attr/windowBackground"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
+        app:layout_constraintEnd_toStartOf="@id/btnViewIndex">
 
         <com.google.android.material.chip.ChipGroup
             android:layout_width="wrap_content"
@@ -30,12 +30,14 @@
                 android:layout_height="wrap_content"
                 android:text="전체"
                 android:checked="true" />
+
             <com.google.android.material.chip.Chip
                 android:id="@+id/chipHighTide"
                 style="@style/Widget.MaterialComponents.Chip.Filter"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="만조" />
+
             <com.google.android.material.chip.Chip
                 android:id="@+id/chipFishing"
                 style="@style/Widget.MaterialComponents.Chip.Filter"
@@ -73,6 +75,19 @@
         </com.google.android.material.chip.ChipGroup>
     </HorizontalScrollView>
 
+    <!-- 지수보기 button — shown when non-만조 activity filter is active -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnViewIndex"
+        style="@style/Widget.MaterialComponents.Button.TextButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="지수보기"
+        android:textSize="13sp"
+        android:visibility="gone"
+        app:layout_constraintTop_toTopOf="@id/scrollActivityChips"
+        app:layout_constraintBottom_toBottomOf="@id/scrollActivityChips"
+        app:layout_constraintEnd_toEndOf="parent" />
+
     <!-- AdMob 배너 -->
     <com.google.android.gms.ads.AdView
         android:id="@+id/adViewMap"
@@ -84,33 +99,17 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
-    <!-- 지도 컨테이너: 이미지 배경 + 핀 오버레이 -->
-    <FrameLayout
-        android:id="@+id/mapContainer"
+    <!-- Naver Map -->
+    <com.naver.maps.map.MapView
+        android:id="@+id/mapView"
         android:layout_width="0dp"
         android:layout_height="0dp"
         app:layout_constraintTop_toBottomOf="@id/adViewMap"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
+        app:layout_constraintEnd_toEndOf="parent" />
 
-        <!-- 배경 지도 이미지 -->
-        <ImageView
-            android:id="@+id/mapImage"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:src="@drawable/korea_map"
-            android:scaleType="fitCenter"
-            android:background="@color/korea_sea" />
-
-        <!-- 핀 오버레이: 투명 배경, 이미지 위에 겹침 -->
-        <com.koretide.app.ui.map.KoreaMapView
-            android:id="@+id/koreaMapView"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent" />
-
-    </FrameLayout>
-
+    <!-- Tooltip card (bottom overlay) -->
     <com.google.android.material.card.MaterialCardView
         android:id="@+id/tooltipCard"
         android:layout_width="0dp"
@@ -130,7 +129,6 @@
             android:padding="@dimen/spacing_sm"
             android:gravity="center_vertical">
 
-            <!-- Station info -->
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
@@ -156,7 +154,6 @@
                     android:maxLines="1" />
             </LinearLayout>
 
-            <!-- Buttons always visible -->
             <Button
                 android:id="@+id/btnViewDetail"
                 style="@style/Widget.MaterialComponents.Button.TextButton"

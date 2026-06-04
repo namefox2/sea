@@ -1,35 +1,41 @@
 package com.koretide.app.ui.map
 
-import android.graphics.Matrix
+import android.graphics.Color
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.view.ViewTreeObserver
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.fragment.app.viewModels
 import androidx.navigation.fragment.findNavController
 import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.MobileAds
+import com.naver.maps.geometry.LatLng
+import com.naver.maps.map.CameraUpdate
+import com.naver.maps.map.NaverMap
+import com.naver.maps.map.OnMapReadyCallback
+import com.naver.maps.map.overlay.Marker
+import com.naver.maps.map.overlay.MarkerIcons
 import com.koretide.app.R
 import com.koretide.app.databinding.FragmentMapBinding
 import com.koretide.app.domain.model.ActivitySpot
 import com.koretide.app.domain.model.ActivityType
 import com.koretide.app.domain.model.Station
-import com.koretide.app.domain.model.StationRegion
 import com.koretide.app.ui.main.SharedViewModel
 import com.koretide.app.util.collectFlow
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
-class MapFragment : Fragment() {
+class MapFragment : Fragment(), OnMapReadyCallback {
 
     private var _binding: FragmentMapBinding? = null
     private val binding get() = _binding!!
-    private var mapLayoutListener: ViewTreeObserver.OnGlobalLayoutListener? = null
+    private var navigating = false
+    private var naverMap: NaverMap? = null
+    private val stationMarkers = mutableListOf<Marker>()
+    private val spotMarkers = mutableListOf<Marker>()
     private var activitySpotNearestStation: Station? = null
-    private var navigating = false  // guard against double-tap navigation crash
 
     private val viewModel: MapViewModel by viewModels()
     private val sharedViewModel: SharedViewModel by activityViewModels()
@@ -43,10 +49,10 @@ class MapFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        setupMapView()
+        binding.mapView.onCreate(savedInstanceState)
+        binding.mapView.getMapAsync(this)
         setupActivityChips()
         setupAdMob()
-        syncPinCoordinatesToImage()
         observeState()
     }
 
@@ -59,52 +65,85 @@ class MapFragment : Fragment() {
         }
     }
 
-    /**
-     * ImageView(fitCenter)가 실제로 이미지를 그린 위치/크기를 읽어
-     * KoreaMapView 핀 좌표계를 이미지 기준으로 보정한다.
-     */
-    private fun syncPinCoordinatesToImage() {
-        mapLayoutListener = ViewTreeObserver.OnGlobalLayoutListener {
-            // 제거하지 않고 유지 — 광고 로드·툴팁 표시 등 레이아웃 변경 시 자동 재동기
-            val drawable = binding.mapImage.drawable ?: return@OnGlobalLayoutListener
-            val m = FloatArray(9)
-            binding.mapImage.imageMatrix.getValues(m)
-            val imgW = drawable.intrinsicWidth  * m[Matrix.MSCALE_X]
-            val imgH = drawable.intrinsicHeight * m[Matrix.MSCALE_Y]
-            binding.koreaMapView.setMapImageRect(m[Matrix.MTRANS_X], m[Matrix.MTRANS_Y], imgW, imgH)
+    override fun onMapReady(map: NaverMap) {
+        if (_binding == null) return
+        naverMap = map
+        map.moveCamera(CameraUpdate.scrollAndZoomTo(LatLng(36.5, 127.8), 5.8))
+        map.setOnMapClickListener { _, _ -> dismissTooltip() }
+        // Apply current ViewModel state immediately (flows may have emitted before map was ready)
+        updateStationMarkers(viewModel.stations.value)
+        updateSpotMarkers(viewModel.activitySpots.value)
+    }
+
+    private fun observeState() {
+        collectFlow(viewModel.stations) { stations ->
+            if (naverMap != null) updateStationMarkers(stations)
         }
-        binding.mapImage.viewTreeObserver.addOnGlobalLayoutListener(mapLayoutListener)
-    }
-
-    private fun setupMapView() {
-        binding.koreaMapView.onPinClick = { station -> onPinSelected(station) }
-        binding.koreaMapView.onActivityPinClick = { spot -> onActivityPinSelected(spot) }
-        binding.koreaMapView.onEmptyTap = { dismissTooltip() }
-    }
-
-    private fun dismissTooltip() {
-        binding.tooltipCard.visibility = View.GONE
-        binding.koreaMapView.clearSelection()
-        activitySpotNearestStation = null
-        navigating = false
-        viewModel.clearPin()
-    }
-
-    private fun navigateToDetail() {
-        if (navigating) return
-        navigating = true
-        try {
-            findNavController().navigate(R.id.action_global_to_detail)
-        } catch (e: Exception) {
-            android.util.Log.w("MapFragment", "navigateToDetail failed", e)
-            navigating = false
+        collectFlow(viewModel.activitySpots) { spots ->
+            if (naverMap != null) updateSpotMarkers(spots)
+        }
+        collectFlow(viewModel.activityFilter) { filter ->
+            val b = _binding ?: return@collectFlow
+            val showIndex = filter != null && filter != ActivityType.HIGH_TIDE
+            b.btnViewIndex.visibility = if (showIndex) View.VISIBLE else View.GONE
         }
     }
 
-    private fun navigateToWatch() {
-        if (navigating) return
-        navigating = true
-        sharedViewModel.requestTabNavigation(R.id.navigation_watch)
+    private fun updateStationMarkers(stations: List<Station>) {
+        stationMarkers.forEach { it.map = null }
+        stationMarkers.clear()
+        val map = naverMap ?: return
+        stations.forEach { station ->
+            val marker = Marker().apply {
+                position = LatLng(station.lat, station.lng)
+                icon = MarkerIcons.BLACK
+                iconTintColor = Color.rgb(21, 101, 192)
+                width = Marker.SIZE_AUTO
+                height = Marker.SIZE_AUTO
+                captionText = station.name
+                captionTextSize = 10f
+                captionMinZoom = 8.0
+                setOnClickListener {
+                    onPinSelected(station)
+                    true
+                }
+            }
+            marker.map = map
+            stationMarkers.add(marker)
+        }
+    }
+
+    private fun updateSpotMarkers(spots: List<ActivitySpot>) {
+        spotMarkers.forEach { it.map = null }
+        spotMarkers.clear()
+        val map = naverMap ?: return
+        spots.forEach { spot ->
+            val marker = Marker().apply {
+                position = LatLng(spot.lat, spot.lng)
+                icon = MarkerIcons.BLACK
+                iconTintColor = spotColor(spot.type)
+                width = Marker.SIZE_AUTO
+                height = Marker.SIZE_AUTO
+                captionText = spot.name
+                captionTextSize = 10f
+                captionMinZoom = 7.0
+                setOnClickListener {
+                    onActivityPinSelected(spot)
+                    true
+                }
+            }
+            marker.map = map
+            spotMarkers.add(marker)
+        }
+    }
+
+    private fun spotColor(type: ActivityType): Int = when (type) {
+        ActivityType.FISHING    -> Color.rgb(76, 175, 80)
+        ActivityType.SURFING    -> Color.rgb(0, 188, 212)
+        ActivityType.TIDAL_FLAT -> Color.rgb(121, 85, 72)
+        ActivityType.SWIMMING   -> Color.rgb(33, 150, 243)
+        ActivityType.SCUBA      -> Color.rgb(13, 71, 161)
+        ActivityType.HIGH_TIDE  -> Color.rgb(21, 101, 192)
     }
 
     private fun setupActivityChips() {
@@ -124,89 +163,98 @@ class MapFragment : Fragment() {
         binding.chipTidalFlat.setOnClickListener    { selectChip(binding.chipTidalFlat,   ActivityType.TIDAL_FLAT) }
         binding.chipSwimming.setOnClickListener     { selectChip(binding.chipSwimming,    ActivityType.SWIMMING) }
         binding.chipScuba.setOnClickListener        { selectChip(binding.chipScuba,       ActivityType.SCUBA) }
-    }
 
-    private fun observeState() {
-        collectFlow(viewModel.stations) { stations ->
-            val b = _binding ?: return@collectFlow
-            b.koreaMapView.pins = stations.map { station ->
-                KoreaMapView.StationPin(station = station)
-            }
-        }
-        collectFlow(viewModel.activitySpots) { spots ->
-            val b = _binding ?: return@collectFlow
-            b.koreaMapView.activitySpots = spots
-        }
-        collectFlow(sharedViewModel.selectedStation) { station ->
-            val b = _binding ?: return@collectFlow
-            b.koreaMapView.selectedCode = station?.code
-        }
-        collectFlow(viewModel.selectedPin) { pin ->
-            val b = _binding ?: return@collectFlow
-            if (pin != null) {
-                b.tooltipCard.visibility = View.VISIBLE
-                b.tvTooltipName.text = pin.name
-                b.tvTooltipRegion.text = pin.region.displayName
-                b.btnViewDetail.visibility = View.VISIBLE
-                b.btnGoWatch.visibility = View.VISIBLE
-            } else {
-                b.tooltipCard.visibility = View.GONE
-            }
+        binding.btnViewIndex.setOnClickListener {
+            sharedViewModel.requestTabNavigation(R.id.navigation_index)
         }
     }
 
     private fun onPinSelected(station: Station) {
         activitySpotNearestStation = null
-        viewModel.selectPin(station)
         sharedViewModel.selectStation(station)
-        // selectedCode 설정은 sharedViewModel 옵저버가 처리 → 자동으로 selectedSpotKey 해제
-        binding.tooltipCard.visibility = View.VISIBLE
-        binding.tvTooltipName.text = station.name
-        binding.tvTooltipRegion.text = station.region.displayName
-        binding.btnViewDetail.visibility = View.VISIBLE
-        binding.btnViewDetail.setOnClickListener { navigateToDetail() }
-        binding.btnGoWatch.visibility = View.VISIBLE
-        binding.btnGoWatch.setOnClickListener { navigateToWatch() }
+        val b = _binding ?: return
+        b.tooltipCard.visibility = View.VISIBLE
+        b.tvTooltipName.text = station.name
+        b.tvTooltipRegion.text = station.region.displayName
+        b.btnViewDetail.visibility = View.VISIBLE
+        b.btnViewDetail.setOnClickListener { navigateToDetail() }
+        b.btnGoWatch.visibility = View.VISIBLE
+        b.btnGoWatch.setOnClickListener { navigateToWatch() }
     }
 
     private fun onActivityPinSelected(spot: ActivitySpot) {
-        // 스팟 선택 → 스테이션 핀 하이라이트 해제, 스팟 핀 하이라이트
-        binding.koreaMapView.selectedSpotKey = "${spot.lat}_${spot.lng}"
-
-        val nearest = viewModel.findNearestStation(spot.lat.toDouble(), spot.lng.toDouble())
+        val nearest = viewModel.findNearestStation(spot.lat, spot.lng)
         activitySpotNearestStation = nearest
 
-        binding.tooltipCard.visibility = View.VISIBLE
-        binding.tvTooltipName.text = spot.name
-        binding.tvTooltipRegion.text = buildString {
+        val b = _binding ?: return
+        b.tooltipCard.visibility = View.VISIBLE
+        b.tvTooltipName.text = spot.name
+        b.tvTooltipRegion.text = buildString {
             append(spot.type.displayName)
             if (nearest != null) append(" · 인근: ${nearest.name}")
         }
         if (nearest != null) {
-            binding.btnViewDetail.visibility = View.VISIBLE
-            binding.btnViewDetail.setOnClickListener {
+            b.btnViewDetail.visibility = View.VISIBLE
+            b.btnViewDetail.setOnClickListener {
                 sharedViewModel.selectStation(nearest)
                 navigateToDetail()
             }
         } else {
-            binding.btnViewDetail.visibility = View.GONE
+            b.btnViewDetail.visibility = View.GONE
         }
-        binding.btnGoWatch.visibility = View.VISIBLE
-        binding.btnGoWatch.setOnClickListener {
+        b.btnGoWatch.visibility = View.VISIBLE
+        b.btnGoWatch.setOnClickListener {
             activitySpotNearestStation?.let { sharedViewModel.selectStation(it) }
             navigateToWatch()
         }
     }
 
-    override fun onResume() {
-        super.onResume()
+    private fun dismissTooltip() {
+        _binding?.tooltipCard?.visibility = View.GONE
+        activitySpotNearestStation = null
         navigating = false
     }
 
+    private fun navigateToDetail() {
+        if (navigating) return
+        navigating = true
+        try {
+            findNavController().navigate(R.id.action_global_to_detail)
+        } catch (e: Exception) {
+            android.util.Log.w("MapFragment", "navigateToDetail failed", e)
+            navigating = false
+        }
+    }
+
+    private fun navigateToWatch() {
+        if (navigating) return
+        navigating = true
+        sharedViewModel.requestTabNavigation(R.id.navigation_watch)
+    }
+
+    override fun onStart()  { super.onStart();  _binding?.mapView?.onStart() }
+    override fun onResume() { super.onResume(); _binding?.mapView?.onResume(); navigating = false }
+    override fun onPause()  { super.onPause();  _binding?.mapView?.onPause() }
+    override fun onStop()   { super.onStop();   _binding?.mapView?.onStop() }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        _binding?.mapView?.onSaveInstanceState(outState)
+    }
+
+    override fun onLowMemory() {
+        super.onLowMemory()
+        _binding?.mapView?.onLowMemory()
+    }
+
     override fun onDestroyView() {
-        mapLayoutListener?.let { binding.mapImage.viewTreeObserver.removeOnGlobalLayoutListener(it) }
-        mapLayoutListener = null
+        stationMarkers.forEach { it.map = null }
+        stationMarkers.clear()
+        spotMarkers.forEach { it.map = null }
+        spotMarkers.clear()
+        naverMap = null
         binding.adViewMap.destroy()
+        binding.mapView.onDestroy()
         super.onDestroyView()
         _binding = null
     }
