@@ -87,7 +87,7 @@ object NetworkModule {
     @KmaBeachRetrofit
     fun provideKmaBeachRetrofit(client: OkHttpClient, moshi: Moshi): Retrofit =
         Retrofit.Builder()
-            .baseUrl("https://apis.data.go.kr/1360000/BeachFrcstInfoService/")
+            .baseUrl("https://apis.data.go.kr/1360000/")
             .client(client)
             .addConverterFactory(MoshiConverterFactory.create(moshi))
             .build()
