@@ -3,6 +3,7 @@ package com.koretide.app.di
 import com.koretide.app.BuildConfig
 import com.koretide.app.data.remote.KhoaApiService
 import com.koretide.app.data.remote.KmaApiService
+import com.koretide.app.data.remote.KmaBeachApiService
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import dagger.Module
@@ -24,6 +25,10 @@ annotation class KhoaRetrofit
 @Qualifier
 @Retention(AnnotationRetention.BINARY)
 annotation class KmaRetrofit
+
+@Qualifier
+@Retention(AnnotationRetention.BINARY)
+annotation class KmaBeachRetrofit
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -76,4 +81,19 @@ object NetworkModule {
     @Singleton
     fun provideKmaApiService(@KmaRetrofit retrofit: Retrofit): KmaApiService =
         retrofit.create(KmaApiService::class.java)
+
+    @Provides
+    @Singleton
+    @KmaBeachRetrofit
+    fun provideKmaBeachRetrofit(client: OkHttpClient, moshi: Moshi): Retrofit =
+        Retrofit.Builder()
+            .baseUrl("https://apis.data.go.kr/1360000/BeachFrcstInfoService/")
+            .client(client)
+            .addConverterFactory(MoshiConverterFactory.create(moshi))
+            .build()
+
+    @Provides
+    @Singleton
+    fun provideKmaBeachApiService(@KmaBeachRetrofit retrofit: Retrofit): KmaBeachApiService =
+        retrofit.create(KmaBeachApiService::class.java)
 }

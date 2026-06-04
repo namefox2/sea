@@ -7,6 +7,7 @@
     <string name="nav_map">지도</string>
     <string name="nav_detail">조위</string>
     <string name="nav_watch">물멍</string>
+    <string name="nav_index">지수</string>
     <string name="nav_settings">설정</string>
 
     <!-- Settings / Themes -->

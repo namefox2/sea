@@ -1,8 +1,10 @@
 package com.koretide.app.di
 
+import com.koretide.app.data.repository.OceanIndexRepositoryImpl
 import com.koretide.app.data.repository.StationRepositoryImpl
 import com.koretide.app.data.repository.TideRepositoryImpl
 import com.koretide.app.data.repository.WeatherRepositoryImpl
+import com.koretide.app.domain.repository.OceanIndexRepository
 import com.koretide.app.domain.repository.StationRepository
 import com.koretide.app.domain.repository.TideRepository
 import com.koretide.app.domain.repository.WeatherRepository
@@ -27,4 +29,8 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindWeatherRepository(impl: WeatherRepositoryImpl): WeatherRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindOceanIndexRepository(impl: OceanIndexRepositoryImpl): OceanIndexRepository
 }
