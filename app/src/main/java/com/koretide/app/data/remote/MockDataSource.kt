@@ -70,36 +70,48 @@ object MockDataSource {
     )
 
     fun mockTideData(stationCode: String): TideData {
+        val station = stations.firstOrNull { it.code == stationCode }
+        val (maxLevel, minLevel) = when (station?.region) {
+            StationRegion.WEST  -> 870 to 80   // 서해: 대조차
+            StationRegion.SOUTH -> 400 to 60   // 남해: 중조차
+            StationRegion.JEJU  -> 220 to 50   // 제주
+            else                -> 170 to 110  // 동해: 소조차
+        }
+
+        // Station-specific phase offset so each station shows a different tide stage
+        val stationHash = (stationCode.hashCode() and 0x7FFFFFFF)
+        val phaseOffset = (stationHash % 1200) * PI / 600.0
+
         val now = System.currentTimeMillis()
-        val hourOfDay = (now / 3_600_000 % 24).toInt()
-        val phase = hourOfDay * PI / 6.0
+        val minuteOfCycle = (now / 60_000L % 720L).toInt()  // 12-hour tidal cycle
+        val phase = minuteOfCycle * PI / 360.0 + phaseOffset
         val tidePercent = ((sin(phase) + 1.0) / 2.0).toFloat()
-        val maxLevel = 600
-        val minLevel = 50
         val currentLevel = (minLevel + (maxLevel - minLevel) * tidePercent).toInt()
+
         val status = when {
             tidePercent > 0.9f -> TideStatus.HIGH_TIDE
             tidePercent < 0.1f -> TideStatus.LOW_TIDE
-            sin(phase) > 0 -> TideStatus.RISING
-            else -> TideStatus.FALLING
+            sin(phase) > 0.0   -> TideStatus.RISING
+            else               -> TideStatus.FALLING
         }
 
         val records = (0..23).map { h ->
-            val p = sin(h * PI / 6.0)
+            val p = sin(h * PI / 6.0 + phaseOffset)
             val level = (minLevel + (maxLevel - minLevel) * ((p + 1.0) / 2.0)).toInt()
             TideRecord(stationCode, now - (23 - h) * 3_600_000L, level, false)
         }
 
+        val hourNow = (minuteOfCycle / 60)
         return TideData(
-            stationCode = stationCode,
+            stationCode  = stationCode,
             currentLevel = currentLevel,
-            maxLevel = maxLevel,
-            minLevel = minLevel,
-            tidePercent = tidePercent,
-            tideStatus = status,
-            highTideTime = "${(hourOfDay + 6) % 24}:00",
-            lowTideTime = "${(hourOfDay + 12) % 24}:00",
-            records = records
+            maxLevel     = maxLevel,
+            minLevel     = minLevel,
+            tidePercent  = tidePercent,
+            tideStatus   = status,
+            highTideTime = "${(hourNow + 6) % 24}:00",
+            lowTideTime  = "${(hourNow + 12) % 24}:00",
+            records      = records
         )
     }
 

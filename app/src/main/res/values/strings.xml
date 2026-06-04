@@ -38,6 +38,7 @@
     <!-- Detail -->
     <string name="no_station_selected">관측소를 선택하세요</string>
     <string name="btn_view_watch">물멍 보기</string>
+    <string name="btn_view_index">해양활동지수 보기</string>
     <string name="high_tide">만조</string>
     <string name="low_tide">간조</string>
     <string name="current_level">현재 수위</string>

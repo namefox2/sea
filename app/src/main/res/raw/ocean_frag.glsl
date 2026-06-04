@@ -21,16 +21,14 @@ uniform sampler2D u_NormalMap;
 uniform vec3      u_HorizonColor;
 
 void main() {
-    // Push ocean edge back 2 units so beach's shore-depth gradient is unobstructed
-    if (v_World.z > u_WaterlineZ - 2.0) discard;
+    if (v_World.z > u_WaterlineZ - 0.5) discard;
 
     // ── Z-distance: shared by fog and depth color ─────────────────────────────
     float fogZ    = max(u_CamPos.z - v_World.z, 0.0);
     float fogFact = clamp(1.0 - exp(-0.002 * fogZ * fogZ), 0.0, 1.0);
 
-    // Depth color: near camera = deep saturated blue, far = hazy/shallow then fog
-    // zDepth: 1.0 right under camera, fades toward 0 at horizon
-    float zDepth = 1.0 - exp(-fogZ * 0.025);        // 0=near(shallow), 1=far(deep)
+    // Near camera = shallow coastal teal, far horizon = deep saturated blue
+    float zDepth = 1.0 - exp(-fogZ * 0.04);         // 0=near(shallow teal), 1=far(deep)
     float yDepth = clamp(1.0 - (v_World.y + 0.5) * 0.5, 0.0, 1.0); // crest=shallow, trough=deep
     float depth  = clamp(zDepth * 0.80 + yDepth * 0.20, 0.0, 1.0);
     vec3  water  = mix(u_ShallowColor, u_DeepColor, depth);

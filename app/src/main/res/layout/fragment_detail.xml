@@ -32,7 +32,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:visibility="gone"
-            app:constraint_referenced_ids="tvStationName,waterLevelView,cardTideInfo,chart,progressBar,tvError,btnViewWatch" />
+            app:constraint_referenced_ids="tvStationName,waterLevelView,cardTideInfo,chart,progressBar,tvError,btnViewWatch,btnViewIndex" />
 
         <TextView
             android:id="@+id/tvStationName"
@@ -161,6 +161,17 @@
             android:layout_marginTop="@dimen/spacing_lg"
             android:text="@string/btn_view_watch"
             app:layout_constraintTop_toBottomOf="@id/chart"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnViewIndex"
+            style="@style/Widget.Material3.Button.OutlinedButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/spacing_sm"
+            android:text="@string/btn_view_index"
+            app:layout_constraintTop_toBottomOf="@id/btnViewWatch"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent" />
 
