@@ -150,12 +150,12 @@ void main() {
         baseColor += u_AmbientColor * (1.0 - NdotL) * shadowStr * 0.18 * shadowBlend;
     }
 
-    // ── Shoaling water entry — meets the ocean shader's pale-aqua shore fade ───
-    // Use a bright shallow aqua (not a dark teal) so the ocean↔beach line reads
-    // as a continuous shallow-water gradient rather than a hard boundary.
+    // ── Shoaling water entry — matches ocean shader's shoreAqua exactly ─────
+    // The ocean renders 2 units past the waterline, so this zone is already
+    // covered by ocean on top. The matching colour here ensures depth-test
+    // fights never expose a colour seam on the rare frame where beach wins.
     if (shallowFactor > 0.001) {
-        vec3 waterTint = vec3(0.45, 0.74, 0.72);   // pale shallow aqua
-        // Caustic shimmer in the very-shallow strip
+        vec3 waterTint = vec3(0.45, 0.74, 0.72);
         float caust = sin(v_World.x * 3.8 + u_Time * 1.4) * sin(v_World.z * 4.3 - u_Time * 1.1);
         caust = pow(max(caust * 0.5 + 0.62, 0.0), 3.0) * (1.0 - shallowFactor * 0.85) * 0.14;
         waterTint += waterTint * caust;

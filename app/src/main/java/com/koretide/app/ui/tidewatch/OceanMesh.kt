@@ -5,10 +5,10 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
 import java.nio.ShortBuffer
+import kotlin.math.sqrt
 
-// To upgrade resolution: change both constants to 128.
-// Safety: (128+1)²=16641 vertices, max index 16640 < 32767 — GL_UNSIGNED_SHORT is safe.
-private const val OCEAN_GRID_COLS = 64
+// 80 cols × 64 rows — GL_UNSIGNED_SHORT safe: (80+1)*(64+1)=5265 vertices, max idx 5264 < 65535
+private const val OCEAN_GRID_COLS = 80
 private const val OCEAN_GRID_ROWS = 64
 
 class OceanMesh(private val cols: Int = OCEAN_GRID_COLS, private val rows: Int = OCEAN_GRID_ROWS) {
@@ -19,15 +19,22 @@ class OceanMesh(private val cols: Int = OCEAN_GRID_COLS, private val rows: Int =
     private var vbo = 0
     private var ibo = 0
 
-    // Vertex: x, z only (y = 0, deformed by vertex shader)
     fun build(): FloatBuffer {
         val verts = FloatBuffer.wrap(FloatArray(vertexCount * 3).also { buf ->
             var vi = 0
+            // Non-uniform Z: sqrt distribution gives dense rows near camera (Z≈22),
+            // sparse rows at the horizon (Z≈-80). row=0 → far, row=rows → near.
+            // dz near ≈ 0.7 m/row;  dz far ≈ 6 m/row  (8:1 density ratio).
+            val zFar  = -80f
+            val zNear =  22f
             for (row in 0..rows) {
+                val t = row.toFloat() / rows           // 0=far, 1=near
+                val z = zFar + (zNear - zFar) * sqrt(t.toDouble()).toFloat()
                 for (col in 0..cols) {
-                    buf[vi++] = (col.toFloat() / cols) * 160f - 80f // X: -80..80
-                    buf[vi++] = 0f                                    // Y: flat, deformed by shader
-                    buf[vi++] = (row.toFloat() / rows) * 80f - 60f  // Z: -60..20
+                    val x = (col.toFloat() / cols) * 240f - 120f  // X: -120..120
+                    buf[vi++] = x
+                    buf[vi++] = 0f
+                    buf[vi++] = z
                 }
             }
         })
