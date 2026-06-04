@@ -160,7 +160,7 @@
                 <TextView
                     android:layout_width="52dp"
                     android:layout_height="wrap_content"
-                    android:text="수위"
+                    android:text="물때"
                     android:textColor="#CCFFFFFF"
                     android:textSize="12sp" />
 

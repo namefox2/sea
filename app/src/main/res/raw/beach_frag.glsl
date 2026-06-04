@@ -100,27 +100,24 @@ void main() {
         baseColor = mix(baseColor, mudflatShallow * 0.7, mudLow * mudflatFactor * 0.40);
         float grainDelta = (grain * 0.20 - 0.10) * mudflatFactor * (1.0 - lod * 0.8);
         baseColor += vec3(grainDelta);
+
+        // Tidal pools in natural low-lying areas — world-space noise placement,
+        // no fract() grid so no rectangular cell boundaries.
+        float poolNear = clamp(1.0 - distToWater / 20.0, 0.0, 1.0);
+        float poolMask = mudLow * mudflatFactor * poolNear * 0.72;
+        vec3  poolReflect = mix(tidalPool, u_Horizon * 0.4, 0.5);
+        baseColor = mix(baseColor, poolReflect, poolMask);
     }
 
-    // ── Tidal pool puddles ────────────────────────────────────────────────
-    float px1   = fract(v_World.x * 0.18 + 0.3);
-    float pz1   = fract(v_World.z * 0.22 + 0.1);
-    float pool1 = smoothstep(0.38, 0.30, length(vec2(px1 - 0.5, (pz1 - 0.5) * 1.6)));
-    float px2   = fract(v_World.x * 0.28 - 0.7);
-    float pz2   = fract(v_World.z * 0.14 + 0.5);
-    float pool2 = smoothstep(0.35, 0.27, length(vec2((px2 - 0.5) * 1.4, pz2 - 0.5)));
-    // Tidal pools concentrated near the waterline (just exposed) and fade out on dry flat
-    float poolNear  = clamp(1.0 - distToWater / 20.0, 0.0, 1.0);
-    float poolMask  = max(pool1, pool2) * mudflatFactor * poolNear;
-    vec3  poolReflect = mix(tidalPool, u_Horizon * 0.4, 0.5);
-    baseColor = mix(baseColor, poolReflect, poolMask * 0.85);
-
-    // ── Sand/mud ripple texture ───────────────────────────────────────────
-    float ripple = pow(sin(v_World.z * 9.0 + v_World.x * 1.2) * 0.5 + 0.5, 6.0)
-                 * pow(sin(v_World.z * 14.0 - v_World.x * 0.7) * 0.5 + 0.5, 4.0);
-    baseColor = mix(baseColor, mudflatDeep, ripple * 0.22 * mudflatFactor);
-    float sandRipple = pow(sin(v_World.z * 6.0 + v_World.x * 2.0) * 0.5 + 0.5, 8.0);
-    baseColor = mix(baseColor, drySand * 0.85, sandRipple * 0.15 * (1.0 - mudflatFactor));
+    // ── Sand/mud ripple texture — oblique single-direction waves, no sin×sin grid ──
+    // Mudflat ripples: single diagonal direction avoids a rectangular bright-spot grid.
+    float ripple = pow(sin(v_World.z * 9.0 + v_World.x * 2.3) * 0.5 + 0.5, 5.0)
+                 * (0.55 + 0.45 * bN(v_World.xz * 0.55 + vec2(4.1, 2.7)));
+    baseColor = mix(baseColor, mudflatDeep, ripple * 0.20 * mudflatFactor);
+    // Dry sand ripples: noise-modulated oblique wave, no perpendicular interference.
+    float sandRipple = pow(sin(v_World.z * 6.0 + v_World.x * 1.8) * 0.5 + 0.5, 7.0)
+                     * (0.5 + 0.5 * bN(v_World.xz * 0.38));
+    baseColor = mix(baseColor, drySand * 0.85, sandRipple * 0.14 * (1.0 - mudflatFactor));
 
     // ── Wet surface sky reflection with light corridor ────────────────────
     vec2  lhDir    = normalize(vec2(u_LightDir.x, u_LightDir.z));
@@ -129,15 +126,17 @@ void main() {
     float corrW    = mix(0.5, 6.0, clamp(dCam / 18.0, 0.0, 1.0));
     float corrMask = exp(-pDist * pDist / (corrW * corrW));
 
-    float wetSpec = pow(sin(v_World.z * 3.5 + u_Time * 0.4) * 0.5 + 0.5, 5.0)
-                  * pow(sin(v_World.x * 1.8 - u_Time * 0.2) * 0.5 + 0.5, 3.0);
-    float reflStr = wetness * (0.12 + wetSpec * 0.30 * corrMask) * (1.0 - u_TidePercent * 0.5);
+    // Single oblique wave × smooth noise — avoids the sin(z)×sin(x) rectangular grid.
+    float wetSpec = pow(sin(v_World.z * 3.5 + v_World.x * 1.1 + u_Time * 0.4) * 0.5 + 0.5, 5.0)
+                  * (0.50 + 0.50 * bN(v_World.xz * 0.72 + u_Time * 0.05));
+    float reflStr = wetness * (0.12 + wetSpec * 0.28 * corrMask) * (1.0 - u_TidePercent * 0.5);
     baseColor = mix(baseColor, u_Horizon * 0.65, reflStr);
 
-    // ── Rocky outcrops (간조 시 바위) ──────────────────────────────────────
+    // ── Rocky outcrops (간조 시 바위) — smooth noise, no floor() grid ────────
     float rockFactor = clamp(1.0 - u_TidePercent * 5.0, 0.0, 1.0);
-    float rockNoise  = step(0.72, fract(sin(dot(floor(v_World.xz * 0.4), vec2(127.1, 311.7))) * 43758.5));
-    baseColor = mix(baseColor, vec3(0.22, 0.20, 0.18), rockNoise * rockFactor * 0.7);
+    float rockNoise  = smoothstep(0.62, 0.80,
+        bN(v_World.xz * 0.30 + vec2(7.3, 2.1)) * bN(v_World.xz * 0.18 + vec2(3.5, 8.8)));
+    baseColor = mix(baseColor, vec3(0.22, 0.20, 0.18), rockNoise * rockFactor * 0.65);
 
     // ── Micro-terrain self-shadowing (above-water only for performance) ───
     if (shallowFactor < 0.95) {
