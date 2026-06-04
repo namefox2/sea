@@ -159,7 +159,7 @@ void main() {
         float caust = sin(v_World.x * 3.8 + u_Time * 1.4) * sin(v_World.z * 4.3 - u_Time * 1.1);
         caust = pow(max(caust * 0.5 + 0.62, 0.0), 3.0) * (1.0 - shallowFactor * 0.85) * 0.14;
         waterTint += waterTint * caust;
-        float shallowBlend = smoothstep(0.0, 0.30, shallowFactor) * 0.90;
+        float shallowBlend = smoothstep(0.0, 0.18, shallowFactor) * 0.95;
         baseColor = mix(baseColor, waterTint, shallowBlend);
     }
 

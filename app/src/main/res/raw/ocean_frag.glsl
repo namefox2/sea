@@ -104,12 +104,13 @@ void main() {
     vec3 litWater = mix(col, mix(col, u_LightColor, 0.6), 0.55);
     col = mix(col, litWater, corrMask);
 
-    // ── 3. 윤슬 — discrete twinkling glints, brighter/larger near the camera ──
-    float density = 0.05 + corrMask * 0.30;                   // denser in the corridor
-    float gA = glintLayer(v_World.xz * mix(1.5, 4.5, distNorm),        u_Time,       density,        mix(0.34, 0.16, distNorm));
-    float gB = glintLayer(v_World.xz * mix(2.8, 8.0, distNorm) + 17.0, u_Time * 1.3, density * 0.8,  mix(0.24, 0.10, distNorm));
+    // ── 3. 윤슬 — discrete twinkling glints, emphasised along the sun line ────
+    // Near glints are only slightly larger than far ones (small growth ratio).
+    float density = 0.035 + corrMask * 0.42;                  // strongly denser on the sun line
+    float gA = glintLayer(v_World.xz * mix(2.4, 5.5, distNorm),        u_Time,       density,        mix(0.20, 0.13, distNorm));
+    float gB = glintLayer(v_World.xz * mix(3.6, 9.0, distNorm) + 17.0, u_Time * 1.3, density * 0.8,  mix(0.15, 0.09, distNorm));
     float glints = max(gA, gB);
-    float glintBright = mix(1.6, 0.7, distNorm);              // bright near, alive far
+    float glintBright = mix(1.35, 0.7, distNorm) * (1.0 + corrMask * 1.3); // brighter on the sun line
 
     // Smooth specular sheen riding the corridor (soft glow under the glints).
     vec3  H    = normalize(L + V);
@@ -131,13 +132,13 @@ void main() {
     // ── Shoreward shoaling: soften the ocean→beach edge into a gradient ───────
     // As the surface nears the waterline it shallows: lightens to a pale aqua
     // and grows a soft foam fringe, so there is no hard teal/sand boundary.
-    float shoreProx = clamp(1.0 - (u_WaterlineZ - v_World.z) / 7.0, 0.0, 1.0);
-    shoreProx = pow(shoreProx, 1.4);
-    vec3  paleAqua  = mix(u_ShallowColor, vec3(0.55, 0.80, 0.78), 0.55);
-    col = mix(col, paleAqua, shoreProx * 0.55);
-    float fringe = smoothstep(0.72, 1.0, shoreProx)
+    float shoreProx = clamp(1.0 - (u_WaterlineZ - v_World.z) / 8.0, 0.0, 1.0);
+    shoreProx = pow(shoreProx, 1.3);
+    vec3  paleAqua  = vec3(0.45, 0.74, 0.72);   // identical to the beach water-entry tint
+    col = mix(col, paleAqua, shoreProx * 0.92);
+    float fringe = smoothstep(0.70, 1.0, shoreProx)
                  * (0.45 + 0.55 * vnoise(v_World.xz * 3.0 + u_Time * 0.6));
-    col = mix(col, vec3(0.95, 0.97, 1.0), fringe * 0.35);
+    col = mix(col, vec3(0.95, 0.97, 1.0), fringe * 0.40);
 
     // ── Thin atmospheric haze at the horizon line only ───────────────────────
     float seam = smoothstep(0.90, 1.0, distNorm);
