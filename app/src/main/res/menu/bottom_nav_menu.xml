@@ -9,13 +9,13 @@
         android:icon="@drawable/ic_map"
         android:title="@string/nav_map" />
     <item
-        android:id="@+id/navigation_watch"
-        android:icon="@drawable/ic_waves"
-        android:title="@string/nav_watch" />
-    <item
         android:id="@+id/navigation_index"
         android:icon="@drawable/ic_index"
         android:title="@string/nav_index" />
+    <item
+        android:id="@+id/navigation_watch"
+        android:icon="@drawable/ic_waves"
+        android:title="@string/nav_watch" />
     <item
         android:id="@+id/navigation_settings"
         android:icon="@drawable/ic_settings"
