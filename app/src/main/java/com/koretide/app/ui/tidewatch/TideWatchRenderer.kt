@@ -76,6 +76,9 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
     private val eyePos = floatArrayOf(0f, 1.8f, 18f)
     private val center = floatArrayOf(0f, -0.3f, 0f)
 
+    // Reused every frame to avoid per-frame Calendar allocation at 60 fps
+    private val calendar = Calendar.getInstance()
+
     // Pre-allocated — never replaced in onDrawFrame to avoid per-frame GC pressure
     private val lightDir   = FloatArray(3)
     private val lightUV    = FloatArray(2)
@@ -184,11 +187,9 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         val wDir = windDirRad
 
         // ── Time of day: compute LUT first so clear color matches sky ─────────
-        val cal  = Calendar.getInstance()
-        // When no station is selected, use noon (12h) so the sun is centered in
-        // the sky by default rather than at a random time-of-day position.
+        calendar.timeInMillis = System.currentTimeMillis()
         val hour = if (useDefaultSun) defaultHour
-                   else cal.get(Calendar.HOUR_OF_DAY) + cal.get(Calendar.MINUTE) / 60f
+                   else calendar.get(Calendar.HOUR_OF_DAY) + calendar.get(Calendar.MINUTE) / 60f
         computeLightDir(hour)   // writes into lightDir member
         sampleSkyLut(hour)      // writes into lutHorizon/Zenith/Light/Ambient/isDark members
 

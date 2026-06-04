@@ -13,6 +13,7 @@ import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
+import androidx.recyclerview.widget.GridLayoutManager
 import com.koretide.app.R
 import com.koretide.app.databinding.FragmentThemeSettingsBinding
 import com.koretide.app.theme.SeasonThemeManager
@@ -55,27 +56,20 @@ class ThemeSettingsFragment : Fragment() {
         val savedId = requireContext()
             .getSharedPreferences(PREFS_THEME, Context.MODE_PRIVATE)
             .getString(KEY_THEME_ID, null)
-        val activeTheme = if (savedId != null) {
-            themes.firstOrNull { it.id == savedId }
-                ?: seasonThemeManager.getThemeForContext(requireContext())
-        } else {
-            seasonThemeManager.getThemeForContext(requireContext())
-        }
+        val activeTheme = themes.firstOrNull { it.id == savedId }
+            ?: seasonThemeManager.getThemeForContext(requireContext())
 
-        binding.tvCurrentTheme.text = activeTheme.displayName
+        binding.tvCurrentTheme.text  = activeTheme.displayName
         binding.tvCurrentSeason.text = activeTheme.tagline()
 
-        val adapter = ThemeCardAdapter(themes, activeTheme.id) { selected ->
+        binding.recyclerThemes.layoutManager = GridLayoutManager(requireContext(), 2)
+        binding.recyclerThemes.adapter = ThemeCardAdapter(themes, activeTheme.id) { selected ->
             saveTheme(selected)
             sharedViewModel.setSelectedTheme(selected.id)
-            binding.tvCurrentTheme.text = selected.displayName
+            binding.tvCurrentTheme.text  = selected.displayName
             binding.tvCurrentSeason.text = selected.tagline()
             Toast.makeText(requireContext(), "${selected.displayName} 테마로 변경됐어요", Toast.LENGTH_SHORT).show()
         }
-        binding.recyclerThemes.adapter = adapter
-        val cols = 2
-        binding.recyclerThemes.layoutManager =
-            androidx.recyclerview.widget.GridLayoutManager(requireContext(), cols)
     }
 
     private fun saveTheme(theme: ThemeConfig) {
@@ -85,21 +79,15 @@ class ThemeSettingsFragment : Fragment() {
     }
 
     private fun setupSupportButtons() {
-        val amounts = listOf(
-            binding.btnSupport400  to getString(R.string.support_400),
-            binding.btnSupport900  to getString(R.string.support_900),
-            binding.btnSupport1500 to getString(R.string.support_1500),
-            binding.btnSupport2000 to getString(R.string.support_2000)
-        )
-        amounts.forEach { (btn, _) ->
-            btn.setOnClickListener {
-                AlertDialog.Builder(requireContext())
-                    .setTitle(getString(R.string.support_thanks_title))
-                    .setMessage(getString(R.string.support_thanks_msg))
-                    .setPositiveButton(getString(R.string.support_ok), null)
-                    .show()
-            }
+        val dialog by lazy {
+            AlertDialog.Builder(requireContext())
+                .setTitle(getString(R.string.support_thanks_title))
+                .setMessage(getString(R.string.support_thanks_msg))
+                .setPositiveButton(getString(R.string.support_ok), null)
+                .create()
         }
+        listOf(binding.btnSupport400, binding.btnSupport900, binding.btnSupport1500, binding.btnSupport2000)
+            .forEach { it.setOnClickListener { dialog.show() } }
     }
 
     private fun setupCrashLog() {

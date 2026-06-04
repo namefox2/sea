@@ -65,16 +65,18 @@ class IndexFragment : Fragment() {
     private fun showLoading() {
         binding.progressBar.isVisible = true
         binding.tvError.isVisible     = false
-        binding.containerCards.isVisible = false
-        binding.tvForecastTitle.isVisible = false
-        binding.scrollForecast.isVisible  = false
-        binding.btnGoWatch.isVisible      = false
+        hideResultArea()
     }
 
     private fun showError(msg: String) {
         binding.progressBar.isVisible = false
         binding.tvError.isVisible     = true
         binding.tvError.text          = msg
+        hideResultArea()
+    }
+
+    // Hides all result-area views; showSuccess selectively re-shows them
+    private fun hideResultArea() {
         binding.containerCards.isVisible  = false
         binding.tvForecastTitle.isVisible = false
         binding.scrollForecast.isVisible  = false
@@ -82,30 +84,21 @@ class IndexFragment : Fragment() {
     }
 
     private fun showSuccess(state: IndexUiState.Success) {
-        binding.progressBar.isVisible = false
-        binding.tvError.isVisible     = false
+        binding.progressBar.isVisible    = false
+        binding.tvError.isVisible        = false
         binding.containerCards.isVisible = true
 
-        val stationText = state.stationName?.let { "📍 $it 기준" } ?: "관측소를 선택하면 해당 지역 지수를 표시합니다"
-        binding.tvStationHint.text = stationText
+        binding.tvStationHint.text = state.stationName?.let { "📍 $it 기준" }
+            ?: "관측소를 선택하면 해당 지역 지수를 표시합니다"
 
-        // 7-day forecast
-        if (state.forecast.isNotEmpty()) {
-            binding.tvForecastTitle.isVisible = true
-            binding.scrollForecast.isVisible  = true
-            binding.btnGoWatch.isVisible      = true
-            renderForecast(state.forecast)
-        } else {
-            binding.tvForecastTitle.isVisible = false
-            binding.scrollForecast.isVisible  = false
-            binding.btnGoWatch.isVisible      = false
-        }
+        val hasForecast = state.forecast.isNotEmpty()
+        binding.tvForecastTitle.isVisible = hasForecast
+        binding.scrollForecast.isVisible  = hasForecast
+        binding.btnGoWatch.isVisible      = hasForecast
+        if (hasForecast) renderForecast(state.forecast)
 
         binding.containerCards.removeAllViews()
-        state.indices.forEach { index ->
-            val card = buildIndexCard(index)
-            binding.containerCards.addView(card)
-        }
+        state.indices.forEach { binding.containerCards.addView(buildIndexCard(it)) }
     }
 
     private fun renderForecast(days: List<DayForecast>) {
@@ -114,13 +107,10 @@ class IndexFragment : Fragment() {
         val inflater = LayoutInflater.from(requireContext())
         days.forEach { day ->
             val card = inflater.inflate(R.layout.item_forecast_day, container, false)
-            card.findViewById<TextView>(R.id.tvDayLabel).text  = day.label
-            card.findViewById<TextView>(R.id.tvWaterTemp).text =
-                day.waterTemp?.let { "%.1f°C".format(it) } ?: "-"
-            card.findViewById<TextView>(R.id.tvWaveHeight).text =
-                day.waveHeight?.let { "%.1fm".format(it) } ?: "-"
-            card.findViewById<TextView>(R.id.tvWindSpeed).text =
-                day.windSpeed?.let { "%.1fm/s".format(it) } ?: "-"
+            card.findViewById<TextView>(R.id.tvDayLabel).text   = day.label
+            card.findViewById<TextView>(R.id.tvWaterTemp).text  = day.waterTemp?.let  { "%.1f°C".format(it) } ?: "-"
+            card.findViewById<TextView>(R.id.tvWaveHeight).text = day.waveHeight?.let { "%.1fm".format(it)  } ?: "-"
+            card.findViewById<TextView>(R.id.tvWindSpeed).text  = day.windSpeed?.let  { "%.1fm/s".format(it)} ?: "-"
             container.addView(card)
         }
     }
@@ -132,51 +122,47 @@ class IndexFragment : Fragment() {
         card.findViewById<TextView>(R.id.tvIndexEmoji).text = index.type.emoji
         card.findViewById<TextView>(R.id.tvIndexName).text  = index.type.displayName
 
-        val tvGrade = card.findViewById<TextView>(R.id.tvGrade)
-        val tvBeach = card.findViewById<TextView>(R.id.tvBeachName)
-        val tvDate  = card.findViewById<TextView>(R.id.tvDate)
+        val tvGrade        = card.findViewById<TextView>(R.id.tvGrade)
+        val tvBeach        = card.findViewById<TextView>(R.id.tvBeachName)
+        val tvDate         = card.findViewById<TextView>(R.id.tvDate)
         val containerStats = card.findViewById<LinearLayout>(R.id.containerStats)
-        val tvPending = card.findViewById<TextView>(R.id.tvPending)
+        val tvPending      = card.findViewById<TextView>(R.id.tvPending)
 
-        if (index.isAvailable && index.grade != null) {
-            tvGrade.isVisible = true
+        val grade = index.grade
+        if (grade != null) {
+            tvGrade.isVisible   = true
             tvPending.isVisible = false
-            tvGrade.text = "${index.grade.emoji} Lv.${index.grade.level}  ${index.gradeLabel ?: index.grade.label}"
-            tvGrade.setTextColor(ContextCompat.getColor(requireContext(), gradeTextColor(index.grade)))
-            tvGrade.setBackgroundResource(gradeBg(index.grade))
-
-            tvBeach.isVisible = index.beachName != null
-            tvBeach.text = index.beachName ?: ""
-
-            tvDate.isVisible = index.date != null
-            tvDate.text = index.date ?: ""
-
-            containerStats.isVisible = index.stats.isNotEmpty()
-            containerStats.removeAllViews()
-            index.stats.forEach { (label, value) ->
-                val tv = TextView(requireContext()).apply {
-                    text = "$label $value"
-                    textSize = 12f
-                    setTextColor(ContextCompat.getColor(requireContext(), android.R.color.secondary_text_light))
-                    setPadding(0, 2, 16, 2)
+            if (index.isAvailable) {
+                tvGrade.text = "${grade.emoji} Lv.${grade.level}  ${index.gradeLabel ?: grade.label}"
+                tvGrade.setTextColor(ContextCompat.getColor(requireContext(), gradeTextColor(grade)))
+                tvGrade.setBackgroundResource(gradeBg(grade))
+                tvBeach.text = index.beachName ?: ""
+                tvBeach.isVisible = index.beachName != null
+                tvDate.text = index.date ?: ""
+                tvDate.isVisible = index.date != null
+                containerStats.isVisible = index.stats.isNotEmpty()
+                containerStats.removeAllViews()
+                index.stats.forEach { (label, value) ->
+                    containerStats.addView(TextView(requireContext()).apply {
+                        text = "$label $value"
+                        textSize = 12f
+                        setTextColor(ContextCompat.getColor(requireContext(), android.R.color.secondary_text_light))
+                        setPadding(0, 2, 16, 2)
+                    })
                 }
-                containerStats.addView(tv)
+            } else {
+                tvGrade.text = "${grade.label} (샘플)"
+                tvGrade.setTextColor(ContextCompat.getColor(requireContext(), android.R.color.darker_gray))
+                tvGrade.background = null
+                tvBeach.isVisible        = false
+                tvDate.isVisible         = false
+                containerStats.isVisible = false
             }
-        } else if (!index.isAvailable && index.grade != null) {
-            tvGrade.isVisible = true
-            tvPending.isVisible = false
-            tvGrade.text = "${index.grade.label} (샘플)"
-            tvGrade.setTextColor(ContextCompat.getColor(requireContext(), android.R.color.darker_gray))
-            tvGrade.background = null
-
-            tvBeach.isVisible = false
-            tvDate.isVisible  = false
-            containerStats.isVisible = false
         } else {
-            tvGrade.isVisible   = false
-            tvPending.isVisible = true
-            tvBeach.isVisible   = false
-            tvDate.isVisible    = false
+            tvGrade.isVisible        = false
+            tvPending.isVisible      = true
+            tvBeach.isVisible        = false
+            tvDate.isVisible         = false
             containerStats.isVisible = false
         }
 

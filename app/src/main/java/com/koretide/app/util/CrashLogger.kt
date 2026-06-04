@@ -14,6 +14,9 @@ object CrashLogger {
     private const val LOG_FILE = "crash_log.txt"
     private const val MAX_BYTES = 64 * 1024  // 64 KB
 
+    // Allocated once, not on every crash
+    private val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.KOREA)
+
     fun install(context: Context) {
         val appContext = context.applicationContext
         val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
@@ -28,10 +31,9 @@ object CrashLogger {
     private fun save(context: Context, thread: Thread, throwable: Throwable) {
         val sw = StringWriter()
         throwable.printStackTrace(PrintWriter(sw))
-        val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.KOREA).format(Date())
         val entry = buildString {
             append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
-            append("[$timestamp]\n")
+            append("[${dateFormat.format(Date())}]\n")
             append("Thread : ${thread.name}\n")
             append("Android: ${Build.VERSION.RELEASE} (SDK ${Build.VERSION.SDK_INT})\n")
             append("Device : ${Build.MANUFACTURER} ${Build.MODEL}\n")
@@ -39,11 +41,13 @@ object CrashLogger {
             append("\n")
         }
         val file = File(context.filesDir, LOG_FILE)
-        val existing = if (file.exists()) file.readText() else ""
-        val combined = existing + entry
-        // Rotate: if over limit, keep the most recent portion
-        val trimmed = if (combined.length > MAX_BYTES) combined.takeLast(MAX_BYTES) else combined
-        file.writeText(trimmed)
+        // Append-only: no full read on the normal path
+        file.appendText(entry)
+        // Trim only when the file has grown past the limit (rare)
+        if (file.length() > MAX_BYTES) {
+            val trimmed = file.readText().takeLast(MAX_BYTES)
+            file.writeText(trimmed)
+        }
     }
 
     fun read(context: Context): String {

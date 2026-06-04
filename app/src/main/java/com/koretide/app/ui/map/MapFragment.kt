@@ -70,7 +70,6 @@ class MapFragment : Fragment(), OnMapReadyCallback {
         naverMap = map
         map.moveCamera(CameraUpdate.scrollAndZoomTo(LatLng(36.5, 127.8), 5.8))
         map.setOnMapClickListener { _, _ -> dismissTooltip() }
-        // Apply current ViewModel state immediately (flows may have emitted before map was ready)
         updateStationMarkers(viewModel.stations.value)
         updateSpotMarkers(viewModel.activitySpots.value)
     }
@@ -89,25 +88,30 @@ class MapFragment : Fragment(), OnMapReadyCallback {
         }
     }
 
+    // Creates a Naver map marker with shared defaults
+    private fun createMarker(
+        lat: Double, lng: Double, name: String,
+        tintColor: Int, minZoom: Double,
+        onClick: () -> Unit
+    ): Marker = Marker().apply {
+        position = LatLng(lat, lng)
+        icon = MarkerIcons.BLACK
+        iconTintColor = tintColor
+        width = Marker.SIZE_AUTO
+        height = Marker.SIZE_AUTO
+        captionText = name
+        captionTextSize = 10f
+        captionMinZoom = minZoom
+        setOnClickListener { onClick(); true }
+    }
+
     private fun updateStationMarkers(stations: List<Station>) {
         stationMarkers.forEach { it.map = null }
         stationMarkers.clear()
         val map = naverMap ?: return
         stations.forEach { station ->
-            val marker = Marker().apply {
-                position = LatLng(station.lat, station.lng)
-                icon = MarkerIcons.BLACK
-                iconTintColor = Color.rgb(21, 101, 192)
-                width = Marker.SIZE_AUTO
-                height = Marker.SIZE_AUTO
-                captionText = station.name
-                captionTextSize = 10f
-                captionMinZoom = 8.0
-                setOnClickListener {
-                    onPinSelected(station)
-                    true
-                }
-            }
+            val marker = createMarker(station.lat, station.lng, station.name,
+                Color.rgb(21, 101, 192), 8.0) { onPinSelected(station) }
             marker.map = map
             stationMarkers.add(marker)
         }
@@ -118,20 +122,8 @@ class MapFragment : Fragment(), OnMapReadyCallback {
         spotMarkers.clear()
         val map = naverMap ?: return
         spots.forEach { spot ->
-            val marker = Marker().apply {
-                position = LatLng(spot.lat, spot.lng)
-                icon = MarkerIcons.BLACK
-                iconTintColor = spotColor(spot.type)
-                width = Marker.SIZE_AUTO
-                height = Marker.SIZE_AUTO
-                captionText = spot.name
-                captionTextSize = 10f
-                captionMinZoom = 7.0
-                setOnClickListener {
-                    onActivityPinSelected(spot)
-                    true
-                }
-            }
+            val marker = createMarker(spot.lat, spot.lng, spot.name,
+                spotColor(spot.type), 7.0) { onActivityPinSelected(spot) }
             marker.map = map
             spotMarkers.add(marker)
         }
@@ -177,9 +169,9 @@ class MapFragment : Fragment(), OnMapReadyCallback {
         b.tvTooltipName.text = station.name
         b.tvTooltipRegion.text = station.region.displayName
         b.btnViewDetail.visibility = View.VISIBLE
-        b.btnViewDetail.setOnClickListener { navigateToDetail() }
+        b.btnViewDetail.setOnClickListener { safeNavigate { findNavController().navigate(R.id.action_global_to_detail) } }
         b.btnGoWatch.visibility = View.VISIBLE
-        b.btnGoWatch.setOnClickListener { navigateToWatch() }
+        b.btnGoWatch.setOnClickListener { safeNavigate { sharedViewModel.requestTabNavigation(R.id.navigation_watch) } }
     }
 
     private fun onActivityPinSelected(spot: ActivitySpot) {
@@ -197,7 +189,7 @@ class MapFragment : Fragment(), OnMapReadyCallback {
             b.btnViewDetail.visibility = View.VISIBLE
             b.btnViewDetail.setOnClickListener {
                 sharedViewModel.selectStation(nearest)
-                navigateToDetail()
+                safeNavigate { findNavController().navigate(R.id.action_global_to_detail) }
             }
         } else {
             b.btnViewDetail.visibility = View.GONE
@@ -205,7 +197,19 @@ class MapFragment : Fragment(), OnMapReadyCallback {
         b.btnGoWatch.visibility = View.VISIBLE
         b.btnGoWatch.setOnClickListener {
             activitySpotNearestStation?.let { sharedViewModel.selectStation(it) }
-            navigateToWatch()
+            safeNavigate { sharedViewModel.requestTabNavigation(R.id.navigation_watch) }
+        }
+    }
+
+    // Prevents double-navigation; resets automatically on onResume
+    private fun safeNavigate(block: () -> Unit) {
+        if (navigating) return
+        navigating = true
+        try {
+            block()
+        } catch (e: Exception) {
+            android.util.Log.w("MapFragment", "navigation failed", e)
+            navigating = false
         }
     }
 
@@ -213,23 +217,6 @@ class MapFragment : Fragment(), OnMapReadyCallback {
         _binding?.tooltipCard?.visibility = View.GONE
         activitySpotNearestStation = null
         navigating = false
-    }
-
-    private fun navigateToDetail() {
-        if (navigating) return
-        navigating = true
-        try {
-            findNavController().navigate(R.id.action_global_to_detail)
-        } catch (e: Exception) {
-            android.util.Log.w("MapFragment", "navigateToDetail failed", e)
-            navigating = false
-        }
-    }
-
-    private fun navigateToWatch() {
-        if (navigating) return
-        navigating = true
-        sharedViewModel.requestTabNavigation(R.id.navigation_watch)
     }
 
     override fun onStart()  { super.onStart();  _binding?.mapView?.onStart() }
