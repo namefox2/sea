@@ -3,6 +3,7 @@ package com.koretide.app.domain.model
 data class OceanIndex(
     val type: IndexType,
     val grade: IndexGrade?,
+    val gradeLabel: String? = null,
     val stats: List<Pair<String, String>>,
     val beachName: String?,
     val date: String?,

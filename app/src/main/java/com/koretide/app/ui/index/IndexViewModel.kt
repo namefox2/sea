@@ -3,6 +3,7 @@ package com.koretide.app.ui.index
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.koretide.app.domain.model.OceanIndex
+import com.koretide.app.domain.model.TideData
 import com.koretide.app.domain.usecase.GetOceanIndicesUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -24,11 +25,16 @@ class IndexViewModel @Inject constructor(
     private val _uiState = MutableStateFlow<IndexUiState>(IndexUiState.Loading)
     val uiState = _uiState.asStateFlow()
 
-    fun load(region: String?, stationName: String?) {
+    fun load(
+        region: String?,
+        stationName: String?,
+        stationCode: String? = null,
+        tideData: TideData? = null
+    ) {
         viewModelScope.launch {
             _uiState.value = IndexUiState.Loading
             try {
-                val indices = getOceanIndices(region)
+                val indices = getOceanIndices(region, stationCode, tideData)
                 _uiState.value = IndexUiState.Success(indices, stationName)
             } catch (e: Exception) {
                 _uiState.value = IndexUiState.Error(e.message ?: "오류가 발생했습니다")

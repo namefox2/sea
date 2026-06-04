@@ -40,9 +40,10 @@ class IndexFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
 
         collectFlow(sharedViewModel.selectedStation) { station ->
-            val region = station?.regionShort()
-            val name   = station?.name
-            viewModel.load(region, name)
+            val region   = station?.regionShort()
+            val name     = station?.name
+            val tideData = sharedViewModel.tideData.value
+            viewModel.load(region, name, station?.code, tideData)
         }
 
         collectFlow(viewModel.uiState) { state ->
@@ -98,7 +99,7 @@ class IndexFragment : Fragment() {
         if (index.isAvailable && index.grade != null) {
             tvGrade.isVisible = true
             tvPending.isVisible = false
-            tvGrade.text = index.grade.label
+            tvGrade.text = index.gradeLabel ?: index.grade.label
             tvGrade.setTextColor(ContextCompat.getColor(requireContext(), gradeTextColor(index.grade)))
             tvGrade.setBackgroundResource(gradeBg(index.grade))
 

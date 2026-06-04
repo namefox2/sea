@@ -12,6 +12,7 @@ import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.fragment.app.viewModels
 import com.koretide.app.databinding.FragmentTideWatchBinding
+import com.koretide.app.domain.model.TideData
 import com.koretide.app.theme.SeasonThemeManager
 import com.koretide.app.ui.main.SharedViewModel
 import com.koretide.app.util.collectFlow
@@ -134,6 +135,7 @@ class TideWatchFragment : Fragment() {
                 b.seekTide.progress = pct
                 sharedViewModel.updateTideData(data)
                 b.tvTideInfo.text = "${data.tideStatus.displayName} $pct%"
+                updateMudflatGrade(b, data)
             }
         }
 
@@ -145,6 +147,21 @@ class TideWatchFragment : Fragment() {
                 sharedViewModel.updateWindData(data)
                 b.tvWindInfo.text = "${data.beaufortName} (${data.beaufort}bft, ${data.speedMs}m/s)"
             }
+        }
+    }
+
+    private fun updateMudflatGrade(b: FragmentTideWatchBinding, data: TideData) {
+        val range = data.maxLevel - data.minLevel
+        if (range > 100) {
+            val exposure = (data.maxLevel - data.currentLevel).toFloat() / range.toFloat()
+            b.tvMudflatGrade.text = when {
+                exposure >= 0.67f -> "🦀 갯벌 매우 많이 드러남"
+                exposure >= 0.33f -> "🦀 갯벌 보통 드러남"
+                else              -> "🦀 갯벌 조금 드러남"
+            }
+            b.tvMudflatGrade.visibility = View.VISIBLE
+        } else {
+            b.tvMudflatGrade.visibility = View.GONE
         }
     }
 
