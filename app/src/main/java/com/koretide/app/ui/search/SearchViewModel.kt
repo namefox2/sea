@@ -42,6 +42,7 @@ class SearchViewModel @Inject constructor(
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     private val stations = combine(_query, _selectedRegion) { q, r -> Pair(q, r) }
         .flatMapLatest { (q, r) -> searchStationsUseCase(q, r) }
 

@@ -146,7 +146,7 @@ class IndexFragment : Fragment() {
                     containerStats.addView(TextView(requireContext()).apply {
                         text = "$label $value"
                         textSize = 12f
-                        setTextColor(ContextCompat.getColor(requireContext(), android.R.color.secondary_text_light))
+                        setTextColor(ContextCompat.getColor(requireContext(), R.color.text_secondary))
                         setPadding(0, 2, 16, 2)
                     })
                 }
