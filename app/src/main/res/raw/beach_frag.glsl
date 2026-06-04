@@ -7,6 +7,7 @@ uniform vec3  u_LightDir;
 uniform float u_Time;
 uniform float u_TidePercent;
 uniform float u_WaterlineZ;
+uniform float u_WindAmp;
 uniform vec3  u_CamPos;
 uniform vec3  u_AmbientColor;
 
@@ -162,15 +163,27 @@ void main() {
         baseColor = mix(baseColor, waterTint, shallowBlend);
     }
 
-    // ── Waterline transition: Runup → Foam → Wet Sand ─────────────────────
-    // Swash foam (wave-animated, only above waterline)
-    float waveEdge = sin(v_World.x * 3.0 + u_Time * 2.2) * 0.35
-                   + cos(v_World.x * 5.0 - u_Time * 1.8) * 0.18;
-    float foamDist = distToWater - waveEdge;
-    float foamEdge = clamp(1.0 - abs(foamDist) / 0.65, 0.0, 1.0);
-    foamEdge = foamEdge * foamEdge * foamEdge;
-    foamEdge *= smoothstep(-0.8, 0.15, distToWater);  // fade out below waterline
-    baseColor = mix(baseColor, vec3(0.95, 0.97, 1.0), foamEdge * 0.88);
+    // ── Waterline transition: irregular swash foam patches ───────────────
+    // Multi-frequency noise sets where the foam tongue reaches along X at each moment.
+    // Three octaves: large slow tongues + medium + fine ripple detail.
+    float fA = bN(vec2(v_World.x * 0.10, u_Time * 0.12))                          * 1.60;
+    float fB = bN(vec2(v_World.x * 0.32, u_Time * 0.18) + vec2(3.1, 1.7))        * 0.80;
+    float fC = bN(vec2(v_World.x * 0.70, u_Time * 0.25) + vec2(8.3, 5.2))        * 0.35;
+    float foamScale = 1.0 + u_WindAmp * 1.5;
+    float foamReach = (fA + fB + fC) / 2.75 * 2.6 * foamScale;
+
+    // Foam band: centred where distToWater ≈ foamReach, half-width ~0.85m.
+    float foamFront = 1.0 - smoothstep(0.0, 0.85, abs(distToWater - foamReach));
+    foamFront *= smoothstep(-0.3, 0.2, distToWater);  // suppress below waterline
+
+    // Patch mask: two drifting bN fields break the band into disconnected blobs.
+    float pA = bN(vec2(v_World.x * 0.38 + u_Time * 0.07, v_World.z * 0.38 - u_Time * 0.04));
+    float pB = bN(vec2(v_World.x * 0.22 - u_Time * 0.05, v_World.z * 0.22 + u_Time * 0.03));
+    float patchThresh = mix(0.30, 0.18, u_WindAmp);
+    float patchMask   = smoothstep(patchThresh, 0.62, pA * 0.55 + pB * 0.45);
+
+    float foamBlend = clamp(foamFront * patchMask, 0.0, 1.0);
+    baseColor = mix(baseColor, vec3(0.94, 0.97, 1.00), foamBlend * 0.88);
 
     // ── Atmospheric fog — linear exponential, scales to 100m depth ───────
     float fogZ    = max(18.0 - v_World.z, 0.0);
