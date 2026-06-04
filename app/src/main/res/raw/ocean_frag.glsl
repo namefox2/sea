@@ -30,10 +30,9 @@ void main() {
 
     // Depth color: near camera = deep saturated blue, far = hazy/shallow then fog
     // zDepth: 1.0 right under camera, fades toward 0 at horizon
-    float zDepth = exp(-fogZ * 0.018);
-    // yDepth: troughs = deeper, crests = shallower (wave-scale micro-variation)
-    float yDepth = clamp(1.0 - (v_World.y + 0.5) * 0.5, 0.0, 1.0);
-    float depth  = clamp(zDepth * 0.70 + yDepth * 0.30, 0.0, 1.0);
+    float zDepth = 1.0 - exp(-fogZ * 0.025);        // 0=near(shallow), 1=far(deep)
+    float yDepth = clamp(1.0 - (v_World.y + 0.5) * 0.5, 0.0, 1.0); // crest=shallow, trough=deep
+    float depth  = clamp(zDepth * 0.80 + yDepth * 0.20, 0.0, 1.0);
     vec3  water  = mix(u_ShallowColor, u_DeepColor, depth);
 
     // ── Normal map: two UV scrolls blended, perturb Gerstner normal ─────────
