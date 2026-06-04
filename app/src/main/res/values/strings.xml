@@ -61,6 +61,7 @@
          ===================================================================== -->
     <string name="admob_app_id" translatable="false">ca-app-pub-3940256099942544~3347511713</string>
     <string name="admob_banner_map_unit_id" translatable="false">ca-app-pub-3940256099942544/6300978111</string>
+    <string name="admob_banner_search_unit_id" translatable="false">ca-app-pub-3940256099942544/6300978111</string>
 
     <!-- 법적 고지 -->
     <string name="open_source_licenses">오픈소스 라이선스</string>

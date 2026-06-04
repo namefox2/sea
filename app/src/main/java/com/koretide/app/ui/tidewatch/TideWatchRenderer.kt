@@ -103,6 +103,10 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
+        // If the EGL context was recreated (e.g. on repeated navigation) while the renderer
+        // was still considered ready, free the old GL objects before rebuilding them.
+        if (glReady) release()
+
         startMs = System.currentTimeMillis()
         GLES20.glClearColor(0.05f, 0.1f, 0.2f, 1f)
         GLES20.glEnable(GLES20.GL_DEPTH_TEST)

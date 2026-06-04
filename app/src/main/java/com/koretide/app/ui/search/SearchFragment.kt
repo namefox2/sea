@@ -10,6 +10,8 @@ import androidx.fragment.app.activityViewModels
 import androidx.fragment.app.viewModels
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
+import com.google.android.gms.ads.AdRequest
+import com.google.android.gms.ads.MobileAds
 import com.koretide.app.R
 import com.koretide.app.databinding.FragmentSearchBinding
 import com.koretide.app.domain.model.Station
@@ -40,10 +42,20 @@ class SearchFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        setupAdMob()
         setupRecyclerView()
         setupSearch()
         setupChips()
         observeState()
+    }
+
+    private fun setupAdMob() {
+        try {
+            MobileAds.initialize(requireContext())
+            binding.adBannerSearch.loadAd(AdRequest.Builder().build())
+        } catch (e: Exception) {
+            android.util.Log.w("SearchFragment", "AdMob init failed", e)
+        }
     }
 
     private fun setupRecyclerView() {
@@ -97,7 +109,17 @@ class SearchFragment : Fragment() {
         findNavController().navigate(R.id.action_global_to_detail)
     }
 
+    override fun onResume() {
+        super.onResume()
+        // Clear state so each visit shows a fresh unfiltered search list.
+        _binding?.etSearch?.text?.clear()
+        viewModel.setQuery("")
+        viewModel.setRegionFilter(null)
+        _binding?.chipAll?.isChecked = true
+    }
+
     override fun onDestroyView() {
+        _binding?.adBannerSearch?.destroy()
         super.onDestroyView()
         _binding = null
     }

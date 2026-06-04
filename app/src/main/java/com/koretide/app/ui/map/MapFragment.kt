@@ -108,13 +108,22 @@ class MapFragment : Fragment() {
     }
 
     private fun setupActivityChips() {
-        binding.chipActivityAll.setOnClickListener  { viewModel.setActivityFilter(null) }
-        binding.chipHighTide.setOnClickListener      { viewModel.setActivityFilter(ActivityType.HIGH_TIDE) }
-        binding.chipFishing.setOnClickListener      { viewModel.setActivityFilter(ActivityType.FISHING) }
-        binding.chipSurfing.setOnClickListener      { viewModel.setActivityFilter(ActivityType.SURFING) }
-        binding.chipTidalFlat.setOnClickListener    { viewModel.setActivityFilter(ActivityType.TIDAL_FLAT) }
-        binding.chipSwimming.setOnClickListener     { viewModel.setActivityFilter(ActivityType.SWIMMING) }
-        binding.chipScuba.setOnClickListener        { viewModel.setActivityFilter(ActivityType.SCUBA) }
+        val allChips = listOf(
+            binding.chipActivityAll, binding.chipHighTide, binding.chipFishing,
+            binding.chipSurfing, binding.chipTidalFlat, binding.chipSwimming, binding.chipScuba
+        )
+        fun selectChip(chip: com.google.android.material.chip.Chip, filter: ActivityType?) {
+            allChips.forEach { it.isChecked = false }
+            chip.isChecked = true
+            viewModel.setActivityFilter(filter)
+        }
+        binding.chipActivityAll.setOnClickListener  { selectChip(binding.chipActivityAll, null) }
+        binding.chipHighTide.setOnClickListener     { selectChip(binding.chipHighTide,    ActivityType.HIGH_TIDE) }
+        binding.chipFishing.setOnClickListener      { selectChip(binding.chipFishing,     ActivityType.FISHING) }
+        binding.chipSurfing.setOnClickListener      { selectChip(binding.chipSurfing,     ActivityType.SURFING) }
+        binding.chipTidalFlat.setOnClickListener    { selectChip(binding.chipTidalFlat,   ActivityType.TIDAL_FLAT) }
+        binding.chipSwimming.setOnClickListener     { selectChip(binding.chipSwimming,    ActivityType.SWIMMING) }
+        binding.chipScuba.setOnClickListener        { selectChip(binding.chipScuba,       ActivityType.SCUBA) }
     }
 
     private fun observeState() {

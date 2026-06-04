@@ -11,8 +11,8 @@ import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import com.koretide.app.R
 import com.koretide.app.databinding.FragmentThemeSettingsBinding
-import com.koretide.app.theme.Season
 import com.koretide.app.theme.SeasonThemeManager
+import com.koretide.app.theme.tagline
 import com.koretide.app.theme.ThemeConfig
 import com.koretide.app.ui.main.SharedViewModel
 import dagger.hilt.android.AndroidEntryPoint
@@ -57,15 +57,13 @@ class ThemeSettingsFragment : Fragment() {
         }
 
         binding.tvCurrentTheme.text = activeTheme.displayName
-        binding.tvCurrentSeason.text = activeTheme.season.koreanName() +
-                if (activeTheme.isDark) " (야간)" else " (주간)"
+        binding.tvCurrentSeason.text = activeTheme.tagline()
 
         val adapter = ThemeCardAdapter(themes, activeTheme.id) { selected ->
             saveTheme(selected)
             sharedViewModel.setSelectedTheme(selected.id)
             binding.tvCurrentTheme.text = selected.displayName
-            binding.tvCurrentSeason.text = selected.season.koreanName() +
-                    if (selected.isDark) " (야간)" else " (주간)"
+            binding.tvCurrentSeason.text = selected.tagline()
             Toast.makeText(requireContext(), "${selected.displayName} 테마로 변경됐어요", Toast.LENGTH_SHORT).show()
         }
         binding.recyclerThemes.adapter = adapter
@@ -96,13 +94,6 @@ class ThemeSettingsFragment : Fragment() {
                     .show()
             }
         }
-    }
-
-    private fun Season.koreanName() = when (this) {
-        Season.SPRING -> "봄"
-        Season.SUMMER -> "여름"
-        Season.AUTUMN -> "가을"
-        Season.WINTER -> "겨울"
     }
 
     override fun onDestroyView() {

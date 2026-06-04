@@ -6,35 +6,16 @@
     android:layout_height="match_parent"
     android:background="?android:attr/windowBackground">
 
-    <!-- Banner ad placeholder -->
-    <FrameLayout
-        android:id="@+id/adBanner"
+    <!-- AdMob 배너 -->
+    <com.google.android.gms.ads.AdView
+        android:id="@+id/adBannerSearch"
         android:layout_width="0dp"
-        android:layout_height="50dp"
-        android:background="#F5F5F5"
+        android:layout_height="wrap_content"
+        app:adSize="BANNER"
+        app:adUnitId="@string/admob_banner_search_unit_id"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:text="@string/ad_label"
-            android:textSize="11sp"
-            android:textColor="#AAAAAA"
-            android:background="#E8E8E8"
-            android:paddingHorizontal="10dp"
-            android:paddingVertical="3dp" />
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:gravity="center"
-            android:text="오늘바다 — 실시간 조위 정보 앱"
-            android:textSize="13sp"
-            android:textColor="#555555" />
-    </FrameLayout>
+        app:layout_constraintEnd_toEndOf="parent" />
 
     <com.google.android.material.textfield.TextInputLayout
         android:id="@+id/tilSearch"
@@ -42,7 +23,7 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_margin="@dimen/spacing_md"
-        app:layout_constraintTop_toBottomOf="@id/adBanner"
+        app:layout_constraintTop_toBottomOf="@id/adBannerSearch"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
 

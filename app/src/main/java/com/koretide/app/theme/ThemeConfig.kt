@@ -2,6 +2,13 @@ package com.koretide.app.theme
 
 import android.graphics.Color
 
+fun ThemeConfig.tagline(): String = when (id) {
+    "SUMMER_LIGHT" -> "맑고 화창한 낮바다"
+    "AUTUMN_LIGHT" -> "황금빛 노을이 물드는 해안"
+    "SUMMER_DARK"  -> "별이 빛나는 고요한 밤바다"
+    else           -> displayName
+}
+
 data class ThemeConfig(
     val id: String,
     val displayName: String,

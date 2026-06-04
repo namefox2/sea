@@ -128,8 +128,6 @@ class TideWatchFragment : Fragment() {
         val vis = if (uiVisible) View.VISIBLE else View.GONE
         binding.overlayCard.visibility = vis
         binding.sliderPanel.visibility = vis
-        binding.bannerNoStation.visibility = if (uiVisible && sharedViewModel.selectedStation.value == null)
-            View.VISIBLE else View.GONE
         sharedViewModel.setWatchImmersive(!uiVisible)
     }
 
@@ -144,10 +142,7 @@ class TideWatchFragment : Fragment() {
         collectFlow(sharedViewModel.selectedStation) { station ->
             val b = _binding ?: return@collectFlow
             b.tideWatchView.setHasStation(station != null)
-            if (station == null) {
-                if (uiVisible) b.bannerNoStation.visible()
-            } else {
-                b.bannerNoStation.gone()
+            if (station != null) {
                 b.tvStationName.text = station.name
                 viewModel.startPolling(station.code, station.lat, station.lng)
             }
@@ -193,7 +188,7 @@ class TideWatchFragment : Fragment() {
 
     override fun onPause() {
         super.onPause()
-        binding.tideWatchView.onPause()
+        _binding?.tideWatchView?.onPause()
         oceanSound.stop()
         viewModel.stopPolling()
         if (!uiVisible) {
@@ -204,7 +199,7 @@ class TideWatchFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
-        binding.tideWatchView.onResume()
+        _binding?.tideWatchView?.onResume()
         if (soundEnabled) oceanSound.start()
         val station = sharedViewModel.selectedStation.value
         if (station != null) {
