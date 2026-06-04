@@ -96,14 +96,17 @@ void main() {
     float perpDist = abs(dot(toFrag, perpXZ));
 
     // Fixed world-space corridor half-width (perspective does the rest).
-    float corrHalf = 5.0;
-    float corrMask = exp(-perpDist * perpDist / (corrHalf * corrHalf));
+    float corrHalf  = 4.0;
+    float corrMask  = exp(-perpDist * perpDist / (corrHalf * corrHalf));
+    // Tighter core: concentrates the sparkle into the centre of the sun path so
+    // it reads as a cluster of glints, not a wide white surface.
+    float corrSharp = corrMask * corrMask;
 
-    // Path brightening: distant water bunches the sun's reflection into a bright
-    // band, but near water keeps its teal colour — glitter only sits on top of it.
-    float pathLight = corrMask * (0.18 + 0.72 * distNorm);
-    vec3  pathTint  = mix(u_LightColor, vec3(1.0), 0.30 * distNorm);
-    col = mix(col, mix(col, pathTint, 0.68), clamp(pathLight, 0.0, 0.85));
+    // Path brightening: only the distant water bunches into a bright band; near
+    // water stays teal so glitter merely sits on top of the blue.
+    float pathLight = corrMask * (0.10 + 0.70 * distNorm);
+    vec3  pathTint  = mix(u_LightColor, vec3(1.0), 0.28 * distNorm);
+    col = mix(col, mix(col, pathTint, 0.60), clamp(pathLight, 0.0, 0.82));
 
     // Half-vector for Blinn-Phong specular.
     vec3  H = normalize(L + V);
@@ -117,14 +120,14 @@ void main() {
     float glints   = pow(max(dot(Nf, H), 0.0), fineExp);
     glints *= 0.5 + 0.5 * max(waveH, 0.0);  // favour crests
 
-    // Blend: small tight highlights near camera (don't wash out the teal),
-    // dense micro-glints toward the horizon.
-    float sparkle = sheen  * (0.42 - distNorm * 0.34) +
-                    glints * (0.35 + distNorm * 3.00);
+    // Favour the tight micro-glints (small sparkles); keep the broad sheen low
+    // so it never spreads into a white sheet — near water shows teal underneath.
+    float sparkle = sheen  * (0.24 - distNorm * 0.16) +
+                    glints * (0.40 + distNorm * 3.00);
 
-    // Corridor multiplier: stronger toward the horizon, restrained up close so
-    // near water stays blue with small glints rather than a white sheet.
-    float corrBoost = 0.07 + corrMask * (1.5 + distNorm * 3.0);
+    // Sparkle lives in the tight corridor core; far horizon level preserved, near
+    // strongly restrained, and almost nothing leaks outside the corridor.
+    float corrBoost = 0.04 + corrSharp * (1.1 + distNorm * 3.4);
     vec3  yunseul   = u_LightColor * u_YunseulStr * sparkle * corrBoost;
 
     // ── 6. Wave-crest foam (whitecaps grow with wind) ────────────────────────
