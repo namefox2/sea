@@ -69,13 +69,22 @@ void main() {
         sky += moonColor * (crescent * 2.2 + glow);
     }
 
-    // Stars at night
+    // Stars at night — tiny aspect-correct diamond points, twinkling
     if (u_IsDark > 0.5) {
-        vec2 sg = floor(v_UV * 110.0);
-        float s = hash(sg);
-        float twinkle = 0.7 + 0.3 * sin(u_Time * (3.0 + s * 4.0));
-        float star = step(0.986, s) * (v_UV.y * 0.6 + 0.4) * twinkle;
-        sky += vec3(0.85, 0.90, 1.00) * star;
+        float nightFactor = clamp((u_IsDark - 0.5) * 2.0, 0.0, 1.0);
+        float grid = 150.0;
+        vec2  sg   = floor(v_UV * grid);
+        vec2  sf   = fract(v_UV * grid) - 0.5;   // -0.5..0.5, (0,0) = cell centre
+        sf.x       *= u_Aspect;                   // aspect-correct: true shape on screen
+        float s     = hash(sg);
+        float starMask  = step(0.976, s);
+        float diamond   = abs(sf.x) + abs(sf.y);  // L1 norm → diamond silhouette
+        float starShape = smoothstep(0.10, 0.005, diamond);
+        float twinkle   = 0.30 + 0.70 * sin(u_Time * (1.8 + s * 5.5) + s * 6.28);
+        float brightness = 0.6 + s * 0.8;
+        float star = starShape * starMask * twinkle * brightness
+                   * (v_UV.y * 0.5 + 0.5) * nightFactor;
+        sky += vec3(0.88, 0.92, 1.00) * star;
     }
 
     // Horizon haze — sky becomes lighter toward the bottom (horizon)

@@ -148,40 +148,67 @@ void main() {
     float caust = sin(v_World.x * 3.8 + u_Time * 1.4) * sin(v_World.z * 4.3 - u_Time * 1.1);
     caust = pow(max(caust * 0.5 + 0.62, 0.0), 3.0) * 0.14;
 
-    // ── Foam reach (shared by wave body, swash, foam line) ────────────────────
-    float fA = bN(vec2(v_World.x * 0.10, u_Time * 0.12))                          * 1.60;
-    float fB = bN(vec2(v_World.x * 0.32, u_Time * 0.18) + vec2(3.1, 1.7))        * 0.80;
-    float fC = bN(vec2(v_World.x * 0.70, u_Time * 0.25) + vec2(8.3, 5.2))        * 0.35;
-    float foamScale = 1.0 + u_WindAmp * 1.5;
-    float foamReach = (fA + fB + fC) / 2.75 * 2.6 * foamScale;
+    // ── Wave cycle: noise drives how far each wave runs up the beach ──────────
+    // Different x-frequencies per octave → angled, organic wave shapes
+    float wA = bN(vec2(v_World.x * 0.08, u_Time * 0.10))                         * 1.80;
+    float wB = bN(vec2(v_World.x * 0.24, u_Time * 0.16) + vec2(3.1, 1.7))        * 0.85;
+    float wC = bN(vec2(v_World.x * 0.55, u_Time * 0.23) + vec2(8.3, 5.2))        * 0.38;
+    float foamScale = 1.0 + u_WindAmp * 1.6;
+    float waveReach = (wA + wB + wC) / 3.03 * 2.8 * foamScale;
+
+    // distToWave > 0: wave has already passed (we are behind the wave front)
+    float distToWave = distToWater - waveReach;
 
     vec3 waterTint = vec3(0.45, 0.74, 0.72);
 
-    // ── Wave body: full water body under the incoming wave (0 → foamReach) ─────
-    float waveBody = smoothstep(foamReach + 0.15, 0.0, distToWater)
-                   * step(0.0, distToWater);
-    if (waveBody > 0.001) {
-        baseColor = mix(baseColor, waterTint + waterTint * caust * 0.5, waveBody * 0.92);
+    // ── 1. Shallow water body: advances & retreats with the wave ──────────────
+    // Covers the full zone from ocean floor to wave front, not just the waterline.
+    // step(-0.5, distToWater) keeps computation on exposed beach mesh only.
+    float shallowZone = step(distToWave, 0.0) * step(-0.5, distToWater);
+    if (shallowZone > 0.5) {
+        // More opaque near the waterline; thinner film at the wave front
+        float depth      = clamp(-distToWave / max(waveReach, 0.1), 0.0, 1.0);
+        float waterAlpha = mix(0.62, 0.90, depth);
+        baseColor = mix(baseColor, waterTint * (1.0 + caust * 0.5), waterAlpha);
     }
 
-    // ── Swash zone: thin film after wave recedes (foamReach → foamReach+2 m) ──
-    float behindFoam  = distToWater - foamReach;
-    float swashFactor = clamp(1.0 - behindFoam / 2.0, 0.0, 1.0)
-                      * step(0.0, behindFoam);
+    // ── 2. Swash zone: thin wet film 0..3 m behind wave front ─────────────────
+    float swashDist   = max(distToWave, 0.0);
+    float swashFactor = smoothstep(3.0, 0.0, swashDist) * step(0.0, distToWater);
     swashFactor *= swashFactor;
     if (swashFactor > 0.001) {
-        float shimmer = bN(v_World.xz * 0.60 + vec2(u_Time * 0.07, -u_Time * 0.05)) * 0.45 + 0.55;
-        baseColor = mix(baseColor, mix(waterTint, wetSand, 0.20), swashFactor * shimmer * 0.80);
+        float shimmer = bN(v_World.xz * 0.55 + vec2(u_Time * 0.07, -u_Time * 0.05)) * 0.40 + 0.60;
+        baseColor = mix(baseColor, mix(waterTint, wetSand, 0.30), swashFactor * shimmer * 0.82);
     }
 
-    // ── Foam line ─────────────────────────────────────────────────────────────
-    float foamFront = 1.0 - smoothstep(0.0, 0.85, abs(distToWater - foamReach));
-    foamFront *= smoothstep(-0.3, 0.2, distToWater);
-    float pA = bN(vec2(v_World.x * 0.38 + u_Time * 0.07, v_World.z * 0.38 - u_Time * 0.04));
-    float pB = bN(vec2(v_World.x * 0.22 - u_Time * 0.05, v_World.z * 0.22 + u_Time * 0.03));
-    float patchThresh = mix(0.30, 0.18, u_WindAmp);
-    float patchMask   = smoothstep(patchThresh, 0.62, pA * 0.55 + pB * 0.45);
-    float foamBlend   = clamp(foamFront * patchMask, 0.0, 1.0);
+    // ── 3. Wet sand: dark reflective strip 3..7 m behind wave front ───────────
+    float wetSandDist   = max(distToWave - 3.0, 0.0);
+    float wetSandFactor = smoothstep(4.0, 0.0, wetSandDist) * step(0.0, distToWater);
+    if (wetSandFactor > 0.001) {
+        float skyRefl = wetSandFactor * 0.12 * (1.0 - u_TidePercent * 0.4);
+        baseColor = mix(baseColor, wetSand * 0.80, wetSandFactor * 0.30);
+        baseColor = mix(baseColor, u_Horizon * 0.60, skyRefl);
+    }
+
+    // ── 4. Foam: patchy clusters at wave front + scattered bubbles in swash ───
+    float foamBand = 1.0 - smoothstep(0.0, 1.0, abs(distToWave));
+    foamBand *= smoothstep(-0.5, 0.3, distToWater);
+
+    // Three noise scales → organic foam clusters, not a solid stripe
+    float pA = bN(vec2(v_World.x * 0.40 + u_Time * 0.10, v_World.z * 0.40 - u_Time * 0.06));
+    float pB = bN(vec2(v_World.x * 0.70 - u_Time * 0.08, v_World.z * 0.70 + u_Time * 0.05));
+    float pC = bN(v_World.xz * 2.20 + vec2(u_Time * 0.28, -u_Time * 0.20));
+    float patchThresh = mix(0.28, 0.14, u_WindAmp);
+    float patchMask   = smoothstep(patchThresh, 0.68, pA * 0.40 + pB * 0.35 + pC * 0.25);
+
+    // Scattered bubble clusters inside the swash zone
+    float bn1 = bN(v_World.xz * 2.8 + vec2(u_Time * 0.18,  u_Time * 0.11));
+    float bn2 = bN(v_World.xz * 5.5 - vec2(u_Time * 0.12,  u_Time * 0.22));
+    float bubbleMask = smoothstep(0.68, 0.90, bn1 * 0.55 + bn2 * 0.45)
+                     * smoothstep(2.5, 0.0, swashDist)
+                     * step(0.0, distToWater);
+
+    float foamBlend = clamp(foamBand * patchMask + bubbleMask * 0.45, 0.0, 1.0);
     baseColor = mix(baseColor, vec3(0.94, 0.97, 1.00), foamBlend * 0.88);
 
     // ── Atmospheric fog ────────────────────────────────────────────────────────
