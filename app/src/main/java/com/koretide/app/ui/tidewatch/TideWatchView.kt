@@ -33,8 +33,18 @@ class TideWatchView @JvmOverloads constructor(
                     "SUMMER_DARK"  -> 22.0f  // 밤바다 → night
                     else           -> 12.0f  // 맑은 낮바다 → noon
                 }
+                // Centred sun/moon + 윤슬 color for themed presets
+                val centre = theme.id == "AUTUMN_LIGHT" || theme.id == "SUMMER_DARK"
+                // Silver moonlight for 밤바다; warm gold for 노을해안; null = LUT-driven
+                val lightOverride: FloatArray? = when (theme.id) {
+                    "SUMMER_DARK"  -> floatArrayOf(0.72f, 0.80f, 0.95f) // silver moonlight
+                    "AUTUMN_LIGHT" -> floatArrayOf(1.00f, 0.62f, 0.22f) // warm sunset gold
+                    else           -> null
+                }
                 queueEvent {
-                    renderer.defaultHour  = themeHour
+                    renderer.defaultHour        = themeHour
+                    renderer.centerLightInView  = centre
+                    renderer.lightColorOverride = lightOverride
                     renderer.deepColor    = floatArrayOf(theme.seaTopColor.r(),    theme.seaTopColor.g(),    theme.seaTopColor.b())
                     renderer.shallowColor = floatArrayOf(theme.seaBottomColor.r(), theme.seaBottomColor.g(), theme.seaBottomColor.b())
                     val flat = theme.tidalFlatColor

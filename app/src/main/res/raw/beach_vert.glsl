@@ -1,7 +1,7 @@
 precision highp float;
 attribute vec3  a_Pos;
-uniform mat4   u_MVP;
-uniform float  u_WaterlineZ;
+uniform mat4          u_MVP;
+uniform mediump float u_WaterlineZ;
 varying vec3   v_World;
 
 void main() {

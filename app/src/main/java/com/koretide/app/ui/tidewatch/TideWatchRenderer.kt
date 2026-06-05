@@ -35,6 +35,10 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
     @Volatile var skyHorizonTheme = floatArrayOf(0.65f, 0.84f, 1.00f)
     @Volatile var skyZenithTheme  = floatArrayOf(0.14f, 0.40f, 0.82f)
     @Volatile var sunColorTheme   = floatArrayOf(1.00f, 0.95f, 0.85f)
+    // When true: zero out lightDir X so sun/moon appears horizontally centred in view
+    @Volatile var centerLightInView = false
+    // When non-null: replaces lutLight after LUT+tint (use for themed 윤슬 color)
+    @Volatile var lightColorOverride: FloatArray? = null
 
     // ── GL state ──────────────────────────────────────────────────────────────
     private var startMs = 0L
@@ -193,6 +197,17 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         val hour = if (useDefaultSun) defaultHour
                    else calendar.get(Calendar.HOUR_OF_DAY) + calendar.get(Calendar.MINUTE) / 60f
         computeLightDir(hour)   // writes into lightDir member
+
+        // Centre sun/moon horizontally in view for themed presets (밤바다, 노을해안)
+        if (centerLightInView) {
+            val elev = lightDir[1]
+            val zComp = lightDir[2]
+            val len = sqrt((elev * elev + zComp * zComp).toDouble()).toFloat().coerceAtLeast(0.001f)
+            lightDir[0] = 0f
+            lightDir[1] = elev / len
+            lightDir[2] = zComp / len
+        }
+
         sampleSkyLut(hour)      // writes into lutHorizon/Zenith/Light/Ambient/isDark members
 
         // Blend theme seasonal tint into LUT result (LUT drives time-of-day, theme adds seasonal flavor)
@@ -204,6 +219,10 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
             lutZenith[j]  = lutZenith[j]  * tintInv + sz[j] * tint
             lutLight[j]   = lutLight[j]   * tintInv + sc[j] * tint
         }
+
+        // Theme 윤슬 color override (e.g. silver moonlight, warm sunset gold)
+        val lco = lightColorOverride
+        if (lco != null) { lutLight[0] = lco[0]; lutLight[1] = lco[1]; lutLight[2] = lco[2] }
 
         lightUV[0] = (lightDir[0] * 0.4f + 0.5f).coerceIn(0.05f, 0.95f)
         lightUV[1] = (lightDir[1] * 0.4f + 0.72f).coerceIn(0.52f, 0.96f)
