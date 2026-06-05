@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Color
 import android.opengl.GLSurfaceView
 import android.util.AttributeSet
+import com.koretide.app.domain.model.StationRegion
 import com.koretide.app.theme.ThemeConfig
 
 class TideWatchView @JvmOverloads constructor(
@@ -59,6 +60,16 @@ class TideWatchView @JvmOverloads constructor(
     fun setTide(percent: Float)  { queueEvent { renderer.tidePercent = percent.coerceIn(0f, 1f) } }
     fun setWind(bft: Int)        { queueEvent { renderer.windAmp = (bft.coerceIn(0, 12) / 12f) } }
     fun setHasStation(has: Boolean) { queueEvent { renderer.useDefaultSun = !has } }
+    fun setCoast(region: StationRegion?) {
+        val scale = when (region) {
+            StationRegion.WEST  -> 1.00f  // 서해: 넓은 갯벌
+            StationRegion.SOUTH -> 0.35f  // 남해: 일부 갯벌
+            StationRegion.JEJU  -> 0.05f  // 제주: 거의 없음
+            StationRegion.EAST  -> 0.00f  // 동해: 갯벌 없음
+            null                -> 1.00f  // 기본값: 서해 스타일
+        }
+        queueEvent { renderer.mudflatScale = scale }
+    }
 
     val initError: String? get() = renderer.initError
 

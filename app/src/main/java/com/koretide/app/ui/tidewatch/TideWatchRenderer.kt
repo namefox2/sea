@@ -22,8 +22,10 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
     @Volatile var tidePercent   = 0.5f
     @Volatile var windAmp       = 0.25f
     @Volatile var windDirRad    = 3.93f
-    @Volatile var useDefaultSun = true   // true → use defaultHour; false → actual local time
-    @Volatile var defaultHour   = 12.0f  // hour used when useDefaultSun=true (set by theme)
+    @Volatile var useDefaultSun  = true   // true → use defaultHour; false → actual local time
+    @Volatile var defaultHour    = 12.0f  // hour used when useDefaultSun=true (set by theme)
+    // 1.0=서해(full 갯벌), 0.35=남해, 0.05=제주, 0.0=동해
+    @Volatile var mudflatScale   = 1.0f
     // Ocean colors — theme-driven
     @Volatile var deepColor    = floatArrayOf(0.02f, 0.09f, 0.22f)  // far/horizon dark navy
     @Volatile var shallowColor = floatArrayOf(0.08f, 0.62f, 0.68f) // near camera bright teal
@@ -235,7 +237,7 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         sky.draw(lutHorizon, lutZenith, lutLight, lightUV, lutIsDark, t, aspect)
 
         // ── Pass 2: Beach ─────────────────────────────────────────────────────
-        beach.draw(mvp, tide, waterlineZ, wAmp, sandDry, sandWet, lutHorizon, lightDir, eyePos, lutAmbient, t)
+        beach.draw(mvp, tide, waterlineZ, wAmp, mudflatScale, sandDry, sandWet, lutHorizon, lightDir, eyePos, lutAmbient, t)
 
         // ── Pass 4: Ocean (normal map bound to texture unit 0) ────────────────
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0)

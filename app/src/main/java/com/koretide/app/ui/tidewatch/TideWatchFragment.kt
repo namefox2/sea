@@ -12,6 +12,7 @@ import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.fragment.app.viewModels
 import com.koretide.app.databinding.FragmentTideWatchBinding
+import com.koretide.app.domain.model.StationRegion
 import com.koretide.app.domain.model.TideData
 import com.koretide.app.theme.SeasonThemeManager
 import com.koretide.app.ui.main.SharedViewModel
@@ -142,6 +143,7 @@ class TideWatchFragment : Fragment() {
         collectFlow(sharedViewModel.selectedStation) { station ->
             val b = _binding ?: return@collectFlow
             b.tideWatchView.setHasStation(station != null)
+            b.tideWatchView.setCoast(station?.region)
             if (station != null) {
                 b.tvStationName.text = station.name
                 viewModel.startPolling(station.code, station.lat, station.lng)
@@ -172,8 +174,10 @@ class TideWatchFragment : Fragment() {
     }
 
     private fun updateMudflatGrade(b: FragmentTideWatchBinding, data: TideData) {
+        val region = sharedViewModel.selectedStation.value?.region
+        val hasTidalFlat = region == StationRegion.WEST || region == StationRegion.SOUTH
         val range = data.maxLevel - data.minLevel
-        if (range > 100) {
+        if (hasTidalFlat && range > 100) {
             val exposure = (data.maxLevel - data.currentLevel).toFloat() / range.toFloat()
             b.tvMudflatGrade.text = when {
                 exposure >= 0.67f -> "🦀 갯벌 매우 많이 드러남"
