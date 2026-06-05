@@ -155,14 +155,31 @@ void main() {
         baseColor += u_AmbientColor * (1.0 - NdotL) * shadowStr * 0.18 * shadowBlend;
     }
 
-    // ── Shoaling water entry — matches ocean shader's shoreAqua exactly ─────
+    // ── Shoaling water + Swash zone ──────────────────────────────────────────
+    // Shared teal tint used on both sides of the waterline.
+    vec3 waterTint = vec3(0.45, 0.74, 0.72);
+    float caust = sin(v_World.x * 3.8 + u_Time * 1.4) * sin(v_World.z * 4.3 - u_Time * 1.1);
+    caust = pow(max(caust * 0.5 + 0.62, 0.0), 3.0) * 0.14;
+
+    // Ocean side: submerged approach (distToWater -3 → 0)
     if (shallowFactor > 0.001) {
-        vec3 waterTint = vec3(0.45, 0.74, 0.72);
-        float caust = sin(v_World.x * 3.8 + u_Time * 1.4) * sin(v_World.z * 4.3 - u_Time * 1.1);
-        caust = pow(max(caust * 0.5 + 0.62, 0.0), 3.0) * (1.0 - shallowFactor * 0.85) * 0.14;
-        waterTint += waterTint * caust;
         float shallowBlend = smoothstep(0.0, 0.25, shallowFactor) * 0.95;
-        baseColor = mix(baseColor, waterTint, shallowBlend);
+        baseColor = mix(baseColor,
+                        waterTint + waterTint * caust * (1.0 - shallowFactor * 0.85),
+                        shallowBlend);
+    }
+
+    // Swash zone: thin water film on the beach side of the waterline (0 → +2m).
+    // The wave has just receded here — teal tint persists before the surface
+    // dries to wet sand, preventing the hard sea/land cut after the foam line.
+    float swashFactor = clamp(1.0 - distToWater / 2.0, 0.0, 1.0);
+    swashFactor *= swashFactor;  // ease — strongest right at the waterline
+    if (swashFactor > 0.001) {
+        // Slow-drifting shimmer: thin film of water glinting as it recedes
+        float shimmer = bN(v_World.xz * 0.60 + vec2(u_Time * 0.07, -u_Time * 0.05)) * 0.45 + 0.55;
+        // Slightly desaturated teal — teal visible but sand colour bleeds through
+        vec3 swashColor = mix(waterTint, wetSand, 0.20);
+        baseColor = mix(baseColor, swashColor, swashFactor * shimmer * 0.82);
     }
 
     // ── Waterline transition: irregular swash foam patches ───────────────
