@@ -168,7 +168,7 @@ void main() {
     float waveReach = (wA + wB + wC) / 3.03 * (5.0 + u_WindAmp*5.0);
 
     // distToWave > 0: wave has already passed (we are behind the wave front)
-    float distToWave = distToWater;// - waveReach;
+    float distToWave = distToWater;// + waveReach;
     float waterSurfaceMask =
             smoothstep(1.5, -1.0, distToWave);
 
@@ -192,7 +192,7 @@ void main() {
         // More opaque near the waterline; thinner film at the wave front
         float depth = clamp(-distToWave / max(waveReach, 0.1), 0.0, 1.0);
 
-        edgeFade = smoothstep(2.5, 0.0, abs(distToWave));
+        edgeFade = smoothstep(12.5, 0.0, abs(distToWave));
 
         waterAlpha = mix(0.62, 0.90, depth) * edgeFade;
         baseColor = mix(baseColor, waterTint * (1.0 + caust * 0.5), waterAlpha);
