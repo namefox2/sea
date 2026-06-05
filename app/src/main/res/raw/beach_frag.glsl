@@ -168,7 +168,7 @@ void main() {
     float waveReach = (wA + wB + wC) / 3.03 * (5.0 + u_WindAmp*5.0);
 
     // distToWave > 0: wave has already passed (we are behind the wave front)
-    float distToWave = distToWater - waveReach;
+    float distToWave = distToWater;// - waveReach;
     float waterSurfaceMask =
             smoothstep(1.5, -1.0, distToWave);
 
@@ -180,7 +180,10 @@ void main() {
 
     float shallowZone =
         smoothstep(2.0, -1.5, distToWave);
-    float reflStr = shallowZone * (0.10 + wetSpec * 0.25 * corrMask);
+    float reflMask = shallowZone * smoothstep(1.0, -0.5, distToWater);
+
+    float reflStr = reflMask * (0.10 + wetSpec * 0.25 * corrMask);
+
     baseColor = mix(baseColor, u_Horizon * 0.65, reflStr);
 
     float edgeFade = 0.0;
@@ -214,8 +217,9 @@ void main() {
     }
 
     // ── 4. Foam: patchy clusters at wave front + scattered bubbles in swash ───
-    float foamBand = 1.0 - smoothstep(0.0, 2.5, abs(distToWave));
+    float foamBand = waterSurfaceMask * (1.0 - smoothstep(0.0, 1.0, abs(distToWave)));
     foamBand *= smoothstep(-0.5, 0.3, distToWater);
+    foamBand *= shorelineMask;
 
     // Three noise scales → organic foam clusters, not a solid stripe
     float pA = bN(vec2(v_World.x * 0.40 + u_Time * 0.10, v_World.z * 0.40 - u_Time * 0.06));
