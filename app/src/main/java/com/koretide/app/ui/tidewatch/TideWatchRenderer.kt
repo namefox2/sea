@@ -72,6 +72,10 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
     private var oc_waterlineZ   = -1
     private var oc_normalMap    = -1
     private var oc_horizonColor = -1
+    private var oc_fadeStartZ   = -1
+    private var oc_fadeEndZ   = -1
+    private var oc_sandDryColor   = -1
+    private var oc_sandWetColor   = -1
 
     // Procedural normal map texture (128×128 RGBA, tiling ripple normals)
     private var normalMapTex = 0
@@ -161,6 +165,10 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
             oc_waterlineZ   = GLES20.glGetUniformLocation(ocProg, "u_WaterlineZ")
             oc_normalMap    = GLES20.glGetUniformLocation(ocProg, "u_NormalMap")
             oc_horizonColor = GLES20.glGetUniformLocation(ocProg, "u_HorizonColor")
+            oc_sandDryColor = GLES20.glGetUniformLocation(ocProg, "u_SandDryColor")
+            oc_sandWetColor = GLES20.glGetUniformLocation(ocProg, "u_SandWetColor")
+            oc_fadeStartZ = GLES20.glGetUniformLocation(ocProg, "u_FadeStartZ")
+            oc_fadeEndZ   = GLES20.glGetUniformLocation(ocProg, "u_FadeEndZ")
 
             ocean        = OceanMesh()
             ocean.uploadToGPU()
@@ -249,12 +257,16 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         //   tide=0.5 (중간) → waterlineZ= -1 → moderate beach strip
         //   tide=1.0 (만조) → waterlineZ=+16 → ocean fills view, thin beach near camera
         val baseWaterlineZ = -18.0f + tide * 34.0f
+
         // Multi-frequency wave advance: superimpose two oscillations so no two waves
         // are identical.  Primary ~5 s period, secondary ~8.6 s.
         // Amplitude: ±1.5 m at calm → ±3.5 m at max wind (visually moves the shoreline).
         val wavePhase   = sin(t * 1.25f) * 0.62f + sin(t * 0.73f + 1.4f) * 0.38f
         val shoreBreath = wavePhase * (wAmp * 0.8f + 0.4f)
         val waterlineZ  = (baseWaterlineZ + shoreBreath).coerceIn(-22f, 19f)
+        val fadeStartZ = waterlineZ + 1.0f
+        val fadeEndZ = waterlineZ + 6.0f
+
         val staticWaterlineZ = baseWaterlineZ
         val shorelineZ = baseWaterlineZ + shoreBreath
         val foamWaterlineZ = staticWaterlineZ + shoreBreath
@@ -286,6 +298,10 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         GLES20.glUniform1f (oc_waterlineZ,   shorelineZ)
         GLES20.glUniform1i (oc_normalMap,    0)
         GLES20.glUniform3fv(oc_horizonColor, 1, lutHorizon, 0)
+        GLES20.glUniform1f(oc_fadeStartZ, fadeStartZ)
+        GLES20.glUniform1f(oc_fadeEndZ, fadeEndZ)
+        GLES20.glUniform3fv(oc_sandDryColor, 1, sandDry, 0)
+        GLES20.glUniform3fv(oc_sandWetColor, 1, sandWet, 0)
 
         ocean.draw(oc_aPos)
 
@@ -419,3 +435,4 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         return prog
     }
 }
+

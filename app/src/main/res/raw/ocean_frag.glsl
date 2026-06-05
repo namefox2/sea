@@ -20,6 +20,10 @@ uniform float     u_WaterlineZ;
 uniform float     u_Tide;
 uniform sampler2D u_NormalMap;
 uniform vec3      u_HorizonColor;
+uniform float u_FadeStartZ;
+uniform float u_FadeEndZ;
+uniform vec3 u_SandDryColor;
+uniform vec3 u_SandWetColor;
 
 float h21(vec2 p) {
     p = fract(p * vec2(127.1, 311.7));
@@ -152,11 +156,16 @@ void main() {
                  * (0.45 + 0.55 * vnoise(v_World.xz * 2.8 + u_Time * 0.55));
     col = mix(col, vec3(0.94, 0.97, 1.00), fringe * 0.42);
 
+
     // ── 8. Horizon atmospheric seam — distant water meets the bright sky ──────
     // Blend toward a bright horizon tone so the far edge dissolves into the sky
     // rather than forming a dark line; still suppressed inside the sun path.
     float seam = smoothstep(0.92, 1.0, distNorm) * (1.0 - corrMask * 0.6);
     col = mix(col, u_HorizonColor * 0.85, seam * 0.55);
 
+    vec3 sandColor =
+            mix(u_SandWetColor, u_SandDryColor, shoreProx);
+    col =
+            mix(col, sandColor, shoreProx * 0.7);
     gl_FragColor = vec4(col, 1.0);
 }
