@@ -253,14 +253,18 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         // are identical.  Primary ~5 s period, secondary ~8.6 s.
         // Amplitude: ±1.5 m at calm → ±3.5 m at max wind (visually moves the shoreline).
         val wavePhase   = sin(t * 1.25f) * 0.62f + sin(t * 0.73f + 1.4f) * 0.38f
-        val shoreBreath = wavePhase * (wAmp * 2.0f + 1.5f)
+        val shoreBreath = wavePhase * (wAmp * 0.8f + 0.4f)
         val waterlineZ  = (baseWaterlineZ + shoreBreath).coerceIn(-22f, 19f)
+        val staticWaterlineZ = baseWaterlineZ
+        val shorelineZ = baseWaterlineZ + shoreBreath
+        val foamWaterlineZ = staticWaterlineZ + shoreBreath
+        val waveAdvance = (sin(t * 0.9f) * 0.5f + 0.5f) * (1.5f + wAmp * 2.5f)
 
         // ── Pass 1: Sky (no depth write) ─────────────────────────────────────
         sky.draw(lutHorizon, lutZenith, lutLight, lightUV, lutIsDark, t, aspect)
 
         // ── Pass 2: Beach ─────────────────────────────────────────────────────
-        beach.draw(mvp, tide, waterlineZ, wAmp, mudflatExposure, sandDry, sandWet, lutHorizon, lightDir, eyePos, lutAmbient, t)
+        beach.draw(mvp, tide, staticWaterlineZ, wAmp, mudflatExposure, sandDry, sandWet, lutHorizon, lightDir, eyePos, lutAmbient, t)
 
         // ── Pass 4: Ocean (normal map bound to texture unit 0) ────────────────
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
@@ -279,14 +283,14 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         GLES20.glUniform3fv(oc_camPos,       1, eyePos,       0)
         GLES20.glUniform1f (oc_roughness,    roughness)
         GLES20.glUniform1f (oc_yunseulStr,   yunseulStr)
-        GLES20.glUniform1f (oc_waterlineZ,   waterlineZ)
+        GLES20.glUniform1f (oc_waterlineZ,   shorelineZ)
         GLES20.glUniform1i (oc_normalMap,    0)
         GLES20.glUniform3fv(oc_horizonColor, 1, lutHorizon, 0)
 
         ocean.draw(oc_aPos)
 
         // ── Pass 5: Shoreline foam (alpha-blended) ────────────────────────────
-        foam.draw(mvp, waterlineZ, wAmp, t, lutLight)
+        foam.draw(mvp, shorelineZ , wAmp, t, lutLight)
 
         // ── Pass 6: Spray particles (GL_POINTS, alpha-blended) ────────────────
         spray.draw(mvp, t, wAmp, wDir, tide, lutLight)

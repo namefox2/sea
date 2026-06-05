@@ -27,7 +27,7 @@ void main() {
     float pT  = fract(u_Time / lt + h2);  // 0..1 within lifetime
 
     // Spawn only at wave crests, die in first 65% of lifetime
-    float active = step(amp * 0.55, wH) * step(pT, 0.65);
+    float active = step(amp * 0.25, wH) * step(pT, 0.8);
 
     // Rise + slight horizontal drift
     float riseY  = pT * 0.85 * (0.6 + h1 * 0.6);

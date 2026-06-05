@@ -33,7 +33,12 @@ float tidalH(vec2 p) {
 
 void main() {
     // distToWater: > 0 = landward (exposed), < 0 = seaward (beach draped below ocean)
-    float distToWater = v_World.z - u_WaterlineZ;
+    float edgeNoise =
+          bN(v_World.xz * 0.08) * 2.0
+        + bN(v_World.xz * 0.25) * 0.8;
+
+    float distToWater =
+        v_World.z - u_WaterlineZ - edgeNoise;
 
     // The vertex shader drapes the beach floor below the ocean surface for
     // distToWater < 0, so those fragments lose the depth test and the ocean
@@ -91,7 +96,7 @@ void main() {
         baseColor = mix(baseColor, mudflatShallow * 0.7, mudLow * mudflatFactor * 0.40);
         baseColor += vec3((grain * 0.20 - 0.10) * mudflatFactor * (1.0 - lod * 0.8));
 
-        float poolNear   = clamp(1.0 - distToWater / 20.0, 0.0, 1.0);
+        float poolNear = smoothstep(6.0, 0.0, distToWater);
         float poolMask   = mudLow * mudflatFactor * poolNear * 0.72;
         baseColor = mix(baseColor, mix(tidalPool, u_Horizon * 0.4, 0.5), poolMask);
     }
@@ -112,8 +117,6 @@ void main() {
     float corrMask = exp(-pDist * pDist / (corrW * corrW));
     float wetSpec  = pow(sin(v_World.z * 3.5 + v_World.x * 1.1 + u_Time * 0.4) * 0.5 + 0.5, 5.0)
                    * (0.50 + 0.50 * bN(v_World.xz * 0.72 + u_Time * 0.05));
-    float reflStr  = wetness * (0.12 + wetSpec * 0.28 * corrMask) * (1.0 - u_TidePercent * 0.5);
-    baseColor = mix(baseColor, u_Horizon * 0.65, reflStr);
 
     // ── Rocky outcrops ─────────────────────────────────────────────────────────
     float rockFactor = clamp(1.0 - u_TidePercent * 5.0, 0.0, 1.0);
@@ -134,15 +137,23 @@ void main() {
         baseColor *= mix(1.0, NdotL * shadowStr + (1.0 - shadowStr), shadowBlend);
         baseColor += u_AmbientColor * (1.0 - NdotL) * shadowStr * 0.18 * shadowBlend;
     }
-
+    vec3 waterTint = vec3(0.45, 0.74, 0.72);
     // ── Shore aqua: match ocean's shore-transition color at the waterline ──────
     // The ocean shader blends to vec3(0.45, 0.74, 0.72) near the waterline.
     // The beach must show the same color at z = waterlineZ so the geometry seam
     // is invisible — the two meshes hand off at the same hue, not a colour jump.
     // Fades to 0 by 5 m inland so natural sand/mudflat colours take over.
-    vec3  shoreAqua  = vec3(0.45, 0.74, 0.72);
-    float shoreBlend = smoothstep(5.0, 0.0, distToWater) * 0.78;
-    baseColor = mix(baseColor, shoreAqua, shoreBlend);
+    //vec3  shoreAqua  = vec3(0.45, 0.74, 0.72);
+    //float shoreBlend = smoothstep(5.0, 0.0, distToWater) * 0.78;
+    //baseColor = mix(baseColor, shoreAqua, shoreBlend);
+
+    float shoreBlend =
+        smoothstep(0.5, -0.5, distToWater);
+
+    baseColor =
+        mix(baseColor,
+            mix(baseColor, waterTint, 0.05),
+            shoreBlend);
 
     // ── Caustics ──────────────────────────────────────────────────────────────
     float caust = sin(v_World.x * 3.8 + u_Time * 1.4) * sin(v_World.z * 4.3 - u_Time * 1.1);
@@ -154,21 +165,33 @@ void main() {
     float wB = bN(vec2(v_World.x * 0.24, u_Time * 0.16) + vec2(3.1, 1.7))        * 0.85;
     float wC = bN(vec2(v_World.x * 0.55, u_Time * 0.23) + vec2(8.3, 5.2))        * 0.38;
     float foamScale = 1.0 + u_WindAmp * 1.6;
-    float waveReach = (wA + wB + wC) / 3.03 * 2.8 * foamScale;
+    float waveReach = (wA + wB + wC) / 3.03 * (5.0 + u_WindAmp*5.0);
 
     // distToWave > 0: wave has already passed (we are behind the wave front)
     float distToWave = distToWater - waveReach;
-
-    vec3 waterTint = vec3(0.45, 0.74, 0.72);
+    float waterSurfaceMask =
+            smoothstep(1.5, -1.0, distToWave);
 
     // ── 1. Shallow water body: advances & retreats with the wave ──────────────
     // Covers the full zone from ocean floor to wave front, not just the waterline.
     // step(-0.5, distToWater) keeps computation on exposed beach mesh only.
-    float shallowZone = step(distToWave, 0.0) * step(-0.5, distToWater);
+    float shorelineMask =
+        smoothstep(3.0, -4.0, distToWater);
+
+    float shallowZone =
+        smoothstep(2.0, -1.5, distToWave);
+    float reflStr = shallowZone * (0.10 + wetSpec * 0.25 * corrMask);
+    baseColor = mix(baseColor, u_Horizon * 0.65, reflStr);
+
+    float edgeFade = 0.0;
+    float waterAlpha = 0.0;
     if (shallowZone > 0.5) {
         // More opaque near the waterline; thinner film at the wave front
-        float depth      = clamp(-distToWave / max(waveReach, 0.1), 0.0, 1.0);
-        float waterAlpha = mix(0.62, 0.90, depth);
+        float depth = clamp(-distToWave / max(waveReach, 0.1), 0.0, 1.0);
+
+        edgeFade = smoothstep(2.5, 0.0, abs(distToWave));
+
+        waterAlpha = mix(0.62, 0.90, depth) * edgeFade;
         baseColor = mix(baseColor, waterTint * (1.0 + caust * 0.5), waterAlpha);
     }
 
@@ -183,7 +206,7 @@ void main() {
 
     // ── 3. Wet sand: dark reflective strip 3..7 m behind wave front ───────────
     float wetSandDist   = max(distToWave - 3.0, 0.0);
-    float wetSandFactor = smoothstep(4.0, 0.0, wetSandDist) * step(0.0, distToWater);
+    float wetSandFactor = smoothstep(2.0, 0.0, wetSandDist) * step(0.0, distToWater);
     if (wetSandFactor > 0.001) {
         float skyRefl = wetSandFactor * 0.12 * (1.0 - u_TidePercent * 0.4);
         baseColor = mix(baseColor, wetSand * 0.80, wetSandFactor * 0.30);
@@ -191,7 +214,7 @@ void main() {
     }
 
     // ── 4. Foam: patchy clusters at wave front + scattered bubbles in swash ───
-    float foamBand = 1.0 - smoothstep(0.0, 1.0, abs(distToWave));
+    float foamBand = 1.0 - smoothstep(0.0, 2.5, abs(distToWave));
     foamBand *= smoothstep(-0.5, 0.3, distToWater);
 
     // Three noise scales → organic foam clusters, not a solid stripe
@@ -208,8 +231,9 @@ void main() {
                      * smoothstep(2.5, 0.0, swashDist)
                      * step(0.0, distToWater);
 
+    vec3 shoreWater = mix(baseColor, waterTint, edgeFade);
     float foamBlend = clamp(foamBand * patchMask + bubbleMask * 0.45, 0.0, 1.0);
-    baseColor = mix(baseColor, vec3(0.94, 0.97, 1.00), foamBlend * 0.88);
+    baseColor = mix(baseColor, vec3(0.92,0.96,1.0), foamBlend);
 
     // ── Atmospheric fog ────────────────────────────────────────────────────────
     float fogZ    = max(18.0 - v_World.z, 0.0);
