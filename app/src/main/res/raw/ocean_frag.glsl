@@ -41,7 +41,7 @@ void main() {
     // Ocean renders 3.5 m past the animated waterline to match the beach's 3 m
     // anticipatory drape — wherever beach geometry has sunk below the surface,
     // ocean fragments can win the depth test and fill the advancing wave zone.
-    if (v_World.z > u_WaterlineZ + 12.0) discard;
+    if (v_World.z > u_WaterlineZ + 3.5) discard;
 
     float dist     = length(v_World.xz - u_CamPos.xz);
     float distNorm = clamp(dist / 68.0, 0.0, 1.0);
