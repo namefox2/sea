@@ -80,7 +80,8 @@ void main() {
         float starMask  = step(0.976, s);
         float diamond   = abs(sf.x) + abs(sf.y);  // L1 norm → diamond silhouette
         float starShape = smoothstep(0.10, 0.005, diamond);
-        float twinkle   = 0.30 + 0.70 * sin(u_Time * (1.8 + s * 5.5) + s * 6.28);
+        // Slow individual pulse: each star drifts 0→1→0 over 8-22 s (not a fast twinkle)
+        float twinkle = 0.05 + 0.95 * (sin(u_Time * (0.28 + s * 0.55) + s * 6.28) * 0.5 + 0.5);
         float brightness = 0.6 + s * 0.8;
         float star = starShape * starMask * twinkle * brightness
                    * (v_UV.y * 0.5 + 0.5) * nightFactor;

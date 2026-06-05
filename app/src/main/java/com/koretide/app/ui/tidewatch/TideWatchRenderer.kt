@@ -249,8 +249,12 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         //   tide=0.5 (중간) → waterlineZ= -1 → moderate beach strip
         //   tide=1.0 (만조) → waterlineZ=+16 → ocean fills view, thin beach near camera
         val baseWaterlineZ = -18.0f + tide * 34.0f
-        val shoreBreath    = sin(t * 0.4f) * wAmp * 0.5f
-        val waterlineZ     = (baseWaterlineZ + shoreBreath).coerceIn(-18.5f, 16.5f)
+        // Multi-frequency wave advance: superimpose two oscillations so no two waves
+        // are identical.  Primary ~5 s period, secondary ~8.6 s.
+        // Amplitude: ±1.5 m at calm → ±3.5 m at max wind (visually moves the shoreline).
+        val wavePhase   = sin(t * 1.25f) * 0.62f + sin(t * 0.73f + 1.4f) * 0.38f
+        val shoreBreath = wavePhase * (wAmp * 2.0f + 1.5f)
+        val waterlineZ  = (baseWaterlineZ + shoreBreath).coerceIn(-22f, 19f)
 
         // ── Pass 1: Sky (no depth write) ─────────────────────────────────────
         sky.draw(lutHorizon, lutZenith, lutLight, lightUV, lutIsDark, t, aspect)
