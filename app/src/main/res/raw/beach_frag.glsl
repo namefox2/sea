@@ -155,13 +155,19 @@ void main() {
         baseColor += u_AmbientColor * (1.0 - NdotL) * shadowStr * 0.18 * shadowBlend;
     }
 
-    // ── Shoaling water + Swash zone ──────────────────────────────────────────
-    // Shared teal tint used on both sides of the waterline.
+    // ── Foam reach: computed early so wave body and swash can reference it ──
+    float fA = bN(vec2(v_World.x * 0.10, u_Time * 0.12))                          * 1.60;
+    float fB = bN(vec2(v_World.x * 0.32, u_Time * 0.18) + vec2(3.1, 1.7))        * 0.80;
+    float fC = bN(vec2(v_World.x * 0.70, u_Time * 0.25) + vec2(8.3, 5.2))        * 0.35;
+    float foamScale = 1.0 + u_WindAmp * 1.5;
+    float foamReach = (fA + fB + fC) / 2.75 * 2.6 * foamScale;
+
+    // ── Shared water tint + caustics ─────────────────────────────────────────
     vec3 waterTint = vec3(0.45, 0.74, 0.72);
     float caust = sin(v_World.x * 3.8 + u_Time * 1.4) * sin(v_World.z * 4.3 - u_Time * 1.1);
     caust = pow(max(caust * 0.5 + 0.62, 0.0), 3.0) * 0.14;
 
-    // Ocean side: submerged approach (distToWater -3 → 0)
+    // ── Ocean approach: submerged entry zone (distToWater -3 → 0) ───────────
     if (shallowFactor > 0.001) {
         float shallowBlend = smoothstep(0.0, 0.25, shallowFactor) * 0.95;
         baseColor = mix(baseColor,
@@ -169,33 +175,33 @@ void main() {
                         shallowBlend);
     }
 
-    // Swash zone: thin water film on the beach side of the waterline (0 → +2m).
-    // The wave has just receded here — teal tint persists before the surface
-    // dries to wet sand, preventing the hard sea/land cut after the foam line.
-    float swashFactor = clamp(1.0 - distToWater / 2.0, 0.0, 1.0);
-    swashFactor *= swashFactor;  // ease — strongest right at the waterline
-    if (swashFactor > 0.001) {
-        // Slow-drifting shimmer: thin film of water glinting as it recedes
-        float shimmer = bN(v_World.xz * 0.60 + vec2(u_Time * 0.07, -u_Time * 0.05)) * 0.45 + 0.55;
-        // Slightly desaturated teal — teal visible but sand colour bleeds through
-        vec3 swashColor = mix(waterTint, wetSand, 0.20);
-        baseColor = mix(baseColor, swashColor, swashFactor * shimmer * 0.82);
+    // ── Wave body: full water under the incoming wave (0 → foamReach) ───────
+    // The foam line is the leading edge; everything behind it toward the ocean
+    // must be water. waveBody ramps from 0 at foamReach to 1 at the waterline.
+    float waveBody = smoothstep(foamReach + 0.15, 0.0, distToWater)
+                   * step(0.0, distToWater);
+    if (waveBody > 0.001) {
+        baseColor = mix(baseColor,
+                        waterTint + waterTint * caust * 0.5,
+                        waveBody * 0.92);
     }
 
-    // ── Waterline transition: irregular swash foam patches ───────────────
-    // Multi-frequency noise sets where the foam tongue reaches along X at each moment.
-    // Three octaves: large slow tongues + medium + fine ripple detail.
-    float fA = bN(vec2(v_World.x * 0.10, u_Time * 0.12))                          * 1.60;
-    float fB = bN(vec2(v_World.x * 0.32, u_Time * 0.18) + vec2(3.1, 1.7))        * 0.80;
-    float fC = bN(vec2(v_World.x * 0.70, u_Time * 0.25) + vec2(8.3, 5.2))        * 0.35;
-    float foamScale = 1.0 + u_WindAmp * 1.5;
-    float foamReach = (fA + fB + fC) / 2.75 * 2.6 * foamScale;
+    // ── Swash zone: thin water film after the wave recedes (foamReach → foamReach+2m) ──
+    // Starts just behind the foam line and fades over 2m of drying beach.
+    float behindFoam  = distToWater - foamReach;
+    float swashFactor = clamp(1.0 - behindFoam / 2.0, 0.0, 1.0)
+                      * step(0.0, behindFoam);
+    swashFactor *= swashFactor;
+    if (swashFactor > 0.001) {
+        float shimmer = bN(v_World.xz * 0.60 + vec2(u_Time * 0.07, -u_Time * 0.05)) * 0.45 + 0.55;
+        vec3 swashColor = mix(waterTint, wetSand, 0.20);
+        baseColor = mix(baseColor, swashColor, swashFactor * shimmer * 0.80);
+    }
 
-    // Foam band: centred where distToWater ≈ foamReach, half-width ~0.85m.
+    // ── Foam line: irregular patches at foamReach ────────────────────────────
     float foamFront = 1.0 - smoothstep(0.0, 0.85, abs(distToWater - foamReach));
     foamFront *= smoothstep(-0.3, 0.2, distToWater);  // suppress below waterline
 
-    // Patch mask: two drifting bN fields break the band into disconnected blobs.
     float pA = bN(vec2(v_World.x * 0.38 + u_Time * 0.07, v_World.z * 0.38 - u_Time * 0.04));
     float pB = bN(vec2(v_World.x * 0.22 - u_Time * 0.05, v_World.z * 0.22 + u_Time * 0.03));
     float patchThresh = mix(0.30, 0.18, u_WindAmp);
