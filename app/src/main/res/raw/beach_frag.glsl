@@ -8,7 +8,7 @@ uniform float u_Time;
 uniform float u_TidePercent;
 uniform float u_WaterlineZ;
 uniform float u_WindAmp;
-uniform float u_MudflatScale; // 1.0=서해(full 갯벌) 0.35=남해 0.0=동해/제주
+uniform float u_MudflatExposure; // 0..1, pre-computed in Kotlin: tidePosition × rangeFactor × regionCap
 uniform vec3  u_CamPos;
 uniform vec3  u_AmbientColor;
 
@@ -59,9 +59,9 @@ void main() {
     drySand = mix(drySand, u_SandDry, 0.35);
     wetSand = mix(wetSand, u_SandWet, 0.25);
 
-    // Mudflat: appears only on coasts with significant tidal range (서해).
-    // u_MudflatScale = 0 for 동해/제주 (no tidal flats), 1 for 서해 (full).
-    float mudflatFactor = clamp(1.0 - u_TidePercent * 2.0, 0.0, 1.0) * u_MudflatScale;
+    // Mudflat exposure: fully computed on the Kotlin side (tidePosition × rangeFactor × regionCap).
+    // 0 = no mudflat visible; 1 = maximum exposure for this coast type and tidal range.
+    float mudflatFactor = u_MudflatExposure;
 
     // ── Base color: sand → wet sand → mudflat ─────────────────────────────
     vec3 baseColor = drySand;

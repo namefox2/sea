@@ -17,8 +17,6 @@ import com.koretide.app.domain.model.TideData
 import com.koretide.app.theme.SeasonThemeManager
 import com.koretide.app.ui.main.SharedViewModel
 import com.koretide.app.util.collectFlow
-import com.koretide.app.util.gone
-import com.koretide.app.util.visible
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 
@@ -26,6 +24,10 @@ private const val PREFS_THEME = "theme_prefs"
 private const val KEY_THEME_ID = "selected_theme_id"
 private const val PREFS_WATCH = "watch_prefs"
 private const val KEY_WAVE_SOUND = "wave_sound_enabled"
+
+// Default tidal range used when no station data is available (서해 typical ~600 cm).
+private const val DEFAULT_MAX_LEVEL = 600
+private const val DEFAULT_MIN_LEVEL = 0
 
 @AndroidEntryPoint
 class TideWatchFragment : Fragment() {
@@ -39,6 +41,12 @@ class TideWatchFragment : Fragment() {
     private val sharedViewModel: SharedViewModel by activityViewModels()
 
     private var uiVisible = true
+    private var isImmersivePreset = false
+
+    // Cached tidal range data — updated whenever real station data arrives.
+    private var cachedRegion: StationRegion? = null
+    private var cachedMaxLevel: Int = DEFAULT_MAX_LEVEL
+    private var cachedMinLevel: Int = DEFAULT_MIN_LEVEL
 
     private val oceanSound = OceanSoundPlayer()
     private var soundEnabled = false
@@ -66,6 +74,7 @@ class TideWatchFragment : Fragment() {
 
         setupSliders()
         setupSound()
+        setupImmersiveButton()
 
         // Tap background to toggle immersive; slider panel consumes its own touches
         binding.root.setOnClickListener { toggleImmersive() }
@@ -84,7 +93,11 @@ class TideWatchFragment : Fragment() {
     }
 
     private fun setupSliders() {
-        binding.tideWatchView.setTide(binding.seekTide.progress / 100f)
+        val initialTidePct = binding.seekTide.progress / 100f
+        binding.tideWatchView.setTide(initialTidePct)
+        binding.tideWatchView.setMudflatExposure(
+            computeMudflatExposure(initialTidePct, cachedMaxLevel, cachedMinLevel, cachedRegion)
+        )
         binding.tideWatchView.setWind(binding.seekWind.progress)
 
         binding.seekWind.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
@@ -100,7 +113,12 @@ class TideWatchFragment : Fragment() {
         binding.seekTide.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(sb: SeekBar, progress: Int, fromUser: Boolean) {
                 binding.tvTidePct.text = "$progress%"
-                binding.tideWatchView.setTide(progress / 100f)
+                val pct = progress / 100f
+                binding.tideWatchView.setTide(pct)
+                // Recompute mudflat exposure whenever the slider changes (user or code).
+                binding.tideWatchView.setMudflatExposure(
+                    computeMudflatExposure(pct, cachedMaxLevel, cachedMinLevel, cachedRegion)
+                )
             }
             override fun onStartTrackingTouch(sb: SeekBar) {}
             override fun onStopTrackingTouch(sb: SeekBar) {}
@@ -124,12 +142,51 @@ class TideWatchFragment : Fragment() {
         }
     }
 
+    private fun setupImmersiveButton() {
+        binding.btnImmersive.setOnClickListener {
+            isImmersivePreset = true
+            binding.tideWatchView.applyImmersivePreset()
+            // Hide the UI to enter full immersive view
+            uiVisible = false
+            binding.overlayCard.visibility = View.GONE
+            binding.sliderPanel.visibility = View.GONE
+            sharedViewModel.setWatchImmersive(true)
+        }
+    }
+
     private fun toggleImmersive() {
         uiVisible = !uiVisible
         val vis = if (uiVisible) View.VISIBLE else View.GONE
         binding.overlayCard.visibility = vis
         binding.sliderPanel.visibility = vis
         sharedViewModel.setWatchImmersive(!uiVisible)
+
+        // Exiting immersive preset: restore real station data / slider state
+        if (uiVisible && isImmersivePreset) {
+            isImmersivePreset = false
+            restoreStationView()
+        }
+    }
+
+    // Re-applies the current station's data (or slider defaults) after exiting immersive preset.
+    private fun restoreStationView() {
+        val station = sharedViewModel.selectedStation.value
+        binding.tideWatchView.setHasStation(station != null)
+
+        val tideData = viewModel.tideData.value
+        if (tideData != null) {
+            applyTideData(binding, tideData)
+        } else {
+            val pct = binding.seekTide.progress / 100f
+            binding.tideWatchView.setTide(pct)
+            binding.tideWatchView.setMudflatExposure(
+                computeMudflatExposure(pct, cachedMaxLevel, cachedMinLevel, cachedRegion)
+            )
+        }
+        viewModel.windData.value?.let { data ->
+            binding.tideWatchView.setWind(data.beaufort)
+            binding.tideWatchView.windDirectionDeg = data.directionDeg
+        }
     }
 
     private fun observeState() {
@@ -140,10 +197,11 @@ class TideWatchFragment : Fragment() {
                 if (newTheme != null) b.tideWatchView.themeConfig = newTheme
             }
         }
+
         collectFlow(sharedViewModel.selectedStation) { station ->
             val b = _binding ?: return@collectFlow
+            cachedRegion = station?.region
             b.tideWatchView.setHasStation(station != null)
-            b.tideWatchView.setCoast(station?.region)
             if (station != null) {
                 b.tvStationName.text = station.name
                 viewModel.startPolling(station.code, station.lat, station.lng)
@@ -152,18 +210,16 @@ class TideWatchFragment : Fragment() {
 
         collectFlow(viewModel.tideData) { data ->
             val b = _binding ?: return@collectFlow
-            if (data != null) {
-                val pct = (data.tidePercent * 100).toInt().coerceIn(0, 100)
-                b.seekTide.progress = pct
+            if (data != null && !isImmersivePreset) {
+                applyTideData(b, data)
                 sharedViewModel.updateTideData(data)
-                b.tvTideInfo.text = "${data.tideStatus.displayName} $pct%"
                 updateMudflatGrade(b, data)
             }
         }
 
         collectFlow(viewModel.windData) { data ->
             val b = _binding ?: return@collectFlow
-            if (data != null) {
+            if (data != null && !isImmersivePreset) {
                 b.seekWind.progress = data.beaufort
                 b.tideWatchView.windDirectionDeg = data.directionDeg
                 oceanSound.setIntensity(data.beaufort.coerceIn(0, 12) / 12f)
@@ -173,18 +229,31 @@ class TideWatchFragment : Fragment() {
         }
     }
 
+    private fun applyTideData(b: FragmentTideWatchBinding, data: TideData) {
+        cachedMaxLevel = data.maxLevel
+        cachedMinLevel = data.minLevel
+
+        val exposure = computeMudflatExposure(data.currentLevel, data.maxLevel, data.minLevel, cachedRegion)
+        val pct = (data.tidePercent * 100).toInt().coerceIn(0, 100)
+
+        b.seekTide.progress = pct
+        b.tideWatchView.setMudflatExposure(exposure)
+        b.tvTideInfo.text = "${data.tideStatus.displayName} $pct%"
+    }
+
     private fun updateMudflatGrade(b: FragmentTideWatchBinding, data: TideData) {
-        val region = sharedViewModel.selectedStation.value?.region
+        val region = cachedRegion
         val hasTidalFlat = region == StationRegion.WEST || region == StationRegion.SOUTH
-        val range = data.maxLevel - data.minLevel
-        if (hasTidalFlat && range > 100) {
-            val exposure = (data.maxLevel - data.currentLevel).toFloat() / range.toFloat()
+        val tidalRange = data.maxLevel - data.minLevel
+        if (hasTidalFlat && tidalRange > 100) {
+            val exposure = computeMudflatExposure(data.currentLevel, data.maxLevel, data.minLevel, region)
             b.tvMudflatGrade.text = when {
-                exposure >= 0.67f -> "🦀 갯벌 매우 많이 드러남"
-                exposure >= 0.33f -> "🦀 갯벌 보통 드러남"
-                else              -> "🦀 갯벌 조금 드러남"
+                exposure >= 0.60f -> "🦀 갯벌 매우 많이 드러남"
+                exposure >= 0.30f -> "🦀 갯벌 보통 드러남"
+                exposure >= 0.05f -> "🦀 갯벌 조금 드러남"
+                else              -> null
             }
-            b.tvMudflatGrade.visibility = View.VISIBLE
+            b.tvMudflatGrade.visibility = if (exposure >= 0.05f) View.VISIBLE else View.GONE
         } else {
             b.tvMudflatGrade.visibility = View.GONE
         }
@@ -197,6 +266,7 @@ class TideWatchFragment : Fragment() {
         viewModel.stopPolling()
         if (!uiVisible) {
             uiVisible = true
+            isImmersivePreset = false
             sharedViewModel.setWatchImmersive(false)
         }
     }
@@ -214,8 +284,51 @@ class TideWatchFragment : Fragment() {
     override fun onDestroyView() {
         sharedViewModel.setWatchImmersive(false)
         oceanSound.stop()
-        _binding?.tideWatchView?.release()  // free GL resources before losing reference
+        _binding?.tideWatchView?.release()
         super.onDestroyView()
         _binding = null
     }
+}
+
+// ── Tidal flat exposure computation ──────────────────────────────────────────
+// Returns a 0..1 value reflecting how much tidal flat is currently visible,
+// combining: (1) how far the tide is out, (2) the local tidal range magnitude,
+// and (3) a hard cap per coast type (동해 rarely exposes mudflat).
+private fun computeMudflatExposure(
+    currentLevel: Int, maxLevel: Int, minLevel: Int, region: StationRegion?
+): Float {
+    val tidalRange = (maxLevel - minLevel).toFloat()
+    if (tidalRange <= 0f) return 0f
+
+    // 0 = submerged (high tide), 1 = fully exposed (low tide)
+    val tidePosition = ((maxLevel - currentLevel).toFloat() / tidalRange).coerceIn(0f, 1f)
+
+    // How much this location's range allows mudflat to form
+    val rangeFactor = when {
+        tidalRange < 100f -> 0.00f                                                    // <1m: no flat
+        tidalRange < 300f -> (tidalRange - 100f) / 200f * 0.30f                      // 1-3m: small
+        tidalRange < 500f -> 0.30f + (tidalRange - 300f) / 200f * 0.50f              // 3-5m: moderate
+        else              -> 0.80f + ((tidalRange - 500f) / 500f).coerceAtMost(1f) * 0.20f // 5m+: large
+    }
+
+    // Per-region hard cap: even at maximum range, 동해/제주 show almost no mudflat
+    val regionCap = when (region) {
+        StationRegion.WEST  -> 1.00f
+        StationRegion.SOUTH -> 0.60f
+        StationRegion.JEJU  -> 0.08f
+        StationRegion.EAST  -> 0.04f
+        null                -> 1.00f
+    }
+
+    return (tidePosition * rangeFactor * regionCap).coerceIn(0f, 1f)
+}
+
+// Overload for the manual slider (no actual level data, only tidePercent).
+private fun computeMudflatExposure(
+    tidePercent: Float, maxLevel: Int, minLevel: Int, region: StationRegion?
+): Float {
+    val tidalRange = (maxLevel - minLevel).toFloat()
+    // tidePercent=0 → lowest tide → currentLevel=minLevel; tidePercent=1 → highest → currentLevel=maxLevel
+    val currentLevel = (minLevel + tidePercent * tidalRange).toInt()
+    return computeMudflatExposure(currentLevel, maxLevel, minLevel, region)
 }
