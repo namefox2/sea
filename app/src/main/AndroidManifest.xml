@@ -23,10 +23,10 @@
             android:name="com.google.android.gms.ads.APPLICATION_ID"
             android:value="@string/admob_app_id" />
 
-        <!-- Naver Maps -->
+        <!-- Naver Maps — set NAVER_CLIENT_ID in local.properties -->
         <meta-data
             android:name="com.naver.maps.map.CLIENT_ID"
-            android:value="j5uq4i1va5" />
+            android:value="${naverClientId}" />
 
         <activity
             android:name=".ui.main.MainActivity"
