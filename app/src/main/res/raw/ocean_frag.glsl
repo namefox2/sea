@@ -41,7 +41,7 @@ void main() {
     // Ocean renders 3.5 m past the animated waterline to match the beach's 3 m
     // anticipatory drape — wherever beach geometry has sunk below the surface,
     // ocean fragments can win the depth test and fill the advancing wave zone.
-    if (v_World.z > u_WaterlineZ + 3.5) discard;
+    if (v_World.z > u_WaterlineZ + 12.0) discard;
 
     float dist     = length(v_World.xz - u_CamPos.xz);
     float distNorm = clamp(dist / 68.0, 0.0, 1.0);
@@ -148,7 +148,10 @@ void main() {
     col += yunseul * (1.0 - foam);
 
     // ── 7. Shore transition (ocean fades to pale aqua toward the beach) ───────
-    float shoreProx = clamp((v_World.z - (u_WaterlineZ - 6.0)) / 9.0, 0.0, 1.0);
+    float shoreProx =
+            clamp((v_World.z - (u_WaterlineZ - 18.0)) / 22.0,
+                  0.0,
+                  1.0);
     shoreProx = pow(shoreProx, 1.1);
     vec3 shoreAqua = vec3(0.45, 0.74, 0.72);
     col = mix(col, shoreAqua, shoreProx * 0.95);
@@ -165,7 +168,6 @@ void main() {
 
     vec3 sandColor =
             mix(u_SandWetColor, u_SandDryColor, shoreProx);
-    col =
-            mix(col, sandColor, shoreProx * 0.7);
+    col = mix(col, sandColor, shoreProx);
     gl_FragColor = vec4(col, 1.0);
 }

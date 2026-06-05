@@ -50,11 +50,12 @@ void main() {
     p += gerstner(a_Pos.xz, normalize(vec2(cos(wd-0.30), sin(wd-0.30))), amp*0.30, L0*0.31, spd*1.7, u_Time, n, ns);
     p += gerstner(a_Pos.xz, normalize(vec2(cos(wd+1.10), sin(wd+1.10))), amp*0.16, L0*0.16, spd*2.3, u_Time, n, ns);
 
-    float shallowT = clamp(
-            (p.z - (u_WaterlineZ - 15.0)) / 15.0,
-            0.0,
-            1.0
-    );
+    float shallowT =
+            clamp(
+                    (p.z - (u_WaterlineZ - 25.0)) / 25.0,
+                    0.0,
+                    1.0
+            );
 
     vec3 waveOffset = p - a_Pos;
     n = mix(
