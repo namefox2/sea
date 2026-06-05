@@ -148,10 +148,7 @@ void main() {
     col += yunseul * (1.0 - foam);
 
     // ── 7. Shore transition (ocean fades to pale aqua toward the beach) ───────
-    float shoreProx =
-            clamp((v_World.z - (u_WaterlineZ - 18.0)) / 22.0,
-                  0.0,
-                  1.0);
+    float shoreProx = clamp((v_World.z - (u_WaterlineZ - 1.0)) / 22.0, 0.0, 1.0);
     shoreProx = pow(shoreProx, 1.1);
     vec3 shoreAqua = vec3(0.45, 0.74, 0.72);
     col = mix(col, shoreAqua, shoreProx * 0.95);
