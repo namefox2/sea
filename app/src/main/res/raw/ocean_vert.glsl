@@ -67,7 +67,12 @@ void main() {
 
     float shallowWidth = mix(4.0, 18.0, u_Tide);
 
-    float shallowT = clamp((p.z - (u_WaterlineZ - shallowWidth)) / shallowWidth, 0.0, 1.0);
+    float shallowT =
+            clamp(
+                    (p.z - (u_WaterlineZ - shallowWidth)) / shallowWidth,
+                    0.0,
+                    1.0
+            );
 
     vec3 waveOffset = p - a_Pos;
     n = mix(
@@ -84,7 +89,7 @@ void main() {
     p.z += shoreZone * runup;
 
     float tideY = u_Tide * 1.4 - 0.7;
-    p.y += tideY - shallowT * u_Tide;
+    p.y += tideY - shallowT * 0.15;
 
     // Floor clamp: troughs never expose empty space below the mesh.
     p.y = max(p.y, tideY - amp * 2.0);
