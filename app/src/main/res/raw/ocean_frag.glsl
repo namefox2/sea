@@ -140,11 +140,25 @@ void main() {
     vec3  yunseul   = u_LightColor * u_YunseulStr * sparkle * corrBoost;
 
     // ── 6. Wave-crest foam (whitecaps grow with wind) ────────────────────────
-    float foamMask = smoothstep(0.25, 0.85, v_Foam);
+    // 1. 해안선 띠 (핵심)
+    float shoreBand = exp(-abs(v_DistToWater) * 0.35);
 
-    float windFactor = mix(0.15, 0.9, wind);
+// 2. 파도 기반
+    float waveMask = smoothstep(0.35, 0.85, v_Foam);
 
-    float foam = foamMask * (0.2 + wind * wind * 0.8);
+// 3. 미세 끊김 제거용 노이즈
+    float n = fract(sin(v_World.x * 12.3 + v_World.z * 7.7) * 43758.5453);
+
+// 4. 최종 foam
+    float foam = shoreBand * waveMask * (0.25 + wind * 0.85);
+
+
+// 노이즈로 자연스럽게 끊김 제거
+    foam *= mix(0.75, 1.15, n);
+
+    float alongWave = sin(v_World.x * 0.2 + u_Time * 2.0);
+    foam *= 0.7 + 0.3 * alongWave;
+
     col = mix(col, vec3(0.94, 0.97, 1.00), foam * 0.70);
 
     // Fresnel near-surface sheen (near water only).
