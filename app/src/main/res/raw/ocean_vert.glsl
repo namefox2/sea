@@ -10,6 +10,7 @@ uniform float u_WindAmp;
 uniform float u_WindDir;
 uniform float u_Tide;
 uniform float u_WaterlineZ;
+varying float v_DistToWater;
 
 varying vec3  v_World;
 varying vec3  v_Normal;
@@ -45,17 +46,28 @@ void main() {
     vec3 p = a_Pos;
     vec3 n = vec3(0.0, 1.0, 0.0);
 
-    p += gerstner(a_Pos.xz, normalize(vec2(cos(wd),      sin(wd))),      amp*1.00, L0*1.00, spd*1.0, u_Time, n, ns);
-    p += gerstner(a_Pos.xz, normalize(vec2(cos(wd+0.45), sin(wd+0.45))), amp*0.55, L0*0.57, spd*1.3, u_Time, n, ns);
-    p += gerstner(a_Pos.xz, normalize(vec2(cos(wd-0.30), sin(wd-0.30))), amp*0.30, L0*0.31, spd*1.7, u_Time, n, ns);
-    p += gerstner(a_Pos.xz, normalize(vec2(cos(wd+1.10), sin(wd+1.10))), amp*0.16, L0*0.16, spd*2.3, u_Time, n, ns);
-
-    float shallowT =
-            clamp(
-                    (p.z - (u_WaterlineZ - 25.0)) / 25.0,
-                    0.0,
-                    1.0
+    float shoreZone =
+            smoothstep(
+                    u_WaterlineZ - 6.0,
+                    u_WaterlineZ + 2.0,
+                    p.z
             );
+    float depthFactor =
+            1.0 -
+            smoothstep(
+                    u_WaterlineZ - 10.0,
+                    u_WaterlineZ + 5.0,
+                    a_Pos.z
+            );
+
+    p += gerstner(a_Pos.xz, normalize(vec2(cos(wd),      sin(wd))),      amp*depthFactor, L0*1.00, spd*1.0, u_Time, n, ns);
+    p += gerstner(a_Pos.xz, normalize(vec2(cos(wd+0.45), sin(wd+0.45))), amp*depthFactor, L0*0.57, spd*1.3, u_Time, n, ns);
+    p += gerstner(a_Pos.xz, normalize(vec2(cos(wd-0.30), sin(wd-0.30))), amp*depthFactor, L0*0.31, spd*1.7, u_Time, n, ns);
+    p += gerstner(a_Pos.xz, normalize(vec2(cos(wd+1.10), sin(wd+1.10))), amp*depthFactor, L0*0.16, spd*2.3, u_Time, n, ns);
+
+    float shallowWidth = mix(4.0, 18.0, u_Tide);
+
+    float shallowT = clamp((p.z - (u_WaterlineZ - shallowWidth)) / shallowWidth, 0.0, 1.0);
 
     vec3 waveOffset = p - a_Pos;
     n = mix(
@@ -65,8 +77,14 @@ void main() {
     );
     p = a_Pos + waveOffset;
 
+    float runup =
+            sin(u_Time * 0.35)
+            * (2.0 + u_WindAmp * 3.0);
+
+    p.z += shoreZone * runup;
+
     float tideY = u_Tide * 1.4 - 0.7;
-    p.y += tideY;
+    p.y += tideY - shallowT * u_Tide;
 
     // Floor clamp: troughs never expose empty space below the mesh.
     p.y = max(p.y, tideY - amp * 2.0);
@@ -76,9 +94,11 @@ void main() {
     // The fragment shader discards anything past waterlineZ+2 anyway.
 
     float waveFade = 1.0 - shallowT;
+    float shoreWaveRetain = mix(0.08, 0.45, u_Tide);
+
     p.y = tideY +
           (p.y - tideY) *
-          mix(1.0, 0.03, shallowT);
+          mix(1.0, shoreWaveRetain, shallowT);
 
     v_Foam   = clamp((p.y - (tideY + amp * 0.55)) * 3.5, 0.0, 1.0);
     v_World  = p;

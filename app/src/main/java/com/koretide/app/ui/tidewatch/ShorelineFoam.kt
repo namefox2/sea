@@ -22,7 +22,8 @@ class ShorelineFoam(private val program: Int) {
     private val uWaterZ    = GLES20.glGetUniformLocation(program, "u_WaterlineZ")
     private val uWindAmp   = GLES20.glGetUniformLocation(program, "u_WindAmp")
     private val uTime      = GLES20.glGetUniformLocation(program, "u_Time")
-    private val uLightColor= GLES20.glGetUniformLocation(program, "u_LightColor")
+    private val uLightColor = GLES20.glGetUniformLocation(program, "u_LightColor")
+    private val uTide = GLES20.glGetUniformLocation(program, "u_Tide")
 
     init {
         // Flat XZ grid: a_Pos.x = -1..1, a_Pos.y = -0.5..0.5 (local Z offset)
@@ -73,7 +74,7 @@ class ShorelineFoam(private val program: Int) {
         GLES20.glDeleteProgram(program)
     }
 
-    fun draw(mvp: FloatArray, waterlineZ: Float, windAmp: Float, time: Float, lightColor: FloatArray) {
+    fun draw(mvp: FloatArray, waterlineZ: Float, windAmp: Float, time: Float, tide: Float, lightColor: FloatArray) {
         GLES20.glUseProgram(program)
         GLES20.glEnable(GLES20.GL_BLEND)
         GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA)
@@ -84,6 +85,7 @@ class ShorelineFoam(private val program: Int) {
         GLES20.glUniform1f (uWindAmp,  windAmp)
         GLES20.glUniform1f (uTime,     time)
         GLES20.glUniform3fv(uLightColor, 1, lightColor, 0)
+        GLES20.glUniform1f(uTide, tide)
 
         GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, vbo)
         GLES20.glEnableVertexAttribArray(aPos)

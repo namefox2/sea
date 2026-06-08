@@ -13,38 +13,50 @@ float hash21(vec2 p) {
 }
 
 void main() {
-    // Cellular bubble foam
-//    vec2  cell   = floor(v_UV * 4.0);
-//    vec2  cellUV = fract(v_UV * 4.0);
-//    float h      = hash21(cell);
-//    float phase  = fract(h + u_Time * (0.8 + h * 1.5));
-//
-//    float dist   = length(cellUV - 0.5) * 2.0;
-//    float bubble = smoothstep(phase + 0.1, phase, dist)
-//                 * smoothstep(0.0, 0.15, phase)
-//                 * smoothstep(1.0, 0.70, phase)
-//                 * step(0.3, h); // only 70% of cells have foam
+    vec2 cell = floor(v_UV * 12.0);
+    vec2 cellUV = fract(v_UV * 12.0);
 
-    float foam1 =
-            sin(v_UV.x * 18.0 + u_Time * 0.8) *
-            sin(v_UV.y * 11.0 - u_Time * 0.4);
+    float h = hash21(cell);
 
-    float foam2 =
-            sin(v_UV.x * 31.0 - u_Time * 0.5) *
-            sin(v_UV.y * 23.0 + u_Time * 0.7);
+    vec2 center = vec2(
+            hash21(cell + 1.7),
+            hash21(cell + 4.3)
+    );
 
-    float bubble =
-            smoothstep(0.4, 0.8, foam1 * foam2 * 0.5 + 0.5);
+    float smallBubble =
+            smoothstep(0.45, 0.1,
+                       length(cellUV - center));
 
-    // Fine cross-hatch texture for foam body
-    float fine = pow(sin(v_UV.x * 28.0 + u_Time * 0.5) * 0.5 + 0.5, 6.0)
-               * pow(sin(v_UV.y * 19.0 - u_Time * 0.3) * 0.5 + 0.5, 4.0);
+    smallBubble *= step(0.35, h);
+
+    vec2 bigCell = floor(v_UV * 4.0);
+    vec2 bigUV   = fract(v_UV * 4.0);
+
+    float bh = hash21(bigCell);
+
+    vec2 bigCenter = vec2(
+            hash21(bigCell + 10.0),
+            hash21(bigCell + 20.0)
+    );
+
+    float bigBubble =
+            smoothstep(0.65, 0.2,
+                       length(bigUV - bigCenter));
+
+    bigBubble *= step(0.55, bh);
 
     float foam =
-            bubble * 0.8 +
-            fine * 0.2;
+            smallBubble * 0.7 +
+            bigBubble * 0.5;
     float alpha = v_Alpha * foam;
+
     if (alpha < 0.02) discard;
-    vec3 foamBase = mix(vec3(0.93, 0.96, 1.0), u_LightColor, 0.18);
-    gl_FragColor = vec4(foamBase, alpha);
+
+    vec3 foamBase =
+            mix(vec3(0.93, 0.96, 1.0),
+                u_LightColor,
+                0.18);
+
+    //gl_FragColor = vec4(foamBase, alpha);
+    gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
 }

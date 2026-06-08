@@ -21,6 +21,7 @@ class BeachRenderer(private val program: Int) {
     private val uMVP         = GLES20.glGetUniformLocation(program, "u_MVP")
     private val uTidePercent = GLES20.glGetUniformLocation(program, "u_TidePercent")
     private val uWaterlineZ  = GLES20.glGetUniformLocation(program, "u_WaterlineZ")
+    private val uShoreBaseZ = GLES20.glGetUniformLocation(program, "u_ShoreBaseZ")
     private val uWindAmp      = GLES20.glGetUniformLocation(program, "u_WindAmp")
     private val uMudflatExposure = GLES20.glGetUniformLocation(program, "u_MudflatExposure")
     private val uSandDry     = GLES20.glGetUniformLocation(program, "u_SandDry")
@@ -85,11 +86,15 @@ class BeachRenderer(private val program: Int) {
         GLES20.glDeleteBuffers(2, intArrayOf(vbo, ibo), 0)
         GLES20.glDeleteProgram(program)
     }
-
+    fun calcWetness(dist: Float, waveReach: Float, slope: Float, tide: Float): Float {
+        val base = (1f - dist / 12f).coerceIn(0f, 1f)
+        return base * base * (1f + waveReach * 0.3f)
+    }
     fun draw(mvp: FloatArray, tidePercent: Float, waterlineZ: Float, windAmp: Float,
              mudflatExposure: Float,
              sandDry: FloatArray, sandWet: FloatArray, horizon: FloatArray,
              lightDir: FloatArray, camPos: FloatArray, ambientColor: FloatArray, time: Float) {
+
         GLES20.glUseProgram(program)
         GLES20.glUniformMatrix4fv(uMVP,             1, false, mvp,          0)
         GLES20.glUniform1f (uTidePercent,     tidePercent)
@@ -103,6 +108,8 @@ class BeachRenderer(private val program: Int) {
         GLES20.glUniform3fv(uCamPos,       1, camPos,       0)
         GLES20.glUniform3fv(uAmbientColor, 1, ambientColor, 0)
         GLES20.glUniform1f (uTime,         time)
+        GLES20.glUniform1f(uWaterlineZ, waterlineZ)
+        GLES20.glUniform1f(uShoreBaseZ, waterlineZ)
 
         GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, vbo)
         GLES20.glEnableVertexAttribArray(aPos)

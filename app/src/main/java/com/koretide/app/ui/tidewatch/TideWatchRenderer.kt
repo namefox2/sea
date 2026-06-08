@@ -306,7 +306,7 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         ocean.draw(oc_aPos)
 
         // ── Pass 5: Shoreline foam (alpha-blended) ────────────────────────────
-        foam.draw(mvp, shorelineZ , wAmp, t, lutLight)
+        foam.draw(mvp, shorelineZ , wAmp, t, tide, lutLight)
 
         // ── Pass 6: Spray particles (GL_POINTS, alpha-blended) ────────────────
         spray.draw(mvp, t, wAmp, wDir, tide, lutLight)

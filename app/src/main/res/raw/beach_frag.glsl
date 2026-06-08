@@ -11,6 +11,8 @@ uniform float u_WindAmp;
 uniform float u_MudflatExposure; // 0..1 pre-computed in Kotlin
 uniform vec3  u_CamPos;
 uniform vec3  u_AmbientColor;
+uniform float u_Wetness;
+varying float v_DistToWater;
 
 // ── Smooth value noise ─────────────────────────────────────────────────────
 float bN(vec2 p) {
@@ -33,12 +35,7 @@ float tidalH(vec2 p) {
 
 void main() {
     // distToWater: > 0 = landward (exposed), < 0 = seaward (beach draped below ocean)
-    float edgeNoise =
-          bN(v_World.xz * 0.08) * 2.0
-        + bN(v_World.xz * 0.25) * 0.8;
-
-    float distToWater =
-        v_World.z - u_WaterlineZ - edgeNoise;
+    float distToWater = v_DistToWater;
 
     // The vertex shader drapes the beach floor below the ocean surface for
     // distToWater < 0, so those fragments lose the depth test and the ocean
@@ -49,8 +46,6 @@ void main() {
     float dCam     = max(length(toFragXZ), 0.01);
 
     // Wetness: 1.0 at waterline, 0.0 at 12 m inland
-    float wetness = clamp(1.0 - distToWater / 12.0, 0.0, 1.0);
-    wetness = wetness * wetness;
 
     // ── Color palette ─────────────────────────────────────────────────────────
     vec3 drySand        = vec3(0.76, 0.68, 0.52);
@@ -67,9 +62,9 @@ void main() {
 
     // ── Base color: sand → wet → mudflat ──────────────────────────────────────
     vec3 baseColor = drySand;
-    baseColor = mix(baseColor, wetSand,        wetness);
+    baseColor = mix(baseColor, wetSand, u_Wetness);
     baseColor = mix(baseColor, mudflatShallow, mudflatFactor * 0.6);
-    baseColor = mix(baseColor, mudflatDeep,    mudflatFactor * wetness);
+    baseColor = mix(baseColor, mudflatDeep,    mudflatFactor * u_Wetness);
 
     // ── Domain-warped mudflat system (간조 갯벌) ───────────────────────────────
     if (mudflatFactor > 0.02) {
@@ -147,13 +142,8 @@ void main() {
     //float shoreBlend = smoothstep(5.0, 0.0, distToWater) * 0.78;
     //baseColor = mix(baseColor, shoreAqua, shoreBlend);
 
-    float shoreBlend =
-        smoothstep(0.5, -0.5, distToWater);
-
-    baseColor =
-        mix(baseColor,
-            mix(baseColor, waterTint, 0.05),
-            shoreBlend);
+    float shoreBlend = smoothstep(0.5, -0.5, distToWater);
+    baseColor = mix(baseColor, waterTint, shoreBlend * 0.08);
 
     // ── Caustics ──────────────────────────────────────────────────────────────
     float caust = sin(v_World.x * 3.8 + u_Time * 1.4) * sin(v_World.z * 4.3 - u_Time * 1.1);

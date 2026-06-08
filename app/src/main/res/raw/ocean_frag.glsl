@@ -6,6 +6,7 @@ precision mediump float;
 varying vec3  v_World;
 varying vec3  v_Normal;
 varying float v_Foam;
+varying float v_DistToWater;
 
 uniform vec3      u_LightDir;
 uniform vec3      u_LightColor;
@@ -25,6 +26,7 @@ uniform float u_FadeEndZ;
 uniform vec3 u_SandDryColor;
 uniform vec3 u_SandWetColor;
 
+
 float h21(vec2 p) {
     p = fract(p * vec2(127.1, 311.7));
     p += dot(p, p + 43.2);
@@ -41,7 +43,7 @@ void main() {
     // Ocean renders 3.5 m past the animated waterline to match the beach's 3 m
     // anticipatory drape — wherever beach geometry has sunk below the surface,
     // ocean fragments can win the depth test and fill the advancing wave zone.
-    if (v_World.z > u_WaterlineZ + 10.0) discard;
+//    if (v_World.z > u_WaterlineZ + 10.0) discard;
 
     float dist     = length(v_World.xz - u_CamPos.xz);
     float distNorm = clamp(dist / 68.0, 0.0, 1.0);
@@ -148,13 +150,12 @@ void main() {
     col += yunseul * (1.0 - foam);
 
     // ── 7. Shore transition (ocean fades to pale aqua toward the beach) ───────
-    float shoreProx = clamp((v_World.z - (u_WaterlineZ - 1.0)) / 22.0, 0.0, 1.0);
+    float distToWater = v_DistToWater;
+    float shoreProx = clamp((distToWater + 1.0) / 22.0, 0.0, 1.0);
     shoreProx = pow(shoreProx, 1.1);
-    vec3 shoreAqua = vec3(0.45, 0.74, 0.72);
-    col = mix(col, shoreAqua, shoreProx * 0.95);
-    float fringe = smoothstep(0.75, 1.0, shoreProx)
-                 * (0.45 + 0.55 * vnoise(v_World.xz * 2.8 + u_Time * 0.55));
-    col = mix(col, vec3(0.94, 0.97, 1.00), fringe * 0.42);
+
+    vec3 shoreMix = mix(col, vec3(0.45, 0.74, 0.72), shoreProx * 0.8);
+    col = mix(shoreMix, u_SandWetColor, shoreProx);
 
 
     // ── 8. Horizon atmospheric seam — distant water meets the bright sky ──────
