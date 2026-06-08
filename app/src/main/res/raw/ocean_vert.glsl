@@ -52,27 +52,27 @@ void main() {
                     u_WaterlineZ + 2.0,
                     p.z
             );
-    float depthFactor =
-            1.0 -
-            smoothstep(
-                    u_WaterlineZ - 10.0,
-                    u_WaterlineZ + 5.0,
-                    a_Pos.z
-            );
+    float depthZ = a_Pos.z;
+
+    float depthFactor = smoothstep(
+            u_WaterlineZ + 20.0,
+            u_WaterlineZ - 10.0,
+            depthZ
+    );
+    depthFactor = clamp(depthFactor, 0.15, 1.0);
 
     p += gerstner(a_Pos.xz, normalize(vec2(cos(wd),      sin(wd))),      amp*depthFactor, L0*1.00, spd*1.0, u_Time, n, ns);
     p += gerstner(a_Pos.xz, normalize(vec2(cos(wd+0.45), sin(wd+0.45))), amp*depthFactor, L0*0.57, spd*1.3, u_Time, n, ns);
     p += gerstner(a_Pos.xz, normalize(vec2(cos(wd-0.30), sin(wd-0.30))), amp*depthFactor, L0*0.31, spd*1.7, u_Time, n, ns);
     p += gerstner(a_Pos.xz, normalize(vec2(cos(wd+1.10), sin(wd+1.10))), amp*depthFactor, L0*0.16, spd*2.3, u_Time, n, ns);
 
-    float shallowWidth = mix(4.0, 18.0, u_Tide);
+    float shallowWidth = 22.0;
 
-    float shallowT =
-            clamp(
-                    (p.z - (u_WaterlineZ - shallowWidth)) / shallowWidth,
-                    0.0,
-                    1.0
-            );
+    float shallowT = smoothstep(
+            u_WaterlineZ - shallowWidth,
+            u_WaterlineZ + 3.0,
+            a_Pos.z
+    );
 
     vec3 waveOffset = p - a_Pos;
     n = mix(
@@ -109,4 +109,7 @@ void main() {
     v_World  = p;
     v_Normal = normalize(n);
     gl_Position = u_MVP * vec4(p, 1.0);
+
+    float distToWater = a_Pos.z - u_WaterlineZ;
+    v_DistToWater = distToWater;
 }

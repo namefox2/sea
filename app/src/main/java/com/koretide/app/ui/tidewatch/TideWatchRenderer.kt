@@ -257,19 +257,33 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         //   tide=0.5 (중간) → waterlineZ= -1 → moderate beach strip
         //   tide=1.0 (만조) → waterlineZ=+16 → ocean fills view, thin beach near camera
         val baseWaterlineZ = -18.0f + tide * 34.0f
+        val seaLevelZ = -18.0f + tide * 34.0f
 
         // Multi-frequency wave advance: superimpose two oscillations so no two waves
         // are identical.  Primary ~5 s period, secondary ~8.6 s.
         // Amplitude: ±1.5 m at calm → ±3.5 m at max wind (visually moves the shoreline).
         val wavePhase   = sin(t * 1.25f) * 0.62f + sin(t * 0.73f + 1.4f) * 0.38f
         val shoreBreath = wavePhase * (wAmp * 0.8f + 0.4f)
-        val waterlineZ  = (baseWaterlineZ + shoreBreath).coerceIn(-22f, 19f)
-        val fadeStartZ = waterlineZ + 1.0f
-        val fadeEndZ = waterlineZ + 6.0f
-
         val staticWaterlineZ = baseWaterlineZ
-        val shorelineZ = baseWaterlineZ + shoreBreath
-        val foamWaterlineZ = staticWaterlineZ + shoreBreath
+
+        // 1. 기준 수위 (유일한 기준)
+        val waterlineBase = -18.0f + tide * 34.0f
+
+// 2. 파도에 의한 shore 이동 (하나만 유지)
+        val shoreWave =
+            (sin(t * 1.25f) * 0.62f + sin(t * 0.73f + 1.4f) * 0.38f) *
+                    (wAmp * 0.8f + 0.4f)
+
+// 3. 최종 waterline (모든 시스템 공통 기준)
+        val waterlineZ = waterlineBase + shoreWave
+
+// 4. beach/foam/fragment가 공유할 동일 기준
+        val shorelineZ = waterlineZ
+        val foamWaterlineZ = waterlineZ
+
+// 5. fade 범위도 동일 기준으로 고정
+        val fadeStartZ = waterlineZ + 1.0f
+        val fadeEndZ   = waterlineZ + 6.0f
         val waveAdvance = (sin(t * 0.9f) * 0.5f + 0.5f) * (1.5f + wAmp * 2.5f)
 
         // ── Pass 1: Sky (no depth write) ─────────────────────────────────────
@@ -295,7 +309,7 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         GLES20.glUniform3fv(oc_camPos,       1, eyePos,       0)
         GLES20.glUniform1f (oc_roughness,    roughness)
         GLES20.glUniform1f (oc_yunseulStr,   yunseulStr)
-        GLES20.glUniform1f (oc_waterlineZ,   shorelineZ)
+        GLES20.glUniform1f (oc_waterlineZ,   waterlineZ)
         GLES20.glUniform1i (oc_normalMap,    0)
         GLES20.glUniform3fv(oc_horizonColor, 1, lutHorizon, 0)
         GLES20.glUniform1f(oc_fadeStartZ, fadeStartZ)
