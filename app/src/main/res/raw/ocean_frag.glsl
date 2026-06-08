@@ -44,7 +44,8 @@ void main() {
     // anticipatory drape — wherever beach geometry has sunk below the surface,
     // ocean fragments can win the depth test and fill the advancing wave zone.
 //    if (v_World.z > u_WaterlineZ + 10.0) discard;
-
+    float wind = smoothstep(0.0, 1.0, u_WindAmp);
+    wind = wind * wind;
     float dist     = length(v_World.xz - u_CamPos.xz);
     float distNorm = clamp(dist / 68.0, 0.0, 1.0);
 
@@ -77,7 +78,7 @@ void main() {
     vec3 nm2 = texture2D(u_NormalMap, uv2).rgb * 2.0 - 1.0;
     vec3 nm3 = texture2D(u_NormalMap, uv3).rgb * 2.0 - 1.0;
 
-    float windPert = u_WindAmp + 0.15;
+    float windPert = 0.2 + wind * 0.6;
     vec2  perturb  = (nm1.xz * 0.40 + nm2.xz * 0.30 + nm3.xz * 0.18) * windPert;
     vec3  N  = normalize(vec3(v_Normal.x + perturb.x, v_Normal.y, v_Normal.z + perturb.y));
     vec3  Nf = normalize(vec3(v_Normal.x + nm1.x*0.55 + nm3.x*0.35,
@@ -139,7 +140,11 @@ void main() {
     vec3  yunseul   = u_LightColor * u_YunseulStr * sparkle * corrBoost;
 
     // ── 6. Wave-crest foam (whitecaps grow with wind) ────────────────────────
-    float foam = smoothstep(0.40, 0.78, v_Foam) * clamp(u_WindAmp * 2.2, 0.0, 1.0);
+    float foamMask = smoothstep(0.25, 0.85, v_Foam);
+
+    float windFactor = mix(0.15, 0.9, wind);
+
+    float foam = foamMask * (0.2 + wind * wind * 0.8);
     col = mix(col, vec3(0.94, 0.97, 1.00), foam * 0.70);
 
     // Fresnel near-surface sheen (near water only).

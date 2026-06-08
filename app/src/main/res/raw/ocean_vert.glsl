@@ -37,7 +37,11 @@ vec3 gerstner(vec2 xz0, vec2 dir, float amp, float L, float speed, float t,
 void main() {
     float w = u_WindAmp;
 
-    float amp = w * w * 0.62 + w * 0.18 + 0.06;
+    // 🔥 핵심: 감쇠된 바람
+    float wind = smoothstep(0.0, 1.0, w);
+    wind = wind * wind; // 더 부드럽게
+
+    float amp = mix(0.06, 0.22, wind);
     float L0  = mix(6.0, 13.0, w);
     float spd = mix(0.9, 1.7,  w);
     float wd  = u_WindDir;
@@ -84,7 +88,7 @@ void main() {
 
     float runup =
             sin(u_Time * 0.35)
-            * (2.0 + u_WindAmp * 3.0);
+            * (1.5 + wind * 2.0);
 
     p.z += shoreZone * runup;
 
