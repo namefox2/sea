@@ -72,10 +72,8 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
     private var oc_waterlineZ   = -1
     private var oc_normalMap    = -1
     private var oc_horizonColor = -1
-    private var oc_fadeStartZ   = -1
-    private var oc_fadeEndZ   = -1
-    private var oc_sandDryColor   = -1
-    private var oc_sandWetColor   = -1
+    private var oc_sandDryColor = -1
+    private var oc_sandWetColor = -1
 
     // Procedural normal map texture (128×128 RGBA, tiling ripple normals)
     private var normalMapTex = 0
@@ -167,8 +165,6 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
             oc_horizonColor = GLES20.glGetUniformLocation(ocProg, "u_HorizonColor")
             oc_sandDryColor = GLES20.glGetUniformLocation(ocProg, "u_SandDryColor")
             oc_sandWetColor = GLES20.glGetUniformLocation(ocProg, "u_SandWetColor")
-            oc_fadeStartZ = GLES20.glGetUniformLocation(ocProg, "u_FadeStartZ")
-            oc_fadeEndZ   = GLES20.glGetUniformLocation(ocProg, "u_FadeEndZ")
 
             ocean        = OceanMesh()
             ocean.uploadToGPU()
@@ -256,41 +252,19 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         //   tide=0.0 (간조) → waterlineZ=-18 → vast 갯벌 visible, ocean at far horizon
         //   tide=0.5 (중간) → waterlineZ= -1 → moderate beach strip
         //   tide=1.0 (만조) → waterlineZ=+16 → ocean fills view, thin beach near camera
-        val baseWaterlineZ = -18.0f + tide * 34.0f
-        val seaLevelZ = -18.0f + tide * 34.0f
-
-        // Multi-frequency wave advance: superimpose two oscillations so no two waves
-        // are identical.  Primary ~5 s period, secondary ~8.6 s.
-        // Amplitude: ±1.5 m at calm → ±3.5 m at max wind (visually moves the shoreline).
-        val wavePhase   = sin(t * 1.25f) * 0.62f + sin(t * 0.73f + 1.4f) * 0.38f
-        val shoreBreath = wavePhase * (wAmp * 0.8f + 0.4f)
-        val staticWaterlineZ = baseWaterlineZ
-
-        // 1. 기준 수위 (유일한 기준)
         val waterlineBase = -18.0f + tide * 34.0f
-
-// 2. 파도에 의한 shore 이동 (하나만 유지)
+        // Multi-frequency wave advance: two oscillations so no two waves are identical.
+        // Primary ~5 s period, secondary ~8.6 s; amplitude ±1.5 m calm → ±3.5 m max wind.
         val shoreWave =
             (sin(t * 1.25f) * 0.62f + sin(t * 0.73f + 1.4f) * 0.38f) *
                     (wAmp * 0.8f + 0.4f)
-
-// 3. 최종 waterline (모든 시스템 공통 기준)
         val waterlineZ = waterlineBase + shoreWave
-
-// 4. beach/foam/fragment가 공유할 동일 기준
-        val shorelineZ = waterlineZ
-        val foamWaterlineZ = waterlineZ
-
-// 5. fade 범위도 동일 기준으로 고정
-        val fadeStartZ = waterlineZ + 1.0f
-        val fadeEndZ   = waterlineZ + 6.0f
-        val waveAdvance = (sin(t * 0.9f) * 0.5f + 0.5f) * (1.5f + wAmp * 2.5f)
 
         // ── Pass 1: Sky (no depth write) ─────────────────────────────────────
         sky.draw(lutHorizon, lutZenith, lutLight, lightUV, lutIsDark, t, aspect)
 
         // ── Pass 2: Beach ─────────────────────────────────────────────────────
-        beach.draw(mvp, tide, shorelineZ, wAmp, mudflatExposure, sandDry, sandWet, lutHorizon, lightDir, eyePos, lutAmbient, t)
+        beach.draw(mvp, tide, waterlineZ, wAmp, mudflatExposure, sandDry, sandWet, lutHorizon, lightDir, eyePos, lutAmbient, t)
 
         // ── Pass 4: Ocean (normal map bound to texture unit 0) ────────────────
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
@@ -312,15 +286,13 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         GLES20.glUniform1f (oc_waterlineZ,   waterlineZ)
         GLES20.glUniform1i (oc_normalMap,    0)
         GLES20.glUniform3fv(oc_horizonColor, 1, lutHorizon, 0)
-        GLES20.glUniform1f(oc_fadeStartZ, fadeStartZ)
-        GLES20.glUniform1f(oc_fadeEndZ, fadeEndZ)
         GLES20.glUniform3fv(oc_sandDryColor, 1, sandDry, 0)
         GLES20.glUniform3fv(oc_sandWetColor, 1, sandWet, 0)
 
         ocean.draw(oc_aPos)
 
         // ── Pass 5: Shoreline foam (alpha-blended) ────────────────────────────
-        foam.draw(mvp, shorelineZ , wAmp, t, tide, lutLight)
+        foam.draw(mvp, waterlineZ, wAmp, t, tide, lutLight)
 
         // ── Pass 6: Spray particles (GL_POINTS, alpha-blended) ────────────────
         spray.draw(mvp, t, wAmp, wDir, tide, lutLight)

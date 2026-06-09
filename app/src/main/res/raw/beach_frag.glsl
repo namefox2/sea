@@ -45,8 +45,6 @@ void main() {
     vec2  toFragXZ = v_World.xz - u_CamPos.xz;
     float dCam     = max(length(toFragXZ), 0.01);
 
-    // Wetness: 1.0 at waterline, 0.0 at 12 m inland
-
     // ── Color palette ─────────────────────────────────────────────────────────
     vec3 drySand        = vec3(0.76, 0.68, 0.52);
     vec3 wetSand        = vec3(0.42, 0.36, 0.26);
@@ -133,15 +131,6 @@ void main() {
         baseColor += u_AmbientColor * (1.0 - NdotL) * shadowStr * 0.18 * shadowBlend;
     }
     vec3 waterTint = vec3(0.45, 0.74, 0.72);
-    // ── Shore aqua: match ocean's shore-transition color at the waterline ──────
-    // The ocean shader blends to vec3(0.45, 0.74, 0.72) near the waterline.
-    // The beach must show the same color at z = waterlineZ so the geometry seam
-    // is invisible — the two meshes hand off at the same hue, not a colour jump.
-    // Fades to 0 by 5 m inland so natural sand/mudflat colours take over.
-    //vec3  shoreAqua  = vec3(0.45, 0.74, 0.72);
-    //float shoreBlend = smoothstep(5.0, 0.0, distToWater) * 0.78;
-    //baseColor = mix(baseColor, shoreAqua, shoreBlend);
-
     float shoreBlend = smoothstep(0.5, -0.5, distToWater);
     baseColor = mix(baseColor, waterTint, shoreBlend * 0.08);
 
@@ -154,7 +143,6 @@ void main() {
     float wA = bN(vec2(v_World.x * 0.08, u_Time * 0.10))                         * 1.80;
     float wB = bN(vec2(v_World.x * 0.24, u_Time * 0.16) + vec2(3.1, 1.7))        * 0.85;
     float wC = bN(vec2(v_World.x * 0.55, u_Time * 0.23) + vec2(8.3, 5.2))        * 0.38;
-    float foamScale = 1.0 + u_WindAmp * 1.6;
     float waveReach = (wA + wB + wC) / 3.03 * (5.0 + u_WindAmp*5.0);
 
     // distToWave > 0: wave has already passed (we are behind the wave front)
@@ -225,7 +213,6 @@ void main() {
                      * smoothstep(2.5, 0.0, swashDist)
                      * step(0.0, distToWater);
 
-    vec3 shoreWater = mix(baseColor, waterTint, edgeFade);
     float foamBlend = clamp(foamBand * patchMask + bubbleMask * 0.45, 0.0, 1.0);
     baseColor = mix(baseColor, vec3(0.92,0.96,1.0), foamBlend);
 

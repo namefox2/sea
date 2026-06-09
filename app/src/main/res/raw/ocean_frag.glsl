@@ -17,14 +17,11 @@ uniform float     u_Roughness;
 uniform float     u_WindAmp;
 uniform float     u_Time;
 uniform float     u_YunseulStr;
-uniform float     u_WaterlineZ;
 uniform float     u_Tide;
 uniform sampler2D u_NormalMap;
 uniform vec3      u_HorizonColor;
-uniform float u_FadeStartZ;
-uniform float u_FadeEndZ;
-uniform vec3 u_SandDryColor;
-uniform vec3 u_SandWetColor;
+uniform vec3      u_SandDryColor;
+uniform vec3      u_SandWetColor;
 
 
 float h21(vec2 p) {
@@ -40,10 +37,6 @@ float vnoise(vec2 p) {
 }
 
 void main() {
-    // Ocean renders 3.5 m past the animated waterline to match the beach's 3 m
-    // anticipatory drape — wherever beach geometry has sunk below the surface,
-    // ocean fragments can win the depth test and fill the advancing wave zone.
-//    if (v_World.z > u_WaterlineZ + 10.0) discard;
     float wind = smoothstep(0.0, 1.0, u_WindAmp);
     wind = wind * wind;
     float dist     = length(v_World.xz - u_CamPos.xz);
@@ -140,20 +133,10 @@ void main() {
     vec3  yunseul   = u_LightColor * u_YunseulStr * sparkle * corrBoost;
 
     // ── 6. Wave-crest foam (whitecaps grow with wind) ────────────────────────
-    // 1. 해안선 띠 (핵심)
     float shoreBand = exp(-abs(v_DistToWater) * 0.35);
-
-// 2. 파도 기반
-    float waveMask = smoothstep(0.35, 0.85, v_Foam);
-
-// 3. 미세 끊김 제거용 노이즈
-    float n = fract(sin(v_World.x * 12.3 + v_World.z * 7.7) * 43758.5453);
-
-// 4. 최종 foam
-    float foam = shoreBand * waveMask * (0.25 + wind * 0.85);
-
-
-// 노이즈로 자연스럽게 끊김 제거
+    float waveMask  = smoothstep(0.35, 0.85, v_Foam);
+    float n         = fract(sin(v_World.x * 12.3 + v_World.z * 7.7) * 43758.5453);
+    float foam      = shoreBand * waveMask * (0.25 + wind * 0.85);
     foam *= mix(0.75, 1.15, n);
 
     float alongWave = sin(v_World.x * 0.2 + u_Time * 2.0);
