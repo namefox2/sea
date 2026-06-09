@@ -2,7 +2,6 @@ package com.koretide.app.ui.tidewatch
 
 import android.media.AudioAttributes
 import android.media.AudioFormat
-import android.media.AudioManager
 import android.media.AudioTrack
 import kotlin.math.PI
 import kotlin.math.sin

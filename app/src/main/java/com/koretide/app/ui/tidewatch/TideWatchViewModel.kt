@@ -1,5 +1,6 @@
 package com.koretide.app.ui.tidewatch
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.koretide.app.domain.model.TideData
@@ -7,7 +8,6 @@ import com.koretide.app.domain.model.WindData
 import com.koretide.app.domain.usecase.GetTideUseCase
 import com.koretide.app.domain.usecase.GetWindUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
-import android.util.Log
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
