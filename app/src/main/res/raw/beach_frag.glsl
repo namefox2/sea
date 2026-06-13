@@ -138,83 +138,82 @@ void main() {
     float caust = sin(v_World.x * 3.8 + u_Time * 1.4) * sin(v_World.z * 4.3 - u_Time * 1.1);
     caust = pow(max(caust * 0.5 + 0.62, 0.0), 3.0) * 0.14;
 
-    // ── Wave cycle: noise drives how far each wave runs up the beach ──────────
-    // Different x-frequencies per octave → angled, organic wave shapes
-    float wA = bN(vec2(v_World.x * 0.08, u_Time * 0.10))                         * 1.80;
-    float wB = bN(vec2(v_World.x * 0.24, u_Time * 0.16) + vec2(3.1, 1.7))        * 0.85;
-    float wC = bN(vec2(v_World.x * 0.55, u_Time * 0.23) + vec2(8.3, 5.2))        * 0.38;
-    float waveReach = (wA + wB + wC) / 3.03 * (5.0 + u_WindAmp*5.0);
+    // ── Wave cycles: per-column sinusoidal waves that advance & retreat ────────
+    // Each X column gets a random phase → wave fronts arrive at angles, not straight.
+    // Squared sin: sharp crest (fast surge), long trough (calm between waves).
+    float wx  = v_World.x * 0.13;
+    float ph1 = bN(vec2(wx,          0.5)) * 6.28;
+    float ph2 = bN(vec2(wx * 1.8 + 4.0, 0.5)) * 6.28;
+    float t1  = pow(sin(u_Time * 1.22 + ph1) * 0.5 + 0.5, 2.0);   // 0..1
+    float t2  = pow(sin(u_Time * 0.79 + ph2) * 0.5 + 0.5, 2.0);   // offset period
+    float waveReach = t1 * (2.8 + u_WindAmp * 4.2) + t2 * (1.2 + u_WindAmp * 2.0);
 
-    // distToWave > 0: wave has already passed (we are behind the wave front)
-    float distToWave = distToWater;// + waveReach;
-    float waterSurfaceMask =
-            smoothstep(1.5, -1.0, distToWave);
+    // distToWave: <0 = wave is here (wet), >0 = wave tip hasn't arrived yet
+    float distToWave       = distToWater - waveReach;
+    float waterSurfaceMask = smoothstep(1.5, -1.0, distToWave);
 
-    // ── 1. Shallow water body: advances & retreats with the wave ──────────────
-    // Covers the full zone from ocean floor to wave front, not just the waterline.
-    // step(-0.5, distToWater) keeps computation on exposed beach mesh only.
-    float shorelineMask =
-        smoothstep(3.0, -4.0, distToWater);
+    // ── 1. Shallow water body ─────────────────────────────────────────────────
+    float shorelineMask = smoothstep(3.0, -4.0, distToWater);
+    float shallowZone   = smoothstep(2.0, -1.5, distToWave);
+    float reflMask      = shallowZone * smoothstep(1.0, -0.5, distToWater);
+    baseColor = mix(baseColor, u_Horizon * 0.65, reflMask * (0.10 + wetSpec * 0.25 * corrMask));
 
-    float shallowZone =
-        smoothstep(2.0, -1.5, distToWave);
-    float reflMask = shallowZone * smoothstep(1.0, -0.5, distToWater);
-
-    float reflStr = reflMask * (0.10 + wetSpec * 0.25 * corrMask);
-
-    baseColor = mix(baseColor, u_Horizon * 0.65, reflStr);
-
-    float edgeFade = 0.0;
+    float edgeFade   = 0.0;
     float waterAlpha = 0.0;
     if (shallowZone > 0.5) {
-        // More opaque near the waterline; thinner film at the wave front
         float depth = clamp(-distToWave / max(waveReach, 0.1), 0.0, 1.0);
-
-        edgeFade = smoothstep(12.5, 0.0, abs(distToWave));
-
+        edgeFade   = smoothstep(12.5, 0.0, abs(distToWave));
         waterAlpha = mix(0.62, 0.90, depth) * edgeFade;
-        baseColor = mix(baseColor, waterTint * (1.0 + caust * 0.5), waterAlpha);
+        baseColor  = mix(baseColor, waterTint * (1.0 + caust * 0.5), waterAlpha);
     }
 
-    // ── 2. Swash zone: thin wet film 0..3 m behind wave front ─────────────────
+    // ── 2. Swash zone: thin wet film behind wave tip ───────────────────────────
     float swashDist   = max(distToWave, 0.0);
-    float swashFactor = smoothstep(3.0, 0.0, swashDist) * step(0.0, distToWater);
+    float swashFactor = smoothstep(3.5, 0.0, swashDist) * step(0.0, distToWater);
     swashFactor *= swashFactor;
     if (swashFactor > 0.001) {
         float shimmer = bN(v_World.xz * 0.55 + vec2(u_Time * 0.07, -u_Time * 0.05)) * 0.40 + 0.60;
         baseColor = mix(baseColor, mix(waterTint, wetSand, 0.30), swashFactor * shimmer * 0.82);
     }
 
-    // ── 3. Wet sand: dark reflective strip 3..7 m behind wave front ───────────
-    float wetSandDist   = max(distToWave - 3.0, 0.0);
-    float wetSandFactor = smoothstep(2.0, 0.0, wetSandDist) * step(0.0, distToWater);
+    // ── 3. Wet sand: dark reflective strip behind swash ───────────────────────
+    float wetSandFactor = smoothstep(2.0, 0.0, max(distToWave - 3.0, 0.0)) * step(0.0, distToWater);
     if (wetSandFactor > 0.001) {
-        float skyRefl = wetSandFactor * 0.12 * (1.0 - u_TidePercent * 0.4);
         baseColor = mix(baseColor, wetSand * 0.80, wetSandFactor * 0.30);
-        baseColor = mix(baseColor, u_Horizon * 0.60, skyRefl);
+        baseColor = mix(baseColor, u_Horizon * 0.60, wetSandFactor * 0.12 * (1.0 - u_TidePercent * 0.4));
     }
 
-    // ── 4. Foam: patchy clusters at wave front + scattered bubbles in swash ───
-    float foamBand = waterSurfaceMask * (1.0 - smoothstep(0.0, 1.0, abs(distToWave)));
-    foamBand *= smoothstep(-0.5, 0.3, distToWater);
-    foamBand *= shorelineMask;
+    // ── 4. Foam: lacy wave-tip stripe + dissolving bubble trail ───────────────
+    // Tip band: thin bright stripe at the exact wave crest, intensity scales with
+    // how large the current wave is (reachNorm ≈ 0 at trough, 1 at full crest).
+    float reachNorm = waveReach / (4.0 + u_WindAmp * 6.2);
+    float tipBand   = smoothstep(0.9, 0.0, abs(distToWave)) * (0.4 + 0.6 * reachNorm);
 
-    // Three noise scales → organic foam clusters, not a solid stripe
-    float pA = bN(vec2(v_World.x * 0.40 + u_Time * 0.10, v_World.z * 0.40 - u_Time * 0.06));
-    float pB = bN(vec2(v_World.x * 0.70 - u_Time * 0.08, v_World.z * 0.70 + u_Time * 0.05));
-    float pC = bN(v_World.xz * 2.20 + vec2(u_Time * 0.28, -u_Time * 0.20));
-    float patchThresh = mix(0.28, 0.14, u_WindAmp);
-    float patchMask   = smoothstep(patchThresh, 0.68, pA * 0.40 + pB * 0.35 + pC * 0.25);
+    // Trail: foam patches dissolve 0..5 m behind the wave tip
+    float trailFade = smoothstep(5.5, 0.0, swashDist) * step(0.0, distToWater);
 
-    // Scattered bubble clusters inside the swash zone
-    float bn1 = bN(v_World.xz * 2.8 + vec2(u_Time * 0.18,  u_Time * 0.11));
-    float bn2 = bN(v_World.xz * 5.5 - vec2(u_Time * 0.12,  u_Time * 0.22));
-    float bubbleMask = smoothstep(0.68, 0.90, bn1 * 0.55 + bn2 * 0.45)
-                     * smoothstep(2.5, 0.0, swashDist)
-                     * step(0.0, distToWater);
+    // Lacy texture: three noise octaves thresholded to punch holes in the foam.
+    // Coarse scale sets cluster structure; fine scale adds individual bubble detail.
+    float fA = bN(v_World.xz * 0.55 + vec2( u_Time * 0.04, -u_Time * 0.03));
+    float fB = bN(v_World.xz * 1.80 - vec2( u_Time * 0.09,  u_Time * 0.06));
+    float fC = bN(v_World.xz * 4.50 + vec2( u_Time * 0.21, -u_Time * 0.13));
+    float foamNoise = fA * 0.42 + fB * 0.36 + fC * 0.22;
+    float thresh    = 0.46 - u_WindAmp * 0.18;   // windier → lower threshold → more foam
+    float laceMask  = smoothstep(thresh, thresh + 0.20, foamNoise);
 
-    float foamBlend = clamp(foamBand * patchMask + bubbleMask * 0.45, 0.0, 1.0);
-    baseColor = mix(baseColor, vec3(0.92,0.96,1.0), foamBlend);
+    // Scattered bubbles in the swash zone (smaller, faster noise than lace)
+    float bA      = bN(v_World.xz * 2.6 + vec2( u_Time * 0.16,  u_Time * 0.09));
+    float bB      = bN(v_World.xz * 6.2 - vec2( u_Time * 0.11,  u_Time * 0.20));
+    float bubbles = smoothstep(0.64, 0.87, bA * 0.55 + bB * 0.45) * trailFade * 0.55;
+
+    float beachGuard = smoothstep(-0.5, 0.4, distToWater);  // suppress underwater fragments
+    float foamFront  = tipBand   * laceMask * beachGuard;
+    float foamTrail  = trailFade * laceMask * 0.55 * beachGuard;
+    float foamTotal  = clamp(foamFront + foamTrail + bubbles, 0.0, 1.0) * shorelineMask;
+
+    // Foam colour: slightly blue-white at the tip (thickest), pale at the trail edges
+    vec3 foamCol = mix(vec3(0.88, 0.93, 0.97), vec3(0.96, 0.98, 1.00), tipBand);
+    baseColor = mix(baseColor, foamCol, foamTotal);
 
     // ── Atmospheric fog ────────────────────────────────────────────────────────
     float fogZ    = max(18.0 - v_World.z, 0.0);
