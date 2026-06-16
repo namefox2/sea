@@ -174,15 +174,16 @@ void main() {
     float edgeFade   = 0.0;
     float waterAlpha = 0.0;
     if (shallowZone > 0.5) {
-        float depth = clamp(-distToWave / max(waveReach, 0.1), 0.0, 1.0);
-        edgeFade   = smoothstep(8.0, 0.0, abs(distToWave));
+        float depth    = clamp(-distToWave / max(waveReach, 0.1), 0.0, 1.0);
+        float bodyW    = waveReach * 1.3 + 1.5;   // body width scales with reach
+        edgeFade   = smoothstep(bodyW, 0.0, abs(distToWave));
         waterAlpha = mix(0.38, 0.65, depth) * edgeFade;
         baseColor  = mix(baseColor, waterTint * (1.0 + caust * 0.5), waterAlpha);
     }
 
     // ── 2. Swash zone: thin wet film behind wave tip ───────────────────────────
     float swashDist   = max(distToWave, 0.0);
-    float swashFactor = smoothstep(3.5, 0.0, swashDist) * step(0.0, distToWater);
+    float swashFactor = smoothstep(waveReach * 0.55 + 0.5, 0.0, swashDist) * step(0.0, distToWater);
     swashFactor *= swashFactor;
     if (swashFactor > 0.001) {
         float shimmer = bN(v_World.xz * 0.55 + vec2(u_Time * 0.07, -u_Time * 0.05)) * 0.40 + 0.60;
@@ -205,7 +206,7 @@ void main() {
     float tipBand   = smoothstep(2.0, 0.0, abs(distToWave)) * (0.5 + 0.5 * reachNorm);
 
     // Trail: foam persists 0..8 m behind wave tip (reference shows extensive coverage)
-    float trailFade = smoothstep(3.5, 0.0, swashDist) * step(0.0, distToWater);
+    float trailFade = smoothstep(waveReach * 0.65 + 0.4, 0.0, swashDist) * step(0.0, distToWater);
 
     // Lacy texture: coarse → cluster structure, fine → bubble holes
     float fA = bN(v_World.xz * 0.45 + vec2( u_Time * 0.04, -u_Time * 0.03));
@@ -221,7 +222,7 @@ void main() {
     float bubbles = smoothstep(0.60, 0.84, bA * 0.55 + bB * 0.45) * trailFade * 0.60;
 
     // Allow foam up to 10 m past the waterline so the wave tip is always visible.
-    float shorelineMask = smoothstep(5.5, -1.0, distToWater);
+    float shorelineMask = smoothstep(waveReach + 1.2, -1.0, distToWater);
     float beachGuard = smoothstep(-0.5, 0.4, distToWater);
     float foamFront  = tipBand   * laceMask * beachGuard;
     float foamTrail  = trailFade * laceMask * 0.38 * beachGuard;
