@@ -23,8 +23,8 @@ vec3 gerstner(vec2 xz0, vec2 dir, float amp, float L, float speed, float t,
     float phase = k * dot(dir, xz0) - speed * t;
     float C = cos(phase);
     float S = sin(phase);
-    // Q=0.28: reduced from 0.40 — rounder crests, no hollow wave undersides.
-    float Q = 0.28;
+    // Q=0.18: rounder crests → swell-like, not choppy peaks.
+    float Q = 0.18;
     vec3 d;
     d.x = Q * amp * dir.x * C;
     d.y = amp * S;
@@ -43,10 +43,10 @@ void main() {
     wind = wind * wind; // 더 부드럽게
 
     float amp = mix(0.06, 0.22, wind);
-    float L0  = mix(6.0, 13.0, w);
-    float spd = mix(0.9, 1.7,  w);
+    float L0  = mix(8.0, 16.0, w);   // longer wavelength → swell look
+    float spd = mix(0.85, 1.65, w);
     float wd  = u_WindDir;
-    float ns  = 1.7 + w * 0.9;
+    float ns  = 1.5 + w * 0.8;
 
     vec3 p = a_Pos;
     vec3 n = vec3(0.0, 1.0, 0.0);
@@ -66,10 +66,12 @@ void main() {
     );
     depthFactor = clamp(depthFactor, 0.15, 1.0);
 
-    p += gerstner(a_Pos.xz, normalize(vec2(cos(wd),      sin(wd))),      amp*depthFactor, L0*1.00, spd*1.0, u_Time, n, ns);
-    p += gerstner(a_Pos.xz, normalize(vec2(cos(wd+0.45), sin(wd+0.45))), amp*depthFactor, L0*0.57, spd*1.3, u_Time, n, ns);
-    p += gerstner(a_Pos.xz, normalize(vec2(cos(wd-0.30), sin(wd-0.30))), amp*depthFactor, L0*0.31, spd*1.7, u_Time, n, ns);
-    p += gerstner(a_Pos.xz, normalize(vec2(cos(wd+1.10), sin(wd+1.10))), amp*depthFactor, L0*0.16, spd*2.3, u_Time, n, ns);
+    // Primary swell dominates — all components nearly aligned so waves roll in
+    // together rather than creating cross-chop. Max angle spread ±0.25 rad (14°).
+    p += gerstner(a_Pos.xz, normalize(vec2(cos(wd),       sin(wd))),       amp       *depthFactor, L0,       spd,      u_Time, n, ns);
+    p += gerstner(a_Pos.xz, normalize(vec2(cos(wd+0.18),  sin(wd+0.18))),  amp*0.38  *depthFactor, L0*0.58,  spd*1.25, u_Time, n, ns);
+    p += gerstner(a_Pos.xz, normalize(vec2(cos(wd-0.14),  sin(wd-0.14))),  amp*0.20  *depthFactor, L0*0.33,  spd*1.58, u_Time, n, ns);
+    p += gerstner(a_Pos.xz, normalize(vec2(cos(wd+0.25),  sin(wd+0.25))),  amp*0.10  *depthFactor, L0*0.16,  spd*2.20, u_Time, n, ns);
 
     float shallowWidth = 22.0;
 
