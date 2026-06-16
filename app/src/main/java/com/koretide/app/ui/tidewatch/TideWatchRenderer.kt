@@ -302,7 +302,7 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         foam.draw(mvp, waterlineZ, wAmp, t, tide, lutLight)
 
         // ── Pass 6: Spray particles (GL_POINTS, alpha-blended) ────────────────
-        spray.draw(mvp, t, wAmp, wDir, tide, lutLight)
+        spray.draw(mvp, t, wAmp, wDir, tide, waterlineZ, lutLight)
     }
 
     // ── Sky LUT helpers ───────────────────────────────────────────────────────

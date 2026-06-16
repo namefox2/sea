@@ -9,6 +9,7 @@ uniform float  u_Time;
 uniform float  u_WindAmp;
 uniform float  u_WindDir;
 uniform float  u_Tide;
+uniform float  u_WaterlineZ;
 
 void main() {
     float amp = u_WindAmp * 0.30 + 0.04;
@@ -26,8 +27,9 @@ void main() {
     float lt  = 1.2 + h1 * 0.9;          // lifetime (s)
     float pT  = fract(u_Time / lt + h2);  // 0..1 within lifetime
 
-    // Spawn only at wave crests, die in first 65% of lifetime
-    float active = step(amp * 0.25, wH) * step(pT, 0.8);
+    // Spawn only at wave crests, seaward of waterline, die in first 80% of lifetime
+    float seaward = step(a_XZ.y, u_WaterlineZ + 1.5);  // 0 if on land/beach
+    float active = step(amp * 0.25, wH) * step(pT, 0.8) * seaward;
 
     // Rise + slight horizontal drift
     float riseY  = pT * 0.85 * (0.6 + h1 * 0.6);
