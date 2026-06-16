@@ -189,25 +189,22 @@ void main() {
     float deepZone = clamp(-v_DistToWater / 12.0, 0.0, 1.0);
     col += yunseul * (1.0 - foam) * deepZone;
 
-    // ── 7. Shore transition — wide wavy fade matching geometry boundary ──────
+    // ── 7. Shore fade — colour shifts shallow, then ocean goes transparent ───
+    // Beach is rendered first (opaque). Ocean blends over it with decreasing
+    // alpha near the waterline so the beach wave animation shows through.
     float distToWater = v_DistToWater;
-    // Same noise as ocean_vert pastWL so colour and depth-test boundary align.
+    // X+time noise → wavy organic edge, ±3.3 m variance per column.
     float shoreNoise = sin(v_World.x * 0.25 + u_Time * 0.40) * 2.0
                      + sin(v_World.x * 0.11 - u_Time * 0.28) * 1.3;
-    // Wide fade: ocean shifts toward shallow turquoise ~14 m before the wavy line.
-    // This prevents the hard navy→teal colour jump at the waterline.
-    float nearShore = smoothstep(-14.0 + shoreNoise, 0.5 + shoreNoise, distToWater);
-    col = mix(col, u_ShallowColor * 1.05, nearShore * 0.65);
-    // Sand blend only right at the noisy waterline edge.
-    float shoreProx = smoothstep(-1.0 + shoreNoise, 2.5 + shoreNoise, distToWater);
-    shoreProx = shoreProx * shoreProx * (2.0 - shoreProx);
-    col = mix(col, u_SandWetColor, shoreProx * 0.85);
+    // Colour: ocean brightens toward shallow turquoise 14 m before fading out.
+    float nearShore = smoothstep(-14.0 + shoreNoise, 1.0 + shoreNoise, distToWater);
+    col = mix(col, u_ShallowColor * 1.1, nearShore * 0.70);
+    // Alpha: ocean fades to 0 over ~5 m around the noisy waterline.
+    float shoreAlpha = 1.0 - smoothstep(shoreNoise - 3.0, shoreNoise + 2.0, distToWater);
 
     // ── 8. Horizon atmospheric seam ──────────────────────────────────────────
     float seam = smoothstep(0.92, 1.0, distNorm) * (1.0 - corrMask * 0.6);
     col = mix(col, u_HorizonColor * 0.85, seam * 0.55);
 
-    vec3 sandColor = mix(u_SandWetColor, u_SandDryColor, shoreProx);
-    col = mix(col, sandColor, shoreProx);
-    gl_FragColor = vec4(col, 1.0);
+    gl_FragColor = vec4(col, shoreAlpha);
 }

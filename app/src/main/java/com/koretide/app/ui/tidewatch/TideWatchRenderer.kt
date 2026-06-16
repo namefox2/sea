@@ -296,7 +296,12 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         GLES20.glUniform3fv(oc_sandWetColor, 1, sandWet, 0)
         GLES20.glUniform1f (oc_windSurge,    windSurge)
 
+        // Ocean is alpha-blended at the shore so the beach wave animation shows
+        // through as the ocean fades out. Beach is already rendered (Pass 2).
+        GLES20.glEnable(GLES20.GL_BLEND)
+        GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA)
         ocean.draw(oc_aPos)
+        GLES20.glDisable(GLES20.GL_BLEND)
 
         // ── Pass 6: Spray particles (GL_POINTS, alpha-blended) ────────────────
         spray.draw(mvp, t, wAmp, wDir, tide, waterlineZ, lutLight)
