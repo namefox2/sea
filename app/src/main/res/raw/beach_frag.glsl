@@ -158,8 +158,8 @@ void main() {
     float k1   = k0 / 0.58;
     float t2   = max(sin(k1 * u_WaterlineZ - om0 * 1.25 * u_Time + ph2) * 0.5 + 0.5, 0.0);
     t2 = t2 * t2;
-    float minReach  = 0.6 + u_WindAmp * 2.2;
-    float waveReach = max(t1 * (3.8 + u_WindAmp * 5.5) + t2 * (1.6 + u_WindAmp * 2.8),
+    float minReach  = 0.25 + u_WindAmp * 0.8;
+    float waveReach = max(t1 * (1.8 + u_WindAmp * 3.2) + t2 * (0.7 + u_WindAmp * 1.5),
                           minReach);
 
     // distToWave: <0 = wave is here (wet), >0 = wave tip hasn't arrived yet
@@ -175,8 +175,8 @@ void main() {
     float waterAlpha = 0.0;
     if (shallowZone > 0.5) {
         float depth = clamp(-distToWave / max(waveReach, 0.1), 0.0, 1.0);
-        edgeFade   = smoothstep(12.5, 0.0, abs(distToWave));
-        waterAlpha = mix(0.62, 0.90, depth) * edgeFade;
+        edgeFade   = smoothstep(8.0, 0.0, abs(distToWave));
+        waterAlpha = mix(0.38, 0.65, depth) * edgeFade;
         baseColor  = mix(baseColor, waterTint * (1.0 + caust * 0.5), waterAlpha);
     }
 
@@ -205,7 +205,7 @@ void main() {
     float tipBand   = smoothstep(2.0, 0.0, abs(distToWave)) * (0.5 + 0.5 * reachNorm);
 
     // Trail: foam persists 0..8 m behind wave tip (reference shows extensive coverage)
-    float trailFade = smoothstep(8.0, 0.0, swashDist) * step(0.0, distToWater);
+    float trailFade = smoothstep(3.5, 0.0, swashDist) * step(0.0, distToWater);
 
     // Lacy texture: coarse → cluster structure, fine → bubble holes
     float fA = bN(v_World.xz * 0.45 + vec2( u_Time * 0.04, -u_Time * 0.03));
@@ -221,10 +221,10 @@ void main() {
     float bubbles = smoothstep(0.60, 0.84, bA * 0.55 + bB * 0.45) * trailFade * 0.60;
 
     // Allow foam up to 10 m past the waterline so the wave tip is always visible.
-    float shorelineMask = smoothstep(10.0, -2.0, distToWater);
+    float shorelineMask = smoothstep(5.5, -1.0, distToWater);
     float beachGuard = smoothstep(-0.5, 0.4, distToWater);
     float foamFront  = tipBand   * laceMask * beachGuard;
-    float foamTrail  = trailFade * laceMask * 0.65 * beachGuard;   // stronger trail
+    float foamTrail  = trailFade * laceMask * 0.38 * beachGuard;
     float foamTotal  = clamp(foamFront + foamTrail + bubbles, 0.0, 1.0) * shorelineMask;
 
     // Near-pure white foam (reference: white not blue-grey)

@@ -169,18 +169,18 @@ void main() {
     // ── 6. Wave-crest foam ────────────────────────────────────────────────────
     // Shore band: decays away from waterline but covers a wider strip than before
     // (reference shows wide turbulent foam sheet near the break point).
-    float shoreBand = exp(-abs(v_DistToWater) * 0.22);   // wider: was 0.35
-    float waveMask  = smoothstep(0.28, 0.75, v_Foam);     // triggers earlier: was 0.35/0.85
+    float shoreBand = exp(-abs(v_DistToWater) * 0.35);
+    float waveMask  = smoothstep(0.42, 0.85, v_Foam);
     // Lacy noise to break foam into patches (not solid white sheet)
     float n1 = fract(sin(v_World.x * 12.3  + v_World.z * 7.7)  * 43758.5453);
     float n2 = fract(sin(v_World.x *  5.1  - v_World.z * 11.3) * 31415.9265);
     float lacyN  = n1 * 0.6 + n2 * 0.4;
     float lacyMask = smoothstep(0.30, 0.70, lacyN);       // punches holes for realism
-    float foam  = shoreBand * waveMask * (0.30 + wind * 0.90) * lacyMask;
+    float foam  = shoreBand * waveMask * (0.16 + wind * 0.60) * lacyMask;
     float alongWave = sin(v_World.x * 0.2 + u_Time * 2.0);
     foam *= 0.75 + 0.25 * alongWave;
 
-    col = mix(col, vec3(0.96, 0.98, 1.00), foam * 0.82);  // brighter white: was 0.94/0.70
+    col = mix(col, vec3(0.96, 0.98, 1.00), foam * 0.58);
 
     // Fresnel near-surface sheen (near water only).
     float fres = pow(1.0 - max(dot(N, V), 0.0), 5.0);
@@ -195,14 +195,15 @@ void main() {
     // Beach is rendered first (opaque). Ocean blends over it with decreasing
     // alpha near the waterline so the beach wave animation shows through.
     float distToWater = v_DistToWater;
-    // X+time noise → wavy organic edge, ±3.3 m variance per column.
-    float shoreNoise = sin(v_World.x * 0.25 + u_Time * 0.40) * 2.0
-                     + sin(v_World.x * 0.11 - u_Time * 0.28) * 1.3;
-    // Colour: ocean brightens toward shallow turquoise 14 m before fading out.
+    // X+time noise → wavy organic edge; 3-frequency sum avoids repeating pattern.
+    float shoreNoise = sin(v_World.x * 0.25 + u_Time * 0.40) * 2.2
+                     + sin(v_World.x * 0.11 - u_Time * 0.28) * 1.4
+                     + sin(v_World.x * 0.58 + u_Time * 0.62) * 0.7;
+    // Colour: ocean brightens toward shallow turquoise before fading out.
     float nearShore = smoothstep(-14.0 + shoreNoise, 1.0 + shoreNoise, distToWater);
     col = mix(col, u_ShallowColor * 1.1, nearShore * 0.70);
-    // Alpha: ocean fades to 0 over ~5 m around the noisy waterline.
-    float shoreAlpha = 1.0 - smoothstep(shoreNoise - 3.0, shoreNoise + 2.0, distToWater);
+    // Alpha: wide fade (8 m) so the ocean edge never reads as a hard line.
+    float shoreAlpha = 1.0 - smoothstep(shoreNoise - 4.5, shoreNoise + 3.5, distToWater);
 
     // ── 8. Sky reflection + noisy horizon seam ───────────────────────────────
     // Grazing-angle Fresnel: far water reflects sky (physically correct).
