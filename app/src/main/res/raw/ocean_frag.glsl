@@ -42,6 +42,7 @@ void main() {
     wind = wind * wind;
     float dist     = length(v_World.xz - u_CamPos.xz);
     float distNorm = clamp(dist / 68.0, 0.0, 1.0);
+    float nearFactor = 1.0 - clamp(dist / 20.0, 0.0, 1.0);
 
     // ── Volume fix: wave undersides (back-faces) are WATER, never black ───────
     // Filled with a lit deep-water colour so a tall wave's underside reads as a
@@ -76,7 +77,7 @@ void main() {
     float shoreBlend = smoothstep(0.0, 1.0, shoreZ + waveDepthMod + boundNoise);
     // High tide = more water overhead even close to camera → push toward deep color.
     float tideBoost  = u_Tide * 0.38;
-    float depthBlend = smoothstep(0.08, 0.88, max(sqrt(distNorm) + tideBoost, shoreBlend));
+    float depthBlend = smoothstep(0.04, 0.66, max(sqrt(distNorm) + tideBoost, shoreBlend));
     vec3 water = mix(u_ShallowColor, u_DeepColor, depthBlend);
 
     // Caustics: animated refraction light-patterns visible in the shallow zone.
@@ -95,20 +96,22 @@ void main() {
     water = mix(water, water * 1.26 + vec3(0.00, 0.04, 0.03), max(waveH, 0.0) * 0.55); // crest
     water = mix(water, u_DeepColor * 0.55, max(-waveH, 0.0) * 0.38);                    // trough
 
-    // ── Normal maps (3 scales → no visible tiling, near + far detail) ────────
+    // ── Normal maps (4 scales — LOD: uv4 fine layer fades in near camera) ────
     vec2 uv1 = v_World.xz * 0.12 + u_Time * vec2( 0.011,  0.007);
     vec2 uv2 = v_World.xz * 0.06 - u_Time * vec2( 0.006,  0.010);
     vec2 uv3 = v_World.xz * 0.42 + u_Time * vec2( 0.028, -0.021);
+    vec2 uv4 = v_World.xz * 2.50 + u_Time * vec2( 0.060, -0.050);
     vec3 nm1 = texture2D(u_NormalMap, uv1).rgb * 2.0 - 1.0;
     vec3 nm2 = texture2D(u_NormalMap, uv2).rgb * 2.0 - 1.0;
     vec3 nm3 = texture2D(u_NormalMap, uv3).rgb * 2.0 - 1.0;
+    vec3 nm4 = texture2D(u_NormalMap, uv4).rgb * 2.0 - 1.0;
 
     float windPert = 0.2 + wind * 0.6;
-    vec2  perturb  = (nm1.xz * 0.40 + nm2.xz * 0.30 + nm3.xz * 0.18) * windPert;
+    vec2  perturb  = (nm1.xz * 0.40 + nm2.xz * 0.30 + nm3.xz * 0.18 + nm4.xz * 0.42 * nearFactor) * windPert;
     vec3  N  = normalize(vec3(v_Normal.x + perturb.x, v_Normal.y, v_Normal.z + perturb.y));
-    vec3  Nf = normalize(vec3(v_Normal.x + nm1.x*0.55 + nm3.x*0.35,
+    vec3  Nf = normalize(vec3(v_Normal.x + nm1.x*0.55 + nm3.x*0.35 + nm4.x*0.50*nearFactor,
                                v_Normal.y,
-                               v_Normal.z + nm1.z*0.55 + nm3.z*0.35) * windPert);
+                               v_Normal.z + nm1.z*0.55 + nm3.z*0.35 + nm4.z*0.50*nearFactor) * windPert);
     vec3  V  = normalize(u_CamPos - v_World);
     vec3  L  = u_LightDir;
 
@@ -156,12 +159,11 @@ void main() {
 
     // Favour the tight micro-glints (small sparkles); keep the broad sheen low
     // so it never spreads into a white sheet — near water shows teal underneath.
-    float sparkle = sheen  * (0.24 - distNorm * 0.16) +
-                    glints * (0.40 + distNorm * 3.00);
+    float sparkle = sheen  * (0.45 - distNorm * 0.20) +
+                    glints * (0.60 + distNorm * 2.80);
 
-    // Sparkle lives in the tight corridor core; far horizon level preserved, near
-    // strongly restrained, and almost nothing leaks outside the corridor.
-    float corrBoost = 0.04 + corrSharp * (1.1 + distNorm * 3.4);
+    // Sparkle lives in the tight corridor core; near-field boost via nearFactor.
+    float corrBoost = 0.05 + corrSharp * (0.9 + distNorm * 2.6) + nearFactor * 0.28;
     vec3  yunseul   = u_LightColor * u_YunseulStr * sparkle * corrBoost;
 
     // ── 6. Wave-crest foam ────────────────────────────────────────────────────
@@ -202,8 +204,15 @@ void main() {
     // Alpha: ocean fades to 0 over ~5 m around the noisy waterline.
     float shoreAlpha = 1.0 - smoothstep(shoreNoise - 3.0, shoreNoise + 2.0, distToWater);
 
-    // ── 8. Horizon atmospheric seam ──────────────────────────────────────────
-    float seam = smoothstep(0.92, 1.0, distNorm) * (1.0 - corrMask * 0.6);
+    // ── 8. Sky reflection + noisy horizon seam ───────────────────────────────
+    // Grazing-angle Fresnel: far water reflects sky (physically correct).
+    float skyReflect = smoothstep(0.58, 0.92, distNorm);
+    col = mix(col, u_HorizonColor * 1.12, skyReflect * (1.0 - foam) * 0.48);
+
+    // Sinusoidal wobble breaks the perfectly-straight horizon line.
+    float horizNoise = sin(v_World.x * 0.09 + u_Time * 0.012) * 0.022
+                     + sin(v_World.x * 0.25 - u_Time * 0.007) * 0.011;
+    float seam = smoothstep(0.90, 1.0, distNorm + horizNoise) * (1.0 - corrMask * 0.6);
     col = mix(col, u_HorizonColor * 0.85, seam * 0.55);
 
     gl_FragColor = vec4(col, shoreAlpha);

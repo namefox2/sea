@@ -27,7 +27,7 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
     // 0..1 pre-computed in TideWatchFragment: tidePosition × rangeFactor × regionCap
     @Volatile var mudflatExposure = 0.40f
     // Ocean colors — theme-driven
-    @Volatile var deepColor    = floatArrayOf(0.03f, 0.28f, 0.44f)  // deep teal-blue (reference: #1a5276 area)
+    @Volatile var deepColor    = floatArrayOf(0.02f, 0.16f, 0.36f)  // deep navy (#0a3d6b area)
     @Volatile var shallowColor = floatArrayOf(0.10f, 0.68f, 0.72f) // bright turquoise (reference: #00CED1 area)
     @Volatile var sandDry      = floatArrayOf(0.92f, 0.86f, 0.68f)
     @Volatile var sandWet      = floatArrayOf(0.68f, 0.60f, 0.44f)

@@ -69,10 +69,13 @@ void main() {
 
     // Primary swell dominates — all components nearly aligned so waves roll in
     // together rather than creating cross-chop. Max angle spread ±0.25 rad (14°).
-    p += gerstner(a_Pos.xz, normalize(vec2(cos(wd),       sin(wd))),       amp       *depthFactor, L0,       spd,      u_Time, n, ns);
-    p += gerstner(a_Pos.xz, normalize(vec2(cos(wd+0.18),  sin(wd+0.18))),  amp*0.38  *depthFactor, L0*0.58,  spd*1.25, u_Time, n, ns);
-    p += gerstner(a_Pos.xz, normalize(vec2(cos(wd-0.14),  sin(wd-0.14))),  amp*0.20  *depthFactor, L0*0.33,  spd*1.58, u_Time, n, ns);
-    p += gerstner(a_Pos.xz, normalize(vec2(cos(wd+0.25),  sin(wd+0.25))),  amp*0.10  *depthFactor, L0*0.16,  spd*2.20, u_Time, n, ns);
+    // LOD: short-wavelength components amplified near camera for close-up detail.
+    float camDist2D = length(a_Pos.xz - vec2(0.0, 18.0));
+    float nearBoost = 1.0 + smoothstep(22.0, 3.0, camDist2D) * 0.7;
+    p += gerstner(a_Pos.xz, normalize(vec2(cos(wd),       sin(wd))),       amp            *depthFactor,           L0,       spd,      u_Time, n, ns);
+    p += gerstner(a_Pos.xz, normalize(vec2(cos(wd+0.18),  sin(wd+0.18))),  amp*0.38       *depthFactor,           L0*0.58,  spd*1.25, u_Time, n, ns);
+    p += gerstner(a_Pos.xz, normalize(vec2(cos(wd-0.14),  sin(wd-0.14))),  amp*0.20       *depthFactor*nearBoost, L0*0.33,  spd*1.58, u_Time, n, ns);
+    p += gerstner(a_Pos.xz, normalize(vec2(cos(wd+0.25),  sin(wd+0.25))),  amp*0.10       *depthFactor*nearBoost, L0*0.16,  spd*2.20, u_Time, n, ns);
 
     float shallowWidth = 22.0;
 
