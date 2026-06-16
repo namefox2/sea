@@ -12,6 +12,7 @@ uniform float u_MudflatExposure; // 0..1 pre-computed in Kotlin
 uniform vec3  u_CamPos;
 uniform vec3  u_AmbientColor;
 uniform float u_Wetness;
+uniform sampler2D u_NormalMap;
 varying float v_DistToWater;
 
 // ── Smooth value noise ─────────────────────────────────────────────────────
@@ -139,6 +140,23 @@ void main() {
     float caust = sin(v_World.x * 3.8 + u_Time * 1.4) * sin(v_World.z * 4.3 - u_Time * 1.1);
     caust = pow(max(caust * 0.5 + 0.62, 0.0), 3.0) * 0.14;
 
+    // ── Water-surface normals — same normal map as ocean, 3 tiling scales ────
+    vec2 uvW1 = v_World.xz * 0.14 + u_Time * vec2( 0.013,  0.009);
+    vec2 uvW2 = v_World.xz * 0.07 - u_Time * vec2( 0.007,  0.012);
+    vec2 uvW3 = v_World.xz * 0.50 + u_Time * vec2( 0.031, -0.023);
+    vec3 wnm1 = texture2D(u_NormalMap, uvW1).rgb * 2.0 - 1.0;
+    vec3 wnm2 = texture2D(u_NormalMap, uvW2).rgb * 2.0 - 1.0;
+    vec3 wnm3 = texture2D(u_NormalMap, uvW3).rgb * 2.0 - 1.0;
+    vec3 waterN = normalize(vec3(
+        wnm1.x * 0.50 + wnm2.x * 0.30 + wnm3.x * 0.20,
+        1.0,
+        wnm1.z * 0.50 + wnm2.z * 0.30 + wnm3.z * 0.20
+    ));
+    vec3 V   = normalize(u_CamPos - v_World);
+    vec3 H   = normalize(u_LightDir + V);
+    float wSpec = pow(max(dot(waterN, H), 0.0), 55.0) * 0.65;
+    float wFres = pow(1.0 - max(dot(waterN, V), 0.0), 3.0);
+
     // ── Wave cycles — phase-locked to Gerstner primary wave in ocean_vert ───
     // Uses the same L0 / spd values so the beach surge starts exactly when
     // the ocean wave crest reaches u_WaterlineZ (realistic wave-runup timing).
@@ -175,10 +193,14 @@ void main() {
     float waterAlpha = 0.0;
     if (shallowZone > 0.5) {
         float depth    = clamp(-distToWave / max(waveReach, 0.1), 0.0, 1.0);
-        float bodyW    = waveReach * 1.3 + 1.5;   // body width scales with reach
+        float bodyW    = waveReach * 1.3 + 1.5;
         edgeFade   = smoothstep(bodyW, 0.0, abs(distToWave));
         waterAlpha = mix(0.38, 0.65, depth) * edgeFade;
-        baseColor  = mix(baseColor, waterTint * (1.0 + caust * 0.5), waterAlpha);
+        // Ripple-perturbed water + sky Fresnel reflection
+        vec3 wRef  = mix(waterTint * (1.0 + caust * 0.6), u_Horizon * 0.78, wFres * 0.38);
+        baseColor  = mix(baseColor, wRef, waterAlpha);
+        // Specular glint from sun on runup water
+        baseColor += vec3(0.90, 0.95, 1.00) * wSpec * waterAlpha * 0.55;
     }
 
     // ── 2. Swash zone: thin wet film behind wave tip ───────────────────────────
@@ -186,16 +208,20 @@ void main() {
     float swashFactor = smoothstep(waveReach * 0.55 + 0.5, 0.0, swashDist) * step(0.0, distToWater);
     swashFactor *= swashFactor;
     if (swashFactor > 0.001) {
-        float shimmer = bN(v_World.xz * 0.55 + vec2(u_Time * 0.07, -u_Time * 0.05)) * 0.40 + 0.60;
-        baseColor = mix(baseColor, mix(waterTint, wetSand, 0.30), swashFactor * shimmer * 0.82);
+        float shimmer  = bN(v_World.xz * 0.55 + vec2(u_Time * 0.07, -u_Time * 0.05)) * 0.40 + 0.60;
+        vec3  swashRef = mix(mix(waterTint, wetSand, 0.35), u_Horizon * 0.65, wFres * 0.28);
+        baseColor = mix(baseColor, swashRef * shimmer, swashFactor * 0.78);
+        baseColor += vec3(0.90, 0.95, 1.00) * pow(max(dot(waterN, H), 0.0), 30.0) * swashFactor * 0.30;
     }
 
     // ── 3. Wet sand: dark reflective strip behind swash ───────────────────────
     // Reference shows very dark wet sand with sky reflection — make it prominent.
     float wetSandFactor = smoothstep(3.5, 0.0, max(distToWave - 2.5, 0.0)) * step(0.0, distToWater);
     if (wetSandFactor > 0.001) {
-        baseColor = mix(baseColor, wetSand * 0.72, wetSandFactor * 0.52);  // strong darkening
-        baseColor = mix(baseColor, u_Horizon * 0.55, wetSandFactor * 0.18 * (1.0 - u_TidePercent * 0.4));
+        baseColor = mix(baseColor, wetSand * 0.72, wetSandFactor * 0.52);
+        // Wet sand sky reflection + sun glint through ripple normal
+        vec3 wetRefl = mix(u_Horizon * 0.58, vec3(0.90, 0.95, 1.00), wSpec * 0.35);
+        baseColor = mix(baseColor, wetRefl, wetSandFactor * 0.22 * (1.0 - u_TidePercent * 0.3));
     }
 
     // ── 4. Foam: wide turbulent sheet + dissolving bubble trail ───────────────

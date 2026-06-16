@@ -269,12 +269,12 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         // ── Pass 1: Sky (no depth write) ─────────────────────────────────────
         sky.draw(lutHorizon, lutZenith, lutLight, lightUV, lutIsDark, t, aspect)
 
-        // ── Pass 2: Beach ─────────────────────────────────────────────────────
-        beach.draw(mvp, tide, waterlineZ, wAmp, mudflatExposure, sandDry, sandWet, lutHorizon, lightDir, eyePos, lutAmbient, t)
-
-        // ── Pass 4: Ocean (normal map bound to texture unit 0) ────────────────
+        // ── Pass 2: Beach (normal map on unit 0 for wave runup water texture) ──
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
         GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, normalMapTex)
+        beach.draw(mvp, tide, waterlineZ, wAmp, mudflatExposure, sandDry, sandWet, lutHorizon, lightDir, eyePos, lutAmbient, t)
+
+        // ── Pass 4: Ocean (normal map still on unit 0) ────────────────────────
 
         GLES20.glUseProgram(ocProg)
         GLES20.glUniformMatrix4fv(oc_mvp,           1, false, mvp,          0)

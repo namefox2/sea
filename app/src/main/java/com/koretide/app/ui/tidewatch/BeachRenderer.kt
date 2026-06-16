@@ -31,6 +31,7 @@ class BeachRenderer(private val program: Int) {
     private val uCamPos      = GLES20.glGetUniformLocation(program, "u_CamPos")
     private val uAmbientColor= GLES20.glGetUniformLocation(program, "u_AmbientColor")
     private val uTime        = GLES20.glGetUniformLocation(program, "u_Time")
+    private val uNormalMap   = GLES20.glGetUniformLocation(program, "u_NormalMap")
 
     init { uploadToGPU() }
 
@@ -106,6 +107,7 @@ class BeachRenderer(private val program: Int) {
         GLES20.glUniform3fv(uAmbientColor, 1, ambientColor, 0)
         GLES20.glUniform1f (uTime,         time)
         GLES20.glUniform1f (uWetness,      tidePercent * 0.55f)
+        GLES20.glUniform1i (uNormalMap,    0)
 
         GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, vbo)
         GLES20.glEnableVertexAttribArray(aPos)
