@@ -115,7 +115,11 @@ void main() {
     v_Foam   = clamp((p.y - (tideY + amp * 0.55)) * 3.5, 0.0, 1.0);
     v_World  = p;
     v_Normal = normalize(n);
-    gl_Position = u_MVP * vec4(p, 1.0);
+
+    // Sink ocean clip-position landward of waterlineZ so the beach shader wins
+    // the depth test there and can render wave runup animation.
+    float pastWL = clamp((a_Pos.z - u_WaterlineZ) / 1.0, 0.0, 1.0);
+    gl_Position = u_MVP * vec4(p.x, p.y - pastWL * 1.5, p.z, 1.0);
 
     float distToWater = a_Pos.z - u_WaterlineZ;
     v_DistToWater = distToWater;
