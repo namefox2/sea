@@ -116,9 +116,12 @@ void main() {
     v_World  = p;
     v_Normal = normalize(n);
 
-    // Sink ocean clip-position landward of waterlineZ so the beach shader wins
-    // the depth test there and can render wave runup animation.
-    float pastWL = clamp((a_Pos.z - u_WaterlineZ) / 1.0, 0.0, 1.0);
+    // Sink ocean clip-position past the waterline so beach shader wins there.
+    // X-varying noise makes the boundary wavy instead of a straight horizontal line.
+    // Same frequencies used in ocean_frag shore blend → geometry and colour align.
+    float wlNoise = sin(a_Pos.x * 0.25 + u_Time * 0.40) * 2.0
+                  + sin(a_Pos.x * 0.11 - u_Time * 0.28) * 1.3;
+    float pastWL = clamp((a_Pos.z - u_WaterlineZ - wlNoise) / 1.5, 0.0, 1.0);
     gl_Position = u_MVP * vec4(p.x, p.y - pastWL * 1.5, p.z, 1.0);
 
     float distToWater = a_Pos.z - u_WaterlineZ;

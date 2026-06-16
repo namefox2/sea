@@ -189,23 +189,25 @@ void main() {
     float deepZone = clamp(-v_DistToWater / 12.0, 0.0, 1.0);
     col += yunseul * (1.0 - foam) * deepZone;
 
-    // ── 7. Shore transition (ocean fades to pale aqua toward the beach) ───────
+    // ── 7. Shore transition — wide wavy fade matching geometry boundary ──────
     float distToWater = v_DistToWater;
-    float shoreProx = clamp((distToWater + 1.0) / 22.0, 0.0, 1.0);
+    // Same noise as ocean_vert pastWL so colour and depth-test boundary align.
+    float shoreNoise = sin(v_World.x * 0.25 + u_Time * 0.40) * 2.0
+                     + sin(v_World.x * 0.11 - u_Time * 0.28) * 1.3;
+    // Wide fade: ocean shifts toward shallow turquoise ~14 m before the wavy line.
+    // This prevents the hard navy→teal colour jump at the waterline.
+    float nearShore = smoothstep(-14.0 + shoreNoise, 0.5 + shoreNoise, distToWater);
+    col = mix(col, u_ShallowColor * 1.05, nearShore * 0.65);
+    // Sand blend only right at the noisy waterline edge.
+    float shoreProx = smoothstep(-1.0 + shoreNoise, 2.5 + shoreNoise, distToWater);
     shoreProx = shoreProx * shoreProx * (2.0 - shoreProx);
+    col = mix(col, u_SandWetColor, shoreProx * 0.85);
 
-    vec3 shoreMix = mix(col, vec3(0.45, 0.74, 0.72), shoreProx * 0.8);
-    col = mix(shoreMix, u_SandWetColor, shoreProx);
-
-
-    // ── 8. Horizon atmospheric seam — distant water meets the bright sky ──────
-    // Blend toward a bright horizon tone so the far edge dissolves into the sky
-    // rather than forming a dark line; still suppressed inside the sun path.
+    // ── 8. Horizon atmospheric seam ──────────────────────────────────────────
     float seam = smoothstep(0.92, 1.0, distNorm) * (1.0 - corrMask * 0.6);
     col = mix(col, u_HorizonColor * 0.85, seam * 0.55);
 
-    vec3 sandColor =
-            mix(u_SandWetColor, u_SandDryColor, shoreProx);
+    vec3 sandColor = mix(u_SandWetColor, u_SandDryColor, shoreProx);
     col = mix(col, sandColor, shoreProx);
     gl_FragColor = vec4(col, 1.0);
 }
