@@ -130,7 +130,8 @@ void main() {
         baseColor *= mix(1.0, NdotL * shadowStr + (1.0 - shadowStr), shadowBlend);
         baseColor += u_AmbientColor * (1.0 - NdotL) * shadowStr * 0.18 * shadowBlend;
     }
-    vec3 waterTint = vec3(0.45, 0.74, 0.72);
+    // Vivid turquoise tint matching reference photo shallow water (#00CED1 area)
+    vec3 waterTint = vec3(0.28, 0.82, 0.76);
     float shoreBlend = smoothstep(0.5, -0.5, distToWater);
     baseColor = mix(baseColor, waterTint, shoreBlend * 0.08);
 
@@ -177,42 +178,43 @@ void main() {
     }
 
     // ── 3. Wet sand: dark reflective strip behind swash ───────────────────────
-    float wetSandFactor = smoothstep(2.0, 0.0, max(distToWave - 3.0, 0.0)) * step(0.0, distToWater);
+    // Reference shows very dark wet sand with sky reflection — make it prominent.
+    float wetSandFactor = smoothstep(3.5, 0.0, max(distToWave - 2.5, 0.0)) * step(0.0, distToWater);
     if (wetSandFactor > 0.001) {
-        baseColor = mix(baseColor, wetSand * 0.80, wetSandFactor * 0.30);
-        baseColor = mix(baseColor, u_Horizon * 0.60, wetSandFactor * 0.12 * (1.0 - u_TidePercent * 0.4));
+        baseColor = mix(baseColor, wetSand * 0.72, wetSandFactor * 0.52);  // strong darkening
+        baseColor = mix(baseColor, u_Horizon * 0.55, wetSandFactor * 0.18 * (1.0 - u_TidePercent * 0.4));
     }
 
-    // ── 4. Foam: lacy wave-tip stripe + dissolving bubble trail ───────────────
-    // Tip band: thin bright stripe at the exact wave crest, intensity scales with
-    // how large the current wave is (reachNorm ≈ 0 at trough, 1 at full crest).
-    float reachNorm = waveReach / (4.0 + u_WindAmp * 6.2);
-    float tipBand   = smoothstep(0.9, 0.0, abs(distToWave)) * (0.4 + 0.6 * reachNorm);
+    // ── 4. Foam: wide turbulent sheet + dissolving bubble trail ───────────────
+    // Reference photo: foam covers a WIDE area (several metres), not just a thin line.
+    // Peak at wave tip, then slowly dissolves over ~8 m of beach.
+    float reachNorm = waveReach / (4.0 + u_WindAmp * 6.2);  // 0=trough, 1=full crest
+    // Wider tip band (2 m vs 0.9 m): matches the broad white front in reference
+    float tipBand   = smoothstep(2.0, 0.0, abs(distToWave)) * (0.5 + 0.5 * reachNorm);
 
-    // Trail: foam patches dissolve 0..5 m behind the wave tip
-    float trailFade = smoothstep(5.5, 0.0, swashDist) * step(0.0, distToWater);
+    // Trail: foam persists 0..8 m behind wave tip (reference shows extensive coverage)
+    float trailFade = smoothstep(8.0, 0.0, swashDist) * step(0.0, distToWater);
 
-    // Lacy texture: three noise octaves thresholded to punch holes in the foam.
-    // Coarse scale sets cluster structure; fine scale adds individual bubble detail.
-    float fA = bN(v_World.xz * 0.55 + vec2( u_Time * 0.04, -u_Time * 0.03));
-    float fB = bN(v_World.xz * 1.80 - vec2( u_Time * 0.09,  u_Time * 0.06));
-    float fC = bN(v_World.xz * 4.50 + vec2( u_Time * 0.21, -u_Time * 0.13));
-    float foamNoise = fA * 0.42 + fB * 0.36 + fC * 0.22;
-    float thresh    = 0.46 - u_WindAmp * 0.18;   // windier → lower threshold → more foam
-    float laceMask  = smoothstep(thresh, thresh + 0.20, foamNoise);
+    // Lacy texture: coarse → cluster structure, fine → bubble holes
+    float fA = bN(v_World.xz * 0.45 + vec2( u_Time * 0.04, -u_Time * 0.03));
+    float fB = bN(v_World.xz * 1.50 - vec2( u_Time * 0.09,  u_Time * 0.06));
+    float fC = bN(v_World.xz * 3.80 + vec2( u_Time * 0.19, -u_Time * 0.12));
+    float foamNoise = fA * 0.45 + fB * 0.35 + fC * 0.20;
+    float thresh    = 0.38 - u_WindAmp * 0.15;    // windier → more foam area
+    float laceMask  = smoothstep(thresh, thresh + 0.22, foamNoise);
 
-    // Scattered bubbles in the swash zone (smaller, faster noise than lace)
-    float bA      = bN(v_World.xz * 2.6 + vec2( u_Time * 0.16,  u_Time * 0.09));
-    float bB      = bN(v_World.xz * 6.2 - vec2( u_Time * 0.11,  u_Time * 0.20));
-    float bubbles = smoothstep(0.64, 0.87, bA * 0.55 + bB * 0.45) * trailFade * 0.55;
+    // Scattered fine bubbles lingering in the wet zone
+    float bA      = bN(v_World.xz * 2.2 + vec2( u_Time * 0.14,  u_Time * 0.08));
+    float bB      = bN(v_World.xz * 5.8 - vec2( u_Time * 0.10,  u_Time * 0.18));
+    float bubbles = smoothstep(0.60, 0.84, bA * 0.55 + bB * 0.45) * trailFade * 0.60;
 
-    float beachGuard = smoothstep(-0.5, 0.4, distToWater);  // suppress underwater fragments
+    float beachGuard = smoothstep(-0.5, 0.4, distToWater);
     float foamFront  = tipBand   * laceMask * beachGuard;
-    float foamTrail  = trailFade * laceMask * 0.55 * beachGuard;
+    float foamTrail  = trailFade * laceMask * 0.65 * beachGuard;   // stronger trail
     float foamTotal  = clamp(foamFront + foamTrail + bubbles, 0.0, 1.0) * shorelineMask;
 
-    // Foam colour: slightly blue-white at the tip (thickest), pale at the trail edges
-    vec3 foamCol = mix(vec3(0.88, 0.93, 0.97), vec3(0.96, 0.98, 1.00), tipBand);
+    // Near-pure white foam (reference: white not blue-grey)
+    vec3 foamCol = mix(vec3(0.92, 0.95, 0.98), vec3(0.98, 0.99, 1.00), tipBand);
     baseColor = mix(baseColor, foamCol, foamTotal);
 
     // ── Atmospheric fog ────────────────────────────────────────────────────────

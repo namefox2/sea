@@ -27,8 +27,8 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
     // 0..1 pre-computed in TideWatchFragment: tidePosition × rangeFactor × regionCap
     @Volatile var mudflatExposure = 0.40f
     // Ocean colors — theme-driven
-    @Volatile var deepColor    = floatArrayOf(0.02f, 0.09f, 0.22f)  // far/horizon dark navy
-    @Volatile var shallowColor = floatArrayOf(0.08f, 0.62f, 0.68f) // near camera bright teal
+    @Volatile var deepColor    = floatArrayOf(0.03f, 0.28f, 0.44f)  // deep teal-blue (reference: #1a5276 area)
+    @Volatile var shallowColor = floatArrayOf(0.10f, 0.68f, 0.72f) // bright turquoise (reference: #00CED1 area)
     @Volatile var sandDry      = floatArrayOf(0.92f, 0.86f, 0.68f)
     @Volatile var sandWet      = floatArrayOf(0.68f, 0.60f, 0.44f)
     // Sky/sun theme tints — blended into the time-of-day LUT each frame
@@ -74,6 +74,7 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
     private var oc_horizonColor = -1
     private var oc_sandDryColor = -1
     private var oc_sandWetColor = -1
+    private var oc_windSurge    = -1
 
     // Procedural normal map texture (128×128 RGBA, tiling ripple normals)
     private var normalMapTex = 0
@@ -165,6 +166,7 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
             oc_horizonColor = GLES20.glGetUniformLocation(ocProg, "u_HorizonColor")
             oc_sandDryColor = GLES20.glGetUniformLocation(ocProg, "u_SandDryColor")
             oc_sandWetColor = GLES20.glGetUniformLocation(ocProg, "u_SandWetColor")
+            oc_windSurge    = GLES20.glGetUniformLocation(ocProg, "u_WindSurge")
 
             ocean        = OceanMesh()
             ocean.uploadToGPU()
@@ -258,7 +260,11 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         val shoreWave =
             (sin(t * 1.25f) * 0.62f + sin(t * 0.73f + 1.4f) * 0.38f) *
                     (wAmp * 0.8f + 0.4f)
-        val waterlineZ = waterlineBase + shoreWave
+        // Wind surge: strong wind piles water up, raising the water plane Y and pushing
+        // the waterline further inland.  0.22 Y-units at max wind; converted to equivalent
+        // Z-advance via the tide range ratio (34 m Z / 1.4 m Y ≈ 24.3 m/m).
+        val windSurge  = wAmp * 0.22f
+        val waterlineZ = waterlineBase + shoreWave + windSurge * (34f / 1.4f)
 
         // ── Pass 1: Sky (no depth write) ─────────────────────────────────────
         sky.draw(lutHorizon, lutZenith, lutLight, lightUV, lutIsDark, t, aspect)
@@ -288,6 +294,7 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         GLES20.glUniform3fv(oc_horizonColor, 1, lutHorizon, 0)
         GLES20.glUniform3fv(oc_sandDryColor, 1, sandDry, 0)
         GLES20.glUniform3fv(oc_sandWetColor, 1, sandWet, 0)
+        GLES20.glUniform1f (oc_windSurge,    windSurge)
 
         ocean.draw(oc_aPos)
 

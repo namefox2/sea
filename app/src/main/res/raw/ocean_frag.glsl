@@ -20,6 +20,7 @@ uniform float     u_YunseulStr;
 uniform float     u_Tide;
 uniform sampler2D u_NormalMap;
 uniform vec3      u_HorizonColor;
+uniform float     u_WindSurge;
 uniform vec3      u_SandDryColor;
 uniform vec3      u_SandWetColor;
 
@@ -51,13 +52,19 @@ void main() {
         return;
     }
 
-    // ── 1. Base colour — strictly monotonic near→far ──────────────────────────
-    vec3 water = mix(u_ShallowColor, u_DeepColor, pow(distNorm, 0.72));
+    // ── 1. Base colour — depth-based (distance + shore proximity) ────────────
+    // v_DistToWater < 0 = near shore (shallow), large negative = deep open water.
+    // Combine camera-distance and shore-distance for a more physical depth blend:
+    // near the waterline the water looks turquoise even if it's close to the camera;
+    // far from the waterline it looks deep blue even at moderate camera distance.
+    float shoreDepth = clamp((-v_DistToWater) / 28.0, 0.0, 1.0); // 0 at shore → 1 deep
+    float depthBlend = max(pow(distNorm, 0.65), pow(shoreDepth, 0.80));
+    vec3 water = mix(u_ShallowColor, u_DeepColor, depthBlend);
 
     // ── 2. Wave volume shading ────────────────────────────────────────────────
     // minAmp matches the vertex shader so waveH ∈ [-1, 1].
     float minAmp = u_WindAmp * u_WindAmp * 0.62 + u_WindAmp * 0.18 + 0.06;
-    float tideY  = u_Tide * 1.4 - 0.7;
+    float tideY  = u_Tide * 1.4 - 0.7 + u_WindSurge;
     float waveH  = clamp((v_World.y - tideY) / (minAmp * 1.4), -1.0, 1.0);
 
     water = mix(water, water * 1.26 + vec3(0.00, 0.04, 0.03), max(waveH, 0.0) * 0.55); // crest
@@ -132,17 +139,21 @@ void main() {
     float corrBoost = 0.04 + corrSharp * (1.1 + distNorm * 3.4);
     vec3  yunseul   = u_LightColor * u_YunseulStr * sparkle * corrBoost;
 
-    // ── 6. Wave-crest foam (whitecaps grow with wind) ────────────────────────
-    float shoreBand = exp(-abs(v_DistToWater) * 0.35);
-    float waveMask  = smoothstep(0.35, 0.85, v_Foam);
-    float n         = fract(sin(v_World.x * 12.3 + v_World.z * 7.7) * 43758.5453);
-    float foam      = shoreBand * waveMask * (0.25 + wind * 0.85);
-    foam *= mix(0.75, 1.15, n);
-
+    // ── 6. Wave-crest foam ────────────────────────────────────────────────────
+    // Shore band: decays away from waterline but covers a wider strip than before
+    // (reference shows wide turbulent foam sheet near the break point).
+    float shoreBand = exp(-abs(v_DistToWater) * 0.22);   // wider: was 0.35
+    float waveMask  = smoothstep(0.28, 0.75, v_Foam);     // triggers earlier: was 0.35/0.85
+    // Lacy noise to break foam into patches (not solid white sheet)
+    float n1 = fract(sin(v_World.x * 12.3  + v_World.z * 7.7)  * 43758.5453);
+    float n2 = fract(sin(v_World.x *  5.1  - v_World.z * 11.3) * 31415.9265);
+    float lacyN  = n1 * 0.6 + n2 * 0.4;
+    float lacyMask = smoothstep(0.30, 0.70, lacyN);       // punches holes for realism
+    float foam  = shoreBand * waveMask * (0.30 + wind * 0.90) * lacyMask;
     float alongWave = sin(v_World.x * 0.2 + u_Time * 2.0);
-    foam *= 0.7 + 0.3 * alongWave;
+    foam *= 0.75 + 0.25 * alongWave;
 
-    col = mix(col, vec3(0.94, 0.97, 1.00), foam * 0.70);
+    col = mix(col, vec3(0.96, 0.98, 1.00), foam * 0.82);  // brighter white: was 0.94/0.70
 
     // Fresnel near-surface sheen (near water only).
     float fres = pow(1.0 - max(dot(N, V), 0.0), 5.0);

@@ -10,6 +10,7 @@ uniform float u_WindAmp;
 uniform float u_WindDir;
 uniform float u_Tide;
 uniform float u_WaterlineZ;
+uniform float u_WindSurge;
 varying float v_DistToWater;
 
 varying vec3  v_World;
@@ -92,7 +93,9 @@ void main() {
 
     p.z += shoreZone * runup;
 
-    float tideY = u_Tide * 1.4 - 0.7;
+    // tideY: base water-plane Y position from tide + wind surge.
+    // Wind piles water up (storm surge), raising the entire water surface.
+    float tideY = u_Tide * 1.4 - 0.7 + u_WindSurge;
     p.y += tideY - shallowT * 0.15;
 
     // Floor clamp: troughs never expose empty space below the mesh.
