@@ -45,7 +45,8 @@ void main() {
     float amp = mix(0.05, 0.50, wind);
     float L0  = mix(8.0, 16.0, w);   // longer wavelength → swell look
     float spd = mix(0.85, 1.65, w);
-    float wd  = u_WindDir;
+    // windDir is "where wind comes FROM"; waves travel in the opposite direction.
+    float wd  = u_WindDir + 3.14159;
     float ns  = 1.5 + w * 0.8;
 
     vec3 p = a_Pos;
