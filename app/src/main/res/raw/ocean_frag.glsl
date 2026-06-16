@@ -74,7 +74,7 @@ void main() {
 
     // Wide smoothstep: transition spans 0.08 → 0.88 (vs. a hard clamp before).
     float shoreBlend = smoothstep(0.0, 1.0, shoreZ + waveDepthMod + boundNoise);
-    float depthBlend = smoothstep(0.08, 0.88, max(pow(distNorm, 0.55), shoreBlend));
+    float depthBlend = smoothstep(0.08, 0.88, max(sqrt(distNorm), shoreBlend));
     vec3 water = mix(u_ShallowColor, u_DeepColor, depthBlend);
 
     // Caustics: animated refraction light-patterns visible in the shallow zone.
@@ -84,9 +84,9 @@ void main() {
              * sin(v_World.z * 3.1 - u_Time * 0.85 + v_World.x * 1.7);
     float c2 = sin(v_World.x * 5.1 + u_Time * 1.50 + v_World.z * 1.6)
              * sin(v_World.z * 4.3 + u_Time * 0.60 - v_World.x * 2.5);
-    float caustic = (pow(max(c1 * 0.5 + 0.52, 0.0), 2.5) * 0.6
-                  +  pow(max(c2 * 0.5 + 0.52, 0.0), 3.0) * 0.4)
-                  * shallowStr * 0.15;
+    float ca = max(c1 * 0.5 + 0.52, 0.0);
+    float cb = max(c2 * 0.5 + 0.52, 0.0);
+    float caustic = (ca * ca * sqrt(ca) * 0.6 + cb * cb * cb * 0.4) * shallowStr * 0.15;
     water += u_LightColor * caustic;
 
     // ── 2. Wave volume shading ────────────────────────────────────────────────
@@ -190,7 +190,7 @@ void main() {
     // ── 7. Shore transition (ocean fades to pale aqua toward the beach) ───────
     float distToWater = v_DistToWater;
     float shoreProx = clamp((distToWater + 1.0) / 22.0, 0.0, 1.0);
-    shoreProx = pow(shoreProx, 1.1);
+    shoreProx = shoreProx * shoreProx * (2.0 - shoreProx);
 
     vec3 shoreMix = mix(col, vec3(0.45, 0.74, 0.72), shoreProx * 0.8);
     col = mix(shoreMix, u_SandWetColor, shoreProx);
