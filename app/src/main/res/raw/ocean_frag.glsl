@@ -191,19 +191,16 @@ void main() {
     float deepZone = clamp(-v_DistToWater / 12.0, 0.0, 1.0);
     col += yunseul * (1.0 - foam) * deepZone;
 
-    // ── 7. Shore fade — colour shifts shallow, then ocean goes transparent ───
-    // Beach is rendered first (opaque). Ocean blends over it with decreasing
-    // alpha near the waterline so the beach wave animation shows through.
+    // ── 7. Shore fade — ocean goes transparent near waterline ────────────────
+    // Beach is rendered first (opaque). Ocean fades out with a noisy wavy edge
+    // so the beach wave animation shows through naturally.
     float distToWater = v_DistToWater;
-    // X+time noise → wavy organic edge; 3-frequency sum avoids repeating pattern.
+    // 3-frequency noise gives organic, non-repeating waterline shape.
     float shoreNoise = sin(v_World.x * 0.25 + u_Time * 0.40) * 2.2
                      + sin(v_World.x * 0.11 - u_Time * 0.28) * 1.4
                      + sin(v_World.x * 0.58 + u_Time * 0.62) * 0.7;
-    // Colour: ocean brightens toward shallow turquoise before fading out.
-    float nearShore = smoothstep(-14.0 + shoreNoise, 1.0 + shoreNoise, distToWater);
-    col = mix(col, u_ShallowColor * 1.1, nearShore * 0.70);
-    // Alpha: wide fade (8 m) so the ocean edge never reads as a hard line.
-    float shoreAlpha = 1.0 - smoothstep(shoreNoise - 4.5, shoreNoise + 3.5, distToWater);
+    // Alpha only — no explicit colour shift; depthBlend already handles shallow hue.
+    float shoreAlpha = 1.0 - smoothstep(shoreNoise - 3.5, shoreNoise + 2.5, distToWater);
 
     // ── 8. Sky reflection + noisy horizon seam ───────────────────────────────
     // Grazing-angle Fresnel: far water reflects sky (physically correct).
