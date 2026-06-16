@@ -160,7 +160,9 @@ void main() {
     col = mix(col, mix(u_ShallowColor, u_HorizonColor, 0.4) * 0.75,
               fres * 0.14 * (1.0 - distNorm) * (1.0 - foam));
 
-    col += yunseul * (1.0 - foam);
+    // Suppress 윤슬 near shore — only sparkle in open water (갯벌에서 안 보이도록)
+    float deepZone = clamp(-v_DistToWater / 12.0, 0.0, 1.0);
+    col += yunseul * (1.0 - foam) * deepZone;
 
     // ── 7. Shore transition (ocean fades to pale aqua toward the beach) ───────
     float distToWater = v_DistToWater;

@@ -147,7 +147,11 @@ void main() {
     float ph2 = bN(vec2(wx * 1.8 + 4.0, 0.5)) * 6.28;
     float t1  = pow(sin(u_Time * 1.22 + ph1) * 0.5 + 0.5, 2.0);   // 0..1
     float t2  = pow(sin(u_Time * 0.79 + ph2) * 0.5 + 0.5, 2.0);   // offset period
-    float waveReach = t1 * (2.8 + u_WindAmp * 4.2) + t2 * (1.2 + u_WindAmp * 2.0);
+    // Minimum floor ensures trough columns still have some water coverage so the
+    // wet zone doesn't shrink to nothing between waves (matches photo: wide coverage).
+    float minReach  = 0.6 + u_WindAmp * 2.2;
+    float waveReach = max(t1 * (3.8 + u_WindAmp * 5.5) + t2 * (1.6 + u_WindAmp * 2.8),
+                          minReach);
 
     // distToWave: <0 = wave is here (wet), >0 = wave tip hasn't arrived yet
     float distToWave       = distToWater - waveReach;
