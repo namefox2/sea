@@ -42,7 +42,7 @@ void main() {
     float wind = smoothstep(0.0, 1.0, w);
     wind = wind * wind; // 더 부드럽게
 
-    float amp = mix(0.06, 0.22, wind);
+    float amp = mix(0.05, 0.50, wind);
     float L0  = mix(8.0, 16.0, w);   // longer wavelength → swell look
     float spd = mix(0.85, 1.65, w);
     float wd  = u_WindDir;
