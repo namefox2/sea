@@ -158,7 +158,6 @@ void main() {
     float waterSurfaceMask = smoothstep(1.5, -1.0, distToWave);
 
     // ── 1. Shallow water body ─────────────────────────────────────────────────
-    float shorelineMask = smoothstep(3.0, -4.0, distToWater);
     float shallowZone   = smoothstep(2.0, -1.5, distToWave);
     float reflMask      = shallowZone * smoothstep(1.0, -0.5, distToWater);
     baseColor = mix(baseColor, u_Horizon * 0.65, reflMask * (0.10 + wetSpec * 0.25 * corrMask));
@@ -212,6 +211,8 @@ void main() {
     float bB      = bN(v_World.xz * 5.8 - vec2( u_Time * 0.10,  u_Time * 0.18));
     float bubbles = smoothstep(0.60, 0.84, bA * 0.55 + bB * 0.45) * trailFade * 0.60;
 
+    // Allow foam up to 10 m past the waterline so the wave tip is always visible.
+    float shorelineMask = smoothstep(10.0, -2.0, distToWater);
     float beachGuard = smoothstep(-0.5, 0.4, distToWater);
     float foamFront  = tipBand   * laceMask * beachGuard;
     float foamTrail  = trailFade * laceMask * 0.65 * beachGuard;   // stronger trail

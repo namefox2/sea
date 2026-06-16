@@ -9,15 +9,12 @@ void main() {
     vec3 p = a_Pos;
     v_DistToWater = p.z - u_WaterlineZ;
 
-    // Anticipatory drape: beach geometry starts sinking 3 m AHEAD of the waterline
-    // so the animated waterlineZ can advance that far inland — ocean wins depth
-    // test wherever beach has sunk below the water surface.
-    // Linear ramp (not quadratic) gives enough Y drop for ocean to win even 1-2 m
-    // in front of the current waterlineZ.  Drape target -3.0 is well below any wave.
-    float seaDepth =
-        max(u_WaterlineZ + 3.0 - p.z, 0.0);
-
-    float drapeT = smoothstep(0.0, 3.0, seaDepth);
+    // Anticipatory drape: beach geometry sinks SEAWARD of the waterline so
+    // the ocean mesh wins the depth test where it covers the beach.
+    // Drape starts AT the waterline (not 3 m ahead) so the wave runup zone
+    // (distToWater > 0) stays visible for the beach wave animation.
+    float seaDepth = max(u_WaterlineZ - p.z, 0.0);
+    float drapeT = smoothstep(0.0, 5.0, seaDepth);
 
     p.y = mix(p.y, p.y - 1.2, drapeT);
 
