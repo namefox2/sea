@@ -139,16 +139,25 @@ void main() {
     float caust = sin(v_World.x * 3.8 + u_Time * 1.4) * sin(v_World.z * 4.3 - u_Time * 1.1);
     caust = pow(max(caust * 0.5 + 0.62, 0.0), 3.0) * 0.14;
 
-    // ── Wave cycles: per-column sinusoidal waves that advance & retreat ────────
-    // Each X column gets a random phase → wave fronts arrive at angles, not straight.
-    // Squared sin: sharp crest (fast surge), long trough (calm between waves).
-    float wx  = v_World.x * 0.13;
-    float ph1 = bN(vec2(wx,          0.5)) * 6.28;
-    float ph2 = bN(vec2(wx * 1.8 + 4.0, 0.5)) * 6.28;
-    float t1  = pow(sin(u_Time * 1.22 + ph1) * 0.5 + 0.5, 2.0);   // 0..1
-    float t2  = pow(sin(u_Time * 0.79 + ph2) * 0.5 + 0.5, 2.0);   // offset period
-    // Minimum floor ensures trough columns still have some water coverage so the
-    // wet zone doesn't shrink to nothing between waves (matches photo: wide coverage).
+    // ── Wave cycles — phase-locked to Gerstner primary wave in ocean_vert ───
+    // Uses the same L0 / spd values so the beach surge starts exactly when
+    // the ocean wave crest reaches u_WaterlineZ (realistic wave-runup timing).
+    float wx   = v_World.x * 0.13;
+    float L0   = mix(8.0, 16.0, u_WindAmp);     // must match ocean_vert.glsl
+    float spd0 = mix(0.85, 1.65, u_WindAmp);
+    float k0   = 6.28318 / L0;
+    float om0  = spd0 * k0;                      // angular frequency ≈ 0.66 rad/s
+    // Per-column offset: small angle so columns arrive in a natural diagonal
+    // wave-front pattern — much tighter than before (was ±π = random scramble).
+    float ph1  = bN(vec2(wx,            0.5)) * 1.8;
+    float ph2  = bN(vec2(wx * 1.8 + 4.0, 0.5)) * 1.2;
+    // t1 peaks (→1) when the primary Gerstner crest is at waterlineZ
+    float t1   = max(sin(k0 * u_WaterlineZ - om0 * u_Time + ph1) * 0.5 + 0.5, 0.0);
+    t1 = t1 * t1;
+    // t2: secondary harmonic (wavelength L0*0.58, matches ocean_vert 2nd component)
+    float k1   = k0 / 0.58;
+    float t2   = max(sin(k1 * u_WaterlineZ - om0 * 1.25 * u_Time + ph2) * 0.5 + 0.5, 0.0);
+    t2 = t2 * t2;
     float minReach  = 0.6 + u_WindAmp * 2.2;
     float waveReach = max(t1 * (3.8 + u_WindAmp * 5.5) + t2 * (1.6 + u_WindAmp * 2.8),
                           minReach);
