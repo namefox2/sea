@@ -52,21 +52,44 @@ void main() {
         return;
     }
 
-    // ── 1. Base colour — depth-based (distance + shore proximity) ────────────
-    // v_DistToWater < 0 = near shore (shallow), large negative = deep open water.
-    // Combine camera-distance and shore-distance for a more physical depth blend:
-    // near the waterline the water looks turquoise even if it's close to the camera;
-    // far from the waterline it looks deep blue even at moderate camera distance.
-    float shoreDepth = clamp((-v_DistToWater) / 28.0, 0.0, 1.0); // 0 at shore → 1 deep
-    float depthBlend = max(pow(distNorm, 0.65), pow(shoreDepth, 0.80));
-    vec3 water = mix(u_ShallowColor, u_DeepColor, depthBlend);
-
-    // ── 2. Wave volume shading ────────────────────────────────────────────────
-    // minAmp matches the vertex shader so waveH ∈ [-1, 1].
+    // ── Wave level & height (computed early — needed for depth blend) ─────────
     float minAmp = u_WindAmp * u_WindAmp * 0.62 + u_WindAmp * 0.18 + 0.06;
     float tideY  = u_Tide * 1.4 - 0.7 + u_WindSurge;
     float waveH  = clamp((v_World.y - tideY) / (minAmp * 1.4), -1.0, 1.0);
 
+    // ── 1. Depth-based water colour — smooth, wave-linked, noise-perturbed ────
+    //
+    // shoreZ: 0 at waterline → 1 at 40 m seaward.  Wider range (was 28 m) spreads
+    // the shallow/deep transition over more of the scene so there is no hard edge.
+    float shoreZ = clamp((-v_DistToWater) / 40.0, 0.0, 1.0);
+
+    // Wave perturbation: crests appear slightly shallower (lighter),
+    // troughs appear slightly deeper — links colour boundary to wave motion.
+    float waveDepthMod = waveH * 0.10;
+
+    // Boundary noise: large-scale sinusoidal wobble makes the shallow/deep
+    // colour boundary look organic rather than a straight horizontal line.
+    float boundNoise = sin(v_World.x * 0.07 + u_Time * 0.03) * 0.08
+                     + sin(v_World.x * 0.19 - u_Time * 0.02 + v_World.z * 0.04) * 0.05;
+
+    // Wide smoothstep: transition spans 0.08 → 0.88 (vs. a hard clamp before).
+    float shoreBlend = smoothstep(0.0, 1.0, shoreZ + waveDepthMod + boundNoise);
+    float depthBlend = smoothstep(0.08, 0.88, max(pow(distNorm, 0.55), shoreBlend));
+    vec3 water = mix(u_ShallowColor, u_DeepColor, depthBlend);
+
+    // Caustics: animated refraction light-patterns visible in the shallow zone.
+    // Two overlapping sin×sin patterns give an interference / dappled look.
+    float shallowStr = (1.0 - depthBlend) * (1.0 - depthBlend);  // squared → sharp falloff
+    float c1 = sin(v_World.x * 3.6 + u_Time * 1.10 + v_World.z * 2.2)
+             * sin(v_World.z * 3.1 - u_Time * 0.85 + v_World.x * 1.7);
+    float c2 = sin(v_World.x * 5.1 + u_Time * 1.50 + v_World.z * 1.6)
+             * sin(v_World.z * 4.3 + u_Time * 0.60 - v_World.x * 2.5);
+    float caustic = (pow(max(c1 * 0.5 + 0.52, 0.0), 2.5) * 0.6
+                  +  pow(max(c2 * 0.5 + 0.52, 0.0), 3.0) * 0.4)
+                  * shallowStr * 0.15;
+    water += u_LightColor * caustic;
+
+    // ── 2. Wave volume shading ────────────────────────────────────────────────
     water = mix(water, water * 1.26 + vec3(0.00, 0.04, 0.03), max(waveH, 0.0) * 0.55); // crest
     water = mix(water, u_DeepColor * 0.55, max(-waveH, 0.0) * 0.38);                    // trough
 
