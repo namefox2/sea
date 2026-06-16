@@ -74,7 +74,9 @@ void main() {
 
     // Wide smoothstep: transition spans 0.08 → 0.88 (vs. a hard clamp before).
     float shoreBlend = smoothstep(0.0, 1.0, shoreZ + waveDepthMod + boundNoise);
-    float depthBlend = smoothstep(0.08, 0.88, max(sqrt(distNorm), shoreBlend));
+    // High tide = more water overhead even close to camera → push toward deep color.
+    float tideBoost  = u_Tide * 0.38;
+    float depthBlend = smoothstep(0.08, 0.88, max(sqrt(distNorm) + tideBoost, shoreBlend));
     vec3 water = mix(u_ShallowColor, u_DeepColor, depthBlend);
 
     // Caustics: animated refraction light-patterns visible in the shallow zone.
