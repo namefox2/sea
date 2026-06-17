@@ -167,8 +167,8 @@ void main() {
     float om0  = spd0 * k0;                      // angular frequency ≈ 0.66 rad/s
     // Per-column offset: small angle so columns arrive in a natural diagonal
     // wave-front pattern — much tighter than before (was ±π = random scramble).
-    float ph1  = bN(vec2(wx,            0.5)) * 1.8;
-    float ph2  = bN(vec2(wx * 1.8 + 4.0, 0.5)) * 1.2;
+    float ph1  = bN(vec2(wx,            0.5)) * 3.2;  // wider per-column timing spread
+    float ph2  = bN(vec2(wx * 1.8 + 4.0, 0.5)) * 2.1;
     // t1 peaks (→1) when the primary Gerstner crest is at waterlineZ
     float t1   = max(sin(k0 * u_WaterlineZ - om0 * u_Time + ph1) * 0.5 + 0.5, 0.0);
     t1 = t1 * t1;
@@ -177,8 +177,11 @@ void main() {
     float t2   = max(sin(k1 * u_WaterlineZ - om0 * 1.25 * u_Time + ph2) * 0.5 + 0.5, 0.0);
     t2 = t2 * t2;
     float minReach  = 0.25 + u_WindAmp * 0.8;
+    // Per-column reach noise breaks up the straight wave front
+    float reachNoise = bN(vec2(wx * 0.7, u_Time * 0.05)) * 0.55
+                     + bN(vec2(wx * 0.25 + 3.0, u_Time * 0.03)) * 0.45;
     float waveReach = max(t1 * (1.8 + u_WindAmp * 3.2) + t2 * (0.7 + u_WindAmp * 1.5),
-                          minReach);
+                          minReach) * (0.65 + reachNoise * 0.70);
 
     // distToWave: <0 = wave is here (wet), >0 = wave tip hasn't arrived yet
     float distToWave       = distToWater - waveReach;
@@ -254,9 +257,9 @@ void main() {
     float foamTrail  = trailFade * laceMask * 0.38 * beachGuard;
     float foamTotal  = clamp(foamFront + foamTrail + bubbles, 0.0, 1.0) * shorelineMask;
 
-    // Near-pure white foam (reference: white not blue-grey)
-    vec3 foamCol = mix(vec3(0.92, 0.95, 0.98), vec3(0.98, 0.99, 1.00), tipBand);
-    baseColor = mix(baseColor, foamCol, foamTotal);
+    // Soft off-white foam — less blinding than pure white
+    vec3 foamCol = mix(vec3(0.82, 0.87, 0.90), vec3(0.93, 0.96, 0.98), tipBand);
+    baseColor = mix(baseColor, foamCol, foamTotal * 0.82);
 
     // ── Atmospheric fog ────────────────────────────────────────────────────────
     float fogZ    = max(18.0 - v_World.z, 0.0);
