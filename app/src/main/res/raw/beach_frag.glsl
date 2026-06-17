@@ -188,6 +188,8 @@ void main() {
     float waterSurfaceMask = smoothstep(1.5, -1.0, distToWave);
 
     // ── 1. Shallow water body ─────────────────────────────────────────────────
+    vec3 bottomColor = baseColor;  // save terrain color — bleeds through shallow water
+
     float shallowZone   = smoothstep(2.0, -1.5, distToWave);
     float reflMask      = shallowZone * smoothstep(1.0, -0.5, distToWater);
     baseColor = mix(baseColor, u_Horizon * 0.65, reflMask * (0.10 + wetSpec * 0.25 * corrMask));
@@ -198,9 +200,16 @@ void main() {
         float depth    = clamp(-distToWave / max(waveReach, 0.1), 0.0, 1.0);
         float bodyW    = waveReach * 1.3 + 1.5;
         edgeFade   = smoothstep(bodyW, 0.0, abs(distToWave));
-        waterAlpha = mix(0.38, 0.65, depth) * edgeFade;
-        // Ripple-perturbed water + sky Fresnel reflection
-        vec3 wRef  = mix(waterTint * (1.0 + caust * 0.4), u_Horizon * 0.55, wFres * 0.18);
+        // Quadratic alpha: very transparent near surface, opaque in deeper water
+        waterAlpha = mix(0.08, 0.58, depth * depth) * edgeFade;
+        // Water color: muddy yellowish-teal (bridges cool ocean ↔ warm mudflat)
+        vec3 muddyTeal = vec3(0.22, 0.58, 0.44);
+        float depthAdv = clamp(depth * 1.8, 0.0, 1.0);
+        vec3 wCol = mix(muddyTeal, waterTint, depthAdv);
+        // Shallow: mudflat bottom shines through; deeper: full water tint + caustics
+        vec3 wRef = mix(bottomColor * 0.75 + wCol * 0.25,
+                        wCol * (1.0 + caust * 0.4), depthAdv);
+        wRef = mix(wRef, u_Horizon * 0.55, wFres * 0.18);
         baseColor  = mix(baseColor, wRef, waterAlpha);
         // Subtle specular glint on runup water
         baseColor += vec3(0.90, 0.95, 1.00) * wSpec * waterAlpha * 0.32;
