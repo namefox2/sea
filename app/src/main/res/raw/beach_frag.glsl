@@ -154,7 +154,7 @@ void main() {
     ));
     vec3 V   = normalize(u_CamPos - v_World);
     vec3 H   = normalize(u_LightDir + V);
-    float wSpec = pow(max(dot(waterN, H), 0.0), 55.0) * 0.65;
+    float wSpec = pow(max(dot(waterN, H), 0.0), 90.0) * 0.38;
     float wFres = pow(1.0 - max(dot(waterN, V), 0.0), 3.0);
 
     // ── Wave cycles — phase-locked to Gerstner primary wave in ocean_vert ───
@@ -197,10 +197,10 @@ void main() {
         edgeFade   = smoothstep(bodyW, 0.0, abs(distToWave));
         waterAlpha = mix(0.38, 0.65, depth) * edgeFade;
         // Ripple-perturbed water + sky Fresnel reflection
-        vec3 wRef  = mix(waterTint * (1.0 + caust * 0.6), u_Horizon * 0.78, wFres * 0.38);
+        vec3 wRef  = mix(waterTint * (1.0 + caust * 0.5), u_Horizon * 0.72, wFres * 0.25);
         baseColor  = mix(baseColor, wRef, waterAlpha);
-        // Specular glint from sun on runup water
-        baseColor += vec3(0.90, 0.95, 1.00) * wSpec * waterAlpha * 0.55;
+        // Subtle specular glint on runup water
+        baseColor += vec3(0.90, 0.95, 1.00) * wSpec * waterAlpha * 0.32;
     }
 
     // ── 2. Swash zone: thin wet film behind wave tip ───────────────────────────
@@ -211,7 +211,7 @@ void main() {
         float shimmer  = bN(v_World.xz * 0.55 + vec2(u_Time * 0.07, -u_Time * 0.05)) * 0.40 + 0.60;
         vec3  swashRef = mix(mix(waterTint, wetSand, 0.35), u_Horizon * 0.65, wFres * 0.28);
         baseColor = mix(baseColor, swashRef * shimmer, swashFactor * 0.78);
-        baseColor += vec3(0.90, 0.95, 1.00) * pow(max(dot(waterN, H), 0.0), 30.0) * swashFactor * 0.30;
+        baseColor += vec3(0.90, 0.95, 1.00) * pow(max(dot(waterN, H), 0.0), 50.0) * swashFactor * 0.15;
     }
 
     // ── 3. Wet sand: dark reflective strip behind swash ───────────────────────

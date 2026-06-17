@@ -195,12 +195,12 @@ void main() {
     // Beach is rendered first (opaque). Ocean fades out with a noisy wavy edge
     // so the beach wave animation shows through naturally.
     float distToWater = v_DistToWater;
-    // 3-frequency noise gives organic, non-repeating waterline shape.
-    float shoreNoise = sin(v_World.x * 0.25 + u_Time * 0.40) * 2.2
-                     + sin(v_World.x * 0.11 - u_Time * 0.28) * 1.4
-                     + sin(v_World.x * 0.58 + u_Time * 0.62) * 0.7;
-    // Alpha only — no explicit colour shift; depthBlend already handles shallow hue.
-    float shoreAlpha = 1.0 - smoothstep(shoreNoise - 3.5, shoreNoise + 2.5, distToWater);
+    // 3-frequency noise — amplitude kept ≤ ±3 m so alpha zone stays within drape range.
+    float shoreNoise = sin(v_World.x * 0.25 + u_Time * 0.40) * 1.4
+                     + sin(v_World.x * 0.11 - u_Time * 0.28) * 0.9
+                     + sin(v_World.x * 0.58 + u_Time * 0.62) * 0.5;
+    // Alpha only — no explicit colour shift; depthBlend handles shallow hue.
+    float shoreAlpha = 1.0 - smoothstep(shoreNoise - 2.5, shoreNoise + 2.0, distToWater);
 
     // ── 8. Sky reflection + noisy horizon seam ───────────────────────────────
     // Grazing-angle Fresnel: far water reflects sky (physically correct).
