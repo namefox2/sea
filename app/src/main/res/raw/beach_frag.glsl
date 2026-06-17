@@ -200,7 +200,7 @@ void main() {
         edgeFade   = smoothstep(bodyW, 0.0, abs(distToWave));
         waterAlpha = mix(0.38, 0.65, depth) * edgeFade;
         // Ripple-perturbed water + sky Fresnel reflection
-        vec3 wRef  = mix(waterTint * (1.0 + caust * 0.5), u_Horizon * 0.72, wFres * 0.25);
+        vec3 wRef  = mix(waterTint * (1.0 + caust * 0.4), u_Horizon * 0.55, wFres * 0.18);
         baseColor  = mix(baseColor, wRef, waterAlpha);
         // Subtle specular glint on runup water
         baseColor += vec3(0.90, 0.95, 1.00) * wSpec * waterAlpha * 0.32;
@@ -212,8 +212,8 @@ void main() {
     swashFactor *= swashFactor;
     if (swashFactor > 0.001) {
         float shimmer  = bN(v_World.xz * 0.55 + vec2(u_Time * 0.07, -u_Time * 0.05)) * 0.40 + 0.60;
-        vec3  swashRef = mix(mix(waterTint, wetSand, 0.35), u_Horizon * 0.65, wFres * 0.28);
-        baseColor = mix(baseColor, swashRef * shimmer, swashFactor * 0.78);
+        vec3  swashRef = mix(mix(waterTint, wetSand, 0.42), u_Horizon * 0.50, wFres * 0.16);
+        baseColor = mix(baseColor, swashRef * shimmer, swashFactor * 0.68);
         baseColor += vec3(0.90, 0.95, 1.00) * pow(max(dot(waterN, H), 0.0), 50.0) * swashFactor * 0.15;
     }
 

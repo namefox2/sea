@@ -77,7 +77,12 @@ void main() {
     float shoreBlend = smoothstep(0.0, 1.0, shoreZ + waveDepthMod + boundNoise);
     // High tide = more water overhead even close to camera → push toward deep color.
     float tideBoost  = u_Tide * 0.38;
-    float depthBlend = smoothstep(0.04, 0.66, max(sqrt(distNorm) + tideBoost, shoreBlend));
+    // shoreProx: 1 at waterline → 0 at 40 m seaward. Ensures shallow colour near
+    // the shore regardless of camera distance (prevents deep-navy seam at waterline).
+    float shoreProx  = 1.0 - shoreZ;
+    float distFactor = clamp(sqrt(distNorm) + tideBoost, 0.0, 1.0);
+    float blendInput = mix(distFactor, shoreBlend, shoreProx * shoreProx);
+    float depthBlend = smoothstep(0.04, 0.66, blendInput);
     vec3 water = mix(u_ShallowColor, u_DeepColor, depthBlend);
 
     // Caustics: animated refraction light-patterns visible in the shallow zone.
@@ -199,8 +204,8 @@ void main() {
     float shoreNoise = sin(v_World.x * 0.25 + u_Time * 0.40) * 1.4
                      + sin(v_World.x * 0.11 - u_Time * 0.28) * 0.9
                      + sin(v_World.x * 0.58 + u_Time * 0.62) * 0.5;
-    // Alpha only — no explicit colour shift; depthBlend handles shallow hue.
-    float shoreAlpha = 1.0 - smoothstep(shoreNoise - 2.5, shoreNoise + 2.0, distToWater);
+    // Alpha only — wide fade so boundary reads as a gradual colour transition.
+    float shoreAlpha = 1.0 - smoothstep(shoreNoise - 4.0, shoreNoise + 3.5, distToWater);
 
     // ── 8. Sky reflection + noisy horizon seam ───────────────────────────────
     // Grazing-angle Fresnel: far water reflects sky (physically correct).
