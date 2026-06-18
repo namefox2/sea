@@ -132,7 +132,7 @@ void main() {
 
     // ── 3. Diffuse body ───────────────────────────────────────────────────────
     float NdotL = max(dot(N, L), 0.0);
-    vec3  col   = water * (NdotL * 0.38 + 0.62);
+    vec3  col   = water * (NdotL * 0.44 + 0.56);
 
     // ── 4. SSS — backlit crests glow cyan-green ──────────────────────────────
     float sss = pow(max(dot(L, -V), 0.0), 5.0) * max(waveH, 0.0) * 0.9;
@@ -156,9 +156,9 @@ void main() {
 
     // Path brightening: only the distant water bunches into a bright band; near
     // water stays teal so glitter merely sits on top of the blue.
-    float pathLight = corrMask * (0.10 + 0.70 * distNorm);
-    vec3  pathTint  = mix(u_LightColor, vec3(1.0), 0.28 * distNorm);
-    col = mix(col, mix(col, pathTint, 0.60), clamp(pathLight, 0.0, 0.82));
+    float pathLight = corrMask * (0.05 + 0.35 * distNorm);
+    vec3  pathTint  = mix(u_LightColor, vec3(1.0), 0.20 * distNorm);
+    col = mix(col, mix(col, pathTint, 0.38), clamp(pathLight, 0.0, 0.50));
 
     // Half-vector for Blinn-Phong specular.
     vec3  H = normalize(L + V);
@@ -175,10 +175,10 @@ void main() {
     // Favour the tight micro-glints (small sparkles); keep the broad sheen low
     // so it never spreads into a white sheet — near water shows teal underneath.
     float sparkle = sheen  * (0.45 - distNorm * 0.20) +
-                    glints * (0.60 + distNorm * 2.80);
+                    glints * (0.50 + distNorm * 1.40);
 
     // Sparkle lives in the tight corridor core; near-field boost via nearFactor.
-    float corrBoost = 0.05 + corrSharp * (0.9 + distNorm * 2.6) + nearFactor * 0.28;
+    float corrBoost = 0.05 + corrSharp * (0.50 + distNorm * 1.20) + nearFactor * 0.15;
     vec3  yunseul   = u_LightColor * u_YunseulStr * sparkle * corrBoost;
 
     // ── 6. Wave-crest foam ────────────────────────────────────────────────────
@@ -220,7 +220,7 @@ void main() {
     // ── 8. Sky reflection + noisy horizon seam ───────────────────────────────
     // Grazing-angle Fresnel: far water reflects sky (physically correct).
     float skyReflect = smoothstep(0.58, 0.92, distNorm);
-    col = mix(col, u_HorizonColor * 1.12, skyReflect * (1.0 - foam) * 0.48);
+    col = mix(col, u_HorizonColor * 1.05, skyReflect * (1.0 - foam) * 0.38);
 
     // Sinusoidal wobble breaks the perfectly-straight horizon line.
     float horizNoise = sin(v_World.x * 0.09 + u_Time * 0.012) * 0.022
