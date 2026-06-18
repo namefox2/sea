@@ -97,10 +97,12 @@ void main() {
     float caustic = (ca * ca * sqrt(ca) * 0.6 + cb * cb * cb * 0.4) * shallowStr * 0.15;
     water += u_LightColor * caustic;
 
-    // Tidal zone: yellowish-green bridging tint where ocean meets exposed mudflat.
-    // Mimics the warm, slightly turbid look of very shallow water over tidal sediment.
+    // Tidal zone: yellowish-green bridging tint where shallow ocean meets exposed mudflat.
+    // tidalFade ensures the tint is ZERO inside the shoreAlpha transition zone (within
+    // 4 m of the waterline) — preventing a colored band where the ocean is semi-transparent.
     float tidalZone = clamp((12.0 + v_DistToWater) / 12.0, 0.0, 1.0);
-    water = mix(water, vec3(0.20, 0.54, 0.42), tidalZone * (1.0 - depthBlend) * 0.50);
+    float tidalFade = clamp(-v_DistToWater / 4.0, 0.0, 1.0);
+    water = mix(water, vec3(0.20, 0.54, 0.42), tidalZone * tidalFade * (1.0 - depthBlend) * 0.45);
 
     // ── 2. Wave volume shading ────────────────────────────────────────────────
     water = mix(water, water * 1.26 + vec3(0.00, 0.04, 0.03), max(waveH, 0.0) * 0.55); // crest
