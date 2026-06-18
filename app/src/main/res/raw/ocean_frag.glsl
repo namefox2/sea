@@ -219,10 +219,12 @@ void main() {
                      + sin(v_World.x * 0.11 - u_Time * 0.28) * 0.9
                      + sin(v_World.x * 0.58 + u_Time * 0.62) * 0.5;
     // shoreAlpha = ocean fragment opacity (NOT a sky/horizon mixer).
-    // Fade ONLY on the beach side (distToWater > 0): the waterline itself is ≈95%
-    // opaque so the beach does not bleed through at the boundary.  Transparency
-    // decays over 3.5 m inland where the beach wave animation shows through.
-    float shoreAlpha = 1.0 - smoothstep(shoreNoise - 0.5, shoreNoise + 3.0, distToWater);
+    // Both smoothstep edges shift with the local wave height so the opacity boundary
+    // pulses in sync with the wave: crest → fully opaque (ocean advancing over beach),
+    // trough → more transparent (beach shows between waves).
+    float waveEdgeShift = waveH * 2.5;
+    float shoreAlpha = 1.0 - smoothstep(shoreNoise - 0.5 + waveEdgeShift,
+                                         shoreNoise + 3.0 + waveEdgeShift, distToWater);
 
     // ── 8. Sky reflection + noisy horizon seam ───────────────────────────────
     // Grazing-angle Fresnel: far water reflects sky (physically correct).

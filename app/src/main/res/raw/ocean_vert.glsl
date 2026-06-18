@@ -93,9 +93,12 @@ void main() {
     );
     p = a_Pos + waveOffset;
 
-    float runup =
-            sin(u_Time * 0.35)
-            * (1.5 + wind * 2.0);
+    // Runup phase is sampled from the primary Gerstner wave at this vertex's X
+    // position evaluated at the waterline Z — same k0/spd as the open-ocean wave so
+    // the swash advance/retreat is always in phase with the approaching swell.
+    float k0    = 6.28318 / L0;
+    float phRef = k0 * (cos(wd) * a_Pos.x + sin(wd) * u_WaterlineZ) - spd * u_Time;
+    float runup = sin(phRef) * (1.5 + wind * 2.0);
 
     p.z += shoreZone * runup;
 
@@ -123,6 +126,7 @@ void main() {
     v_Normal = normalize(n);
     gl_Position = u_MVP * vec4(p, 1.0);
 
-    float distToWater = a_Pos.z - u_WaterlineZ;
-    v_DistToWater = distToWater;
+    // Use displaced p.z so the shoreAlpha boundary in the fragment shader moves
+    // with both the Gerstner Z-offset and the runup advance/retreat each frame.
+    v_DistToWater = p.z - u_WaterlineZ;
 }
