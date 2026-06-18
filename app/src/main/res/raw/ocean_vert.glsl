@@ -107,8 +107,11 @@ void main() {
     float tideY = u_Tide * 1.4 - 0.7 + u_WindSurge;
     p.y += tideY - shallowT * 0.15;
 
-    // Floor clamp: troughs never expose empty space below the mesh.
-    p.y = max(p.y, tideY - amp * 2.0);
+    // Clamp both ceiling and floor so multi-wave constructive interference cannot
+    // produce unnaturally tall crests or exposed troughs.  Without the ceiling,
+    // four Gerstner components occasionally add in phase and produce waveH→1
+    // instantly, causing a hard crest-brightening flash at the waterline.
+    p.y = clamp(p.y, tideY - amp * 1.8, tideY + amp * 1.5);
 
     // Shore draping: vertices approaching the waterline smoothly sink below the
     // beach surface so the ocean mesh boundary is hidden by the depth test.
@@ -121,7 +124,11 @@ void main() {
           (p.y - tideY) *
           mix(1.0, shoreWaveRetain, shallowT);
 
-    v_Foam   = clamp((p.y - (tideY + amp * 0.55)) * 3.5, 0.0, 1.0);
+    // Smoothstep onset over 0.60×amp (vs old 0.12m linear ramp) gives hysteresis:
+    // small interference oscillations near the threshold produce partial foam rather
+    // than hard on/off flicker.  Range 0.45→1.05 keeps the same approximate
+    // centre as the old clamp((p.y-tideY-0.55*amp)*3.5) but with a soft S-curve.
+    v_Foam = smoothstep(tideY + amp * 0.45, tideY + amp * 1.05, p.y);
     v_World  = p;
     v_Normal = normalize(n);
     gl_Position = u_MVP * vec4(p, 1.0);
