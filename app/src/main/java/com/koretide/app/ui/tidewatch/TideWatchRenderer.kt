@@ -193,7 +193,12 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
             GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
             return
         }
-        val t    = (System.currentTimeMillis() - startMs) / 1000f
+        // rawT grows without bound; t is wrapped to [0, 1000) so GPU float precision
+        // never degrades. 1000 s is the LCM of all normal-map UV scroll periods
+        // (0.011, 0.007, 0.006, 0.010, 0.028, 0.021, 0.060, 0.050 × 1000 = integers),
+        // so the texture seam at the wrap is perfectly invisible.
+        val rawT = (System.currentTimeMillis() - startMs) / 1000f
+        val t    = rawT % 1000f
         val tide = tidePercent
         val wAmp = windAmp
         val wDir = windDirRad
@@ -257,8 +262,9 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         val waterlineBase = -18.0f + tide * 34.0f
         // Multi-frequency wave advance: two oscillations so no two waves are identical.
         // Primary ~5 s period, secondary ~8.6 s; amplitude ±1.5 m calm → ±3.5 m max wind.
+        // Uses rawT (not wrapped t) so waterlineZ never jumps at the 1000-s boundary.
         val shoreWave =
-            (sin(t * 1.25f) * 0.62f + sin(t * 0.73f + 1.4f) * 0.38f) *
+            (sin(rawT * 1.25f) * 0.62f + sin(rawT * 0.73f + 1.4f) * 0.38f) *
                     (wAmp * 0.8f + 0.4f)
         // Wind surge: strong wind piles water up, raising the water plane Y and pushing
         // the waterline further inland.  0.22 Y-units at max wind; converted to equivalent
