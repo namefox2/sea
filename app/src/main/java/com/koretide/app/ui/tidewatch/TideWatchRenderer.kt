@@ -280,10 +280,10 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         val shoreWave =
             (sin(rawT * 1.25f) * 0.62f + sin(rawT * 0.73f + 1.4f) * 0.38f) *
                     (wAmp * 0.8f + 0.4f)
-        // Wind surge: strong wind piles water up, raising the water plane Y and pushing
-        // the waterline further inland.  0.22 Y-units at max wind; converted to equivalent
-        // Z-advance via the tide range ratio (34 m Z / 1.4 m Y ≈ 24.3 m/m).
-        val windSurge  = wAmp * 0.22f
+        // Wind surge: strong wind raises the mean water level slightly.
+        // Coefficient kept small (0.07) so the Z-advance (×24.3 ratio) stays ≤ 1.7 m
+        // at max wind — enough to be perceptible without mimicking a tide change.
+        val windSurge  = wAmp * 0.07f
         val waterlineZ = waterlineBase + shoreWave + windSurge * (34f / 1.4f)
 
         // Track for debug dump (GL thread only — no sync needed)
