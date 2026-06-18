@@ -99,6 +99,8 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
     private var dbgWaterlineBase = 0f
     private var dbgShoreWave     = 0f
     private var dbgWindSurge     = 0f
+    private val dbgLightColor   = FloatArray(3)
+    private val dbgHorizonColor = FloatArray(3)
 
     // Pre-allocated — never replaced in onDrawFrame to avoid per-frame GC pressure
     private val lightDir   = FloatArray(3)
@@ -288,6 +290,8 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         dbgRawT = rawT; dbgT = t
         dbgWaterlineBase = waterlineBase; dbgShoreWave = shoreWave
         dbgWindSurge = windSurge; dbgWaterlineZ = waterlineZ
+        System.arraycopy(lutLight,   0, dbgLightColor,   0, 3)
+        System.arraycopy(lutHorizon, 0, dbgHorizonColor, 0, 3)
 
         if (debugDumpRequested) {
             debugDumpRequested = false
@@ -482,11 +486,46 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         val foam_at_wl      = 1.0f * waveMask * (0.16f + wind * 0.60f)   // shoreBand=1
 
         // Crest colour boost in ocean_frag
-        val crestBoost = waveH_crest * 0.55f  // mix factor for water*1.26 branch
+        val crestBoost = waveH_crest * 0.45f  // mix factor for water*1.26 branch
 
         // Roughness / yunseul
         val roughness  = (wAmp*wAmp*0.40f + 0.04f).coerceAtMost(0.40f)
         val yunseulStr = (1f - wAmp*0.9f).coerceIn(0f, 1f)
+
+        // ── Pixel trace: CPU re-run of ocean_frag at distToWater=0, shoreNoise=0 ──
+        val lc = dbgLightColor; val hc = dbgHorizonColor; val sc = shallowColor
+        val distXZ_wl  = sqrt((cz - wz) * (cz - wz))      // cx=wx=0 → XZ only
+        val dNorm_wl   = (distXZ_wl / 68f).coerceIn(0f, 1f)
+        val NdotV_wl   = Vy                                  // flat N=(0,1,0)·V
+        val fres_wl    = Math.pow((1f - NdotV_wl).toDouble(), 5.0).toFloat()
+        // shoreProx=1 at distToWater=0 → blendInput=shoreBlend≈0 → depthBlend≈0 → water=shallowColor
+        val depthBlend_wl = smoothstep(0.04f, 0.66f, 0f)
+        // crest (waveH=+1):
+        val wCr = floatArrayOf(
+            sc[0] + 0.45f * (sc[0] * 1.26f            - sc[0]),
+            sc[1] + 0.45f * (sc[1] * 1.26f + 0.04f   - sc[1]),
+            sc[2] + 0.45f * (sc[2] * 1.26f + 0.03f   - sc[2])
+        )
+        // troughDepth=0 at distToWater=0 → no trough effect
+        val dFac = NdotL * 0.38f + 0.62f
+        val cA   = floatArrayOf(wCr[0] * dFac, wCr[1] * dFac, wCr[2] * dFac)
+        // foam:
+        val fM   = foam_at_wl * 0.58f
+        val cB   = floatArrayOf(cA[0] + fM*(0.96f-cA[0]), cA[1] + fM*(0.98f-cA[1]), cA[2] + fM*(1f-cA[2]))
+        // Fresnel (deepZone=0 at waterline → yunseul=0; skyReflect≈0 at this dist):
+        val fTgt = floatArrayOf(
+            (sc[0] + 0.4f*(hc[0]-sc[0])) * 0.75f,
+            (sc[1] + 0.4f*(hc[1]-sc[1])) * 0.75f,
+            (sc[2] + 0.4f*(hc[2]-sc[2])) * 0.75f
+        )
+        val fMix = fres_wl * 0.14f * (1f - dNorm_wl) * (1f - fM)
+        val cC   = floatArrayOf(cB[0]+fMix*(fTgt[0]-cB[0]), cB[1]+fMix*(fTgt[1]-cB[1]), cB[2]+fMix*(fTgt[2]-cB[2]))
+        val aWl  = 1f - smoothstep(-4f, 3.5f, 0f)           // shoreAlpha at noise=0
+        val comp = floatArrayOf(
+            sandDry[0]*(1f-aWl) + cC[0]*aWl,
+            sandDry[1]*(1f-aWl) + cC[1]*aWl,
+            sandDry[2]*(1f-aWl) + cC[2]*aWl
+        )
 
         val sep = "─────────────────────────────────"
         Log.d(TAG, "╔══ OCEAN DEBUG SNAPSHOT ══════════════")
@@ -533,10 +572,24 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         Log.d(TAG, "║  roughness   = %.3f  yunseulStr = %.3f".format(roughness, yunseulStr))
         Log.d(TAG, "║  fineExp     = %.0f".format(280f - (280f-100f)*roughness))
         Log.d(TAG, "╠$sep")
-        Log.d(TAG, "║ [COLORS]")
-        Log.d(TAG, "║  shallowColor = (%.3f, %.3f, %.3f)".format(shallowColor[0], shallowColor[1], shallowColor[2]))
+        Log.d(TAG, "║ [COLORS & UNIFORMS]")
+        Log.d(TAG, "║  lightColor   = (%.3f, %.3f, %.3f)  ← u_LightColor".format(lc[0], lc[1], lc[2]))
+        Log.d(TAG, "║  horizonColor = (%.3f, %.3f, %.3f)  ← u_HorizonColor (sky at horizon)".format(hc[0], hc[1], hc[2]))
+        Log.d(TAG, "║  shallowColor = (%.3f, %.3f, %.3f)".format(sc[0], sc[1], sc[2]))
         Log.d(TAG, "║  deepColor    = (%.3f, %.3f, %.3f)".format(deepColor[0], deepColor[1], deepColor[2]))
         Log.d(TAG, "║  sandDry      = (%.3f, %.3f, %.3f)".format(sandDry[0], sandDry[1], sandDry[2]))
+        Log.d(TAG, "╠$sep")
+        Log.d(TAG, "║ [PIXEL TRACE  distToWater=0, shoreNoise=0  (waterline centre, crest)]")
+        Log.d(TAG, "║  dist(XZ)=%.1f m  dNorm=%.3f  depthBlend=%.3f".format(distXZ_wl, dNorm_wl, depthBlend_wl))
+        Log.d(TAG, "║  NdotV=%.3f  Fresnel=%.3f  fresMix=%.3f".format(NdotV_wl, fres_wl, fMix))
+        Log.d(TAG, "║  water(base)     = (%.3f, %.3f, %.3f)  ← shallowColor (depthBlend≈0)".format(sc[0], sc[1], sc[2]))
+        Log.d(TAG, "║  after crest0.45 = (%.3f, %.3f, %.3f)  troughDepth=0→억제됨".format(wCr[0], wCr[1], wCr[2]))
+        Log.d(TAG, "║  after diffuse×%.3f = (%.3f, %.3f, %.3f)".format(dFac, cA[0], cA[1], cA[2]))
+        Log.d(TAG, "║  foam mix=%.3f   → (%.3f, %.3f, %.3f)".format(fM, cB[0], cB[1], cB[2]))
+        Log.d(TAG, "║  fres target     = (%.3f, %.3f, %.3f)".format(fTgt[0], fTgt[1], fTgt[2]))
+        Log.d(TAG, "║  after Fresnel   = (%.3f, %.3f, %.3f)  [yunseul=0, skyRefl=0 at this dist]".format(cC[0], cC[1], cC[2]))
+        Log.d(TAG, "║  shoreAlpha=%.3f  →  COMPOSITED = (%.3f, %.3f, %.3f)  ← 실제 보이는 색".format(aWl, comp[0], comp[1], comp[2]))
+        Log.d(TAG, "║  horizonColor    = (%.3f, %.3f, %.3f)  ← 비교용 하늘색".format(hc[0], hc[1], hc[2]))
         Log.d(TAG, "╚══════════════════════════════════════")
     }
 
