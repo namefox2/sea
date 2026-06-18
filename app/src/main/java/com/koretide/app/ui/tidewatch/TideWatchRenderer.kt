@@ -596,6 +596,112 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         Log.d(TAG, "║    COMPOSITED=beach×%.3f + ocean×%.3f = (%.3f, %.3f, %.3f)".format(1f-aWl, aWl, comp[0], comp[1], comp[2]))
         Log.d(TAG, "║    skyReflect: distNorm=%.3f → smoothstep(0.58,0.92)=0  ← 수평선 먼바다만 적용".format(dNorm_wl))
         Log.d(TAG, "║  horizonColor    = (%.3f, %.3f, %.3f)  ← 비교용 하늘색 (skyReflect 경로)".format(hc[0], hc[1], hc[2]))
+        Log.d(TAG, "╠$sep")
+
+        // ── Far-ocean scan: distNorm 0.55–0.95  (skyReflect active zone) ─────────
+        // Camera at eyePos=(0,1.8,18). Reference point: X=0, Z=eyeZ-dist (straight ahead).
+        // For each distNorm sample: decompose final color into 3 additive contributions:
+        //   (A) water base × diffuse  (B) skyReflect Δ  (C) yunseul Δ (in corridor centre)
+        Log.d(TAG, "║ [FAR-OCEAN SCAN  skyReflect zone  smoothstep(0.58, 0.92)]")
+        Log.d(TAG, "║  horizonColor×1.05 = (%.3f, %.3f, %.3f)  deepColor = (%.3f, %.3f, %.3f)".format(
+            hc[0]*1.05f, hc[1]*1.05f, hc[2]*1.05f, deepColor[0], deepColor[1], deepColor[2]))
+        Log.d(TAG, "║  roughness=%.3f  yunseulStr=%.3f  (foam≈0 all: shoreBand→0 far from shore)".format(roughness, yunseulStr))
+
+        // Sun corridor geometry: perpendicular direction to light XZ projection
+        val lhLen2  = sqrt(Lx*Lx + Lz*Lz).coerceAtLeast(1e-6f)
+        val lhNX2   = Lx / lhLen2       // normalized light X in XZ plane
+        val lhNZ2   = Lz / lhLen2       // normalized light Z in XZ plane
+        // perpXZ = vec2(-lhDir.y, lhDir.x) in GLSL vec2(X,Z) notation
+        val perpXscan = -lhNZ2          // corridor perpendicular: world-X component
+        val perpZscan =  lhNX2          // corridor perpendicular: world-Z component
+        Log.d(TAG, "║  lightXZ = (%.3f, %.3f)  corrPerpXZ = (%.3f, %.3f)".format(lhNX2, lhNZ2, perpXscan, perpZscan))
+        Log.d(TAG, "║")
+        Log.d(TAG, "║  dNorm | dist |skyRefl| corrMask |corrBoost| yunseul(in)| water base        | +skyRefl          | +yunseul(in)      | Δlum_sky | Δlum_yu")
+
+        val scanDN = floatArrayOf(0.55f, 0.65f, 0.75f, 0.85f, 0.92f, 0.97f)
+        for (dn in scanDN) {
+            val dist   = 68f * dn
+            val wZscan = eyePos[2] - dist   // world Z directly ahead of camera
+            val wYscan = tideY              // flat water surface
+
+            // View vector V = normalize(eyePos - worldPoint)
+            val vxSc = eyePos[0]; val vySc = eyePos[1] - wYscan; val vzSc = eyePos[2] - wZscan
+            val vlSc = sqrt(vxSc*vxSc + vySc*vySc + vzSc*vzSc).coerceAtLeast(1e-6f)
+            val VxSc = vxSc/vlSc; val VySc = vySc/vlSc; val VzSc = vzSc/vlSc
+
+            // Half-vector H = normalize(L + V), NdotH = H.y (N=(0,1,0))
+            val hxSc = Lx+VxSc; val hySc = Ly+VySc; val hzSc = Lz+VzSc
+            val hlSc = sqrt(hxSc*hxSc + hySc*hySc + hzSc*hzSc).coerceAtLeast(1e-6f)
+            val NdotHsc = (hySc/hlSc).coerceAtLeast(0f)
+
+            // Specular contributions
+            val sheenSc = Math.pow(NdotHsc.toDouble(), sheenExp.toDouble()).toFloat()
+            val fineExpSc = 280f - (280f - 100f) * roughness
+            val glintSc = Math.pow(NdotHsc.toDouble(), fineExpSc.toDouble()).toFloat() *
+                          (0.5f + 0.5f * 1f)  // favour crest (waveH=+1 assumed)
+            val sparkleSc = sheenSc * (0.45f - dn * 0.20f) + glintSc * (0.50f + dn * 1.40f)
+
+            // Sun corridor: point is at X=0, Z=wZscan
+            // toFrag = (worldX-camX, worldZ-camZ) = (0, wZscan-18) = (0, -dist)
+            val perpDistSc = kotlin.math.abs((-dist) * perpZscan)  // = dist*|lhNX2|
+            val corrHalfSc = 4f
+            val corrMaskSc  = kotlin.math.exp((-perpDistSc*perpDistSc/(corrHalfSc*corrHalfSc)).toDouble()).toFloat()
+            val corrSharpSc = corrMaskSc * corrMaskSc
+            // corrBoost IN corridor (corrSharp=1) vs at this actual scan point
+            val corrBoostIn  = 0.05f + 1f          * (0.50f + dn * 1.20f)
+            val corrBoostAct = 0.05f + corrSharpSc  * (0.50f + dn * 1.20f)
+
+            // yunseul: lightColor * yunseulStr * sparkle * corrBoost * deepZone(≈1 far)
+            val lBrt = (lc[0] + lc[1] + lc[2]) / 3f
+            val yunBrtIn  = lBrt * yunseulStr * sparkleSc * corrBoostIn
+            val yunBrtAct = lBrt * yunseulStr * sparkleSc * corrBoostAct
+
+            // skyReflect
+            val skyReflSc = smoothstep(0.58f, 0.92f, dn)
+            val skyBlendSc = skyReflSc * 0.38f   // (1-foam)≈1
+
+            // Depth blend (shoreProx≈0 at far distance → blendInput ≈ distFactor)
+            val depthBlendSc = smoothstep(0.04f, 0.66f, (sqrt(dn) + tide * 0.38f).coerceIn(0f, 1f))
+            val wRsc = shallowColor[0] + depthBlendSc * (deepColor[0] - shallowColor[0])
+            val wGsc = shallowColor[1] + depthBlendSc * (deepColor[1] - shallowColor[1])
+            val wBsc = shallowColor[2] + depthBlendSc * (deepColor[2] - shallowColor[2])
+            val NdotLsc = Ly.coerceAtLeast(0f)
+            val dFsc = NdotLsc * 0.44f + 0.56f
+            val bR = wRsc * dFsc; val bG = wGsc * dFsc; val bB = wBsc * dFsc  // water base
+
+            // After skyReflect
+            val sR = bR + skyBlendSc * (hc[0]*1.05f - bR)
+            val sG = bG + skyBlendSc * (hc[1]*1.05f - bG)
+            val sB = bB + skyBlendSc * (hc[2]*1.05f - bB)
+            val lumDeltaSky = 0.299f*(sR-bR) + 0.587f*(sG-bG) + 0.114f*(sB-bB)
+
+            // yunseul delta (in corridor, deepZone=1)
+            val yR = lc[0] * yunseulStr * sparkleSc * corrBoostIn
+            val yG = lc[1] * yunseulStr * sparkleSc * corrBoostIn
+            val yB = lc[2] * yunseulStr * sparkleSc * corrBoostIn
+            val lumDeltaYun = 0.299f*yR + 0.587f*yG + 0.114f*yB
+
+            // Foam: shoreBand ≈ 0 far from shore
+            val distToWaterSc = wZscan - wzZ
+            val shoreBandSc = kotlin.math.exp((kotlin.math.abs(distToWaterSc) * (-0.35)).toDouble()).toFloat()
+
+            // seam: smoothstep(0.90,1.0,dn)*(1-corrMask*0.6)*0.55
+            val seamSc = smoothstep(0.90f, 1.0f, dn) * (1f - corrMaskSc * 0.6f) * 0.55f
+
+            Log.d(TAG, "║  %.2f  |%4.0fm |  %.3f | %.3f    |  %.3f  |  %.4f   | (%.3f,%.3f,%.3f) | (%.3f,%.3f,%.3f) | (%.3f,%.3f,%.3f) | +%.3f   | +%.4f".format(
+                dn, dist, skyReflSc, corrMaskSc, corrBoostIn, yunBrtIn,
+                bR, bG, bB, sR, sG, sB, sR+yR, sG+yG, sB+yB,
+                lumDeltaSky, lumDeltaYun))
+            if (shoreBandSc > 0.001f) {
+                Log.d(TAG, "║    ⚠ foam: distToWater=%.1f  shoreBand=%.4f  (not zero!)".format(distToWaterSc, shoreBandSc))
+            }
+            if (seamSc > 0.01f) {
+                Log.d(TAG, "║    seam blend %.3f × horizonColor×0.85 active here".format(seamSc))
+            }
+        }
+        Log.d(TAG, "║")
+        Log.d(TAG, "║  NOTE: yunseul col above = in sun-corridor centre (corrMask=1).")
+        Log.d(TAG, "║        Out-of-corridor actual corrMask shown; corrBoost(actual)=corrSharp²×range.")
         Log.d(TAG, "╚══════════════════════════════════════")
     }
 
