@@ -480,13 +480,20 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         // Beach runup water specular (flat N=(0,1,0))
         val wSpec_flat = Math.pow(NdotH.toDouble(), 90.0).toFloat() * 0.38f
 
-        // Foam at waterline crest
-        val vFoam_waterline = (1.575f * amp).coerceIn(0f, 1f)
-        val waveMask        = smoothstep(0.42f, 0.85f, vFoam_waterline)
-        val foam_at_wl      = 1.0f * waveMask * (0.16f + wind * 0.60f)   // shoreBand=1
+        // Foam — new smoothstep formula matching ocean_vert.glsl:
+        //   v_Foam = smoothstep(tideY + amp*0.45, tideY + amp*1.05, p.y)
+        val foamBase     = 0.16f + wind * 0.60f
+        val vFoam_low    = smoothstep(tideY + amp * 0.45f, tideY + amp * 1.05f, tideY + amp * 0.55f)
+        val vFoam_mid    = smoothstep(tideY + amp * 0.45f, tideY + amp * 1.05f, tideY + amp * 0.75f)
+        val vFoam_max    = smoothstep(tideY + amp * 0.45f, tideY + amp * 1.05f, tideY + amp * 1.50f)
+        val waveMask_mid = smoothstep(0.42f, 0.85f, vFoam_mid)
+        val waveMask_max = smoothstep(0.42f, 0.85f, vFoam_max)
+        val foam_mid     = waveMask_mid * foamBase
+        val foam_max     = waveMask_max * foamBase
+        val foam_at_wl   = foam_max   // max-crest foam for pixel trace (shoreBand=1)
 
-        // Crest colour boost in ocean_frag
-        val crestBoost = waveH_crest * 0.45f  // mix factor for water*1.26 branch
+        // Crest colour boost — smoothstep(0,1,waveH) × 0.32  (ocean_frag.glsl; was 0.45)
+        val crestFac = smoothstep(0f, 1f, waveH_crest) * 0.32f
 
         // Roughness / yunseul
         val roughness  = (wAmp*wAmp*0.40f + 0.04f).coerceAtMost(0.40f)
@@ -502,9 +509,9 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         val depthBlend_wl = smoothstep(0.04f, 0.66f, 0f)
         // crest (waveH=+1):
         val wCr = floatArrayOf(
-            sc[0] + 0.45f * (sc[0] * 1.26f            - sc[0]),
-            sc[1] + 0.45f * (sc[1] * 1.26f + 0.04f   - sc[1]),
-            sc[2] + 0.45f * (sc[2] * 1.26f + 0.03f   - sc[2])
+            sc[0] + crestFac * (sc[0] * 1.26f            - sc[0]),
+            sc[1] + crestFac * (sc[1] * 1.26f + 0.04f   - sc[1]),
+            sc[2] + crestFac * (sc[2] * 1.26f + 0.03f   - sc[2])
         )
         // troughDepth=0 at distToWater=0 → no trough effect
         val dFac = NdotL * 0.38f + 0.62f
@@ -564,12 +571,13 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         Log.d(TAG, "║  L·(-V)                   = %.3f  → SSS@crest = %.4f".format(LdotNegV, sss_crest))
         Log.d(TAG, "╠$sep")
         Log.d(TAG, "║ [CREST vs TROUGH  (ocean_frag contributions)]")
-        Log.d(TAG, "║  crest brightening mix  = %.3f  (water × 1.26 + tint)".format(crestBoost))
+        Log.d(TAG, "║  crest brightening mix  = %.3f  (smoothstep(0,1,waveH) × 0.32)".format(crestFac))
         Log.d(TAG, "║  SSS at crest           = %.4f × lightColor".format(sss_crest))
         Log.d(TAG, "║  beach wSpec (flat N)   = %.4f  → +%.3f to runup color".format(wSpec_flat, wSpec_flat*0.32f))
         Log.d(TAG, "╠$sep")
-        Log.d(TAG, "║ [FOAM at waterlineZ crest]")
-        Log.d(TAG, "║  v_Foam estimate  = %.3f  waveMask = %.3f  foam = %.3f".format(vFoam_waterline, waveMask, foam_at_wl))
+        Log.d(TAG, "║ [FOAM at waterlineZ  (onset tideY+amp×0.45 → full tideY+amp×1.05)]")
+        Log.d(TAG, "║  v_Foam  low=%.3f mid=%.3f max=%.3f  waveMask(mid/max)=%.3f/%.3f  foam(max)=%.3f".format(
+            vFoam_low, vFoam_mid, vFoam_max, waveMask_mid, waveMask_max, foam_max))
         Log.d(TAG, "╠$sep")
         Log.d(TAG, "║ [SPECULAR / GLITTER]")
         Log.d(TAG, "║  roughness   = %.3f  yunseulStr = %.3f".format(roughness, yunseulStr))
@@ -586,7 +594,7 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         Log.d(TAG, "║  dist(XZ)=%.1f m  dNorm=%.3f  depthBlend=%.3f".format(distXZ_wl, dNorm_wl, depthBlend_wl))
         Log.d(TAG, "║  NdotV=%.3f  Fresnel=%.3f  fresMix=%.3f".format(NdotV_wl, fres_wl, fMix))
         Log.d(TAG, "║  water(base)     = (%.3f, %.3f, %.3f)  ← shallowColor (depthBlend≈0)".format(sc[0], sc[1], sc[2]))
-        Log.d(TAG, "║  after crest0.45 = (%.3f, %.3f, %.3f)  troughDepth=0→억제됨".format(wCr[0], wCr[1], wCr[2]))
+        Log.d(TAG, "║  after crest×%.3f = (%.3f, %.3f, %.3f)  troughDepth=0→억제됨".format(crestFac, wCr[0], wCr[1], wCr[2]))
         Log.d(TAG, "║  after diffuse×%.3f = (%.3f, %.3f, %.3f)".format(dFac, cA[0], cA[1], cA[2]))
         Log.d(TAG, "║  foam mix=%.3f   → (%.3f, %.3f, %.3f)".format(fM, cB[0], cB[1], cB[2]))
         Log.d(TAG, "║  fres target     = (%.3f, %.3f, %.3f)".format(fTgt[0], fTgt[1], fTgt[2]))
@@ -702,6 +710,20 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         Log.d(TAG, "║")
         Log.d(TAG, "║  NOTE: yunseul col above = in sun-corridor centre (corrMask=1).")
         Log.d(TAG, "║        Out-of-corridor actual corrMask shown; corrBoost(actual)=corrSharp²×range.")
+        Log.d(TAG, "╠$sep")
+        Log.d(TAG, "║ [BEACH FOAM through OCEAN EDGE  beach_frag §4 × (1 - shoreAlpha)]")
+        Log.d(TAG, "║  waveReach = %.2f m  (t1=%.3f t2=%.3f, no per-column noise)".format(waveReach, t1, t2))
+        Log.d(TAG, "║  shorelineMask = smoothstep(waveReach+1.2, -1.0, distToWater)  — peaks near waterline")
+        Log.d(TAG, "║  oceanAlpha    = 1 - smoothstep(-0.5, 3.0, distToWater)        — transparent 0→3 m inland")
+        Log.d(TAG, "║  dtw(m) | beachFoamMask | oceanAlpha | visible=(mask×(1-alpha))")
+        for (dtw in floatArrayOf(0f, 0.5f, 1.0f, 1.5f, 2.0f, 2.5f, 3.0f)) {
+            val foamMaskB  = smoothstep(waveReach + 1.2f, -1.0f, dtw)
+            val oceanAlpB  = 1f - smoothstep(-0.5f, 3.0f, dtw)
+            val visible    = foamMaskB * (1f - oceanAlpB)
+            val flag = if (visible > 0.15f) "  ← WHITE BAND" else ""
+            Log.d(TAG, "║    %+.1f m      %.3f         %.3f        %.3f%s".format(
+                dtw, foamMaskB, oceanAlpB, visible, flag))
+        }
         Log.d(TAG, "╚══════════════════════════════════════")
     }
 
