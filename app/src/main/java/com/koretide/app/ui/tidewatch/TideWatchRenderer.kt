@@ -520,8 +520,8 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         )
         val fMix = fres_wl * 0.14f * (1f - dNorm_wl) * (1f - fM)
         val cC   = floatArrayOf(cB[0]+fMix*(fTgt[0]-cB[0]), cB[1]+fMix*(fTgt[1]-cB[1]), cB[2]+fMix*(fTgt[2]-cB[2]))
-        // shoreAlpha formula updated: edges shifted -3/+4.5 (was -4/+3.5)
-        val shoreE0 = -3f; val shoreE1 = 4.5f
+        // shoreAlpha formula: fade only on beach side (edge0=-0.5, edge1=+3.0)
+        val shoreE0 = -0.5f; val shoreE1 = 3.0f
         val aWl  = 1f - smoothstep(shoreE0, shoreE1, 0f)    // shoreAlpha at noise=0, distToWater=0
         val shoreT_wl = ((0f - shoreE0) / (shoreE1 - shoreE0)).coerceIn(0f, 1f)
         val comp = floatArrayOf(
