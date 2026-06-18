@@ -520,7 +520,10 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         )
         val fMix = fres_wl * 0.14f * (1f - dNorm_wl) * (1f - fM)
         val cC   = floatArrayOf(cB[0]+fMix*(fTgt[0]-cB[0]), cB[1]+fMix*(fTgt[1]-cB[1]), cB[2]+fMix*(fTgt[2]-cB[2]))
-        val aWl  = 1f - smoothstep(-4f, 3.5f, 0f)           // shoreAlpha at noise=0
+        // shoreAlpha formula updated: edges shifted -3/+4.5 (was -4/+3.5)
+        val shoreE0 = -3f; val shoreE1 = 4.5f
+        val aWl  = 1f - smoothstep(shoreE0, shoreE1, 0f)    // shoreAlpha at noise=0, distToWater=0
+        val shoreT_wl = ((0f - shoreE0) / (shoreE1 - shoreE0)).coerceIn(0f, 1f)
         val comp = floatArrayOf(
             sandDry[0]*(1f-aWl) + cC[0]*aWl,
             sandDry[1]*(1f-aWl) + cC[1]*aWl,
@@ -588,8 +591,11 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         Log.d(TAG, "║  foam mix=%.3f   → (%.3f, %.3f, %.3f)".format(fM, cB[0], cB[1], cB[2]))
         Log.d(TAG, "║  fres target     = (%.3f, %.3f, %.3f)".format(fTgt[0], fTgt[1], fTgt[2]))
         Log.d(TAG, "║  after Fresnel   = (%.3f, %.3f, %.3f)  [yunseul=0, skyRefl=0 at this dist]".format(cC[0], cC[1], cC[2]))
-        Log.d(TAG, "║  shoreAlpha=%.3f  →  COMPOSITED = (%.3f, %.3f, %.3f)  ← 실제 보이는 색".format(aWl, comp[0], comp[1], comp[2]))
-        Log.d(TAG, "║  horizonColor    = (%.3f, %.3f, %.3f)  ← 비교용 하늘색".format(hc[0], hc[1], hc[2]))
+        Log.d(TAG, "║  [shoreAlpha 계산]  edge0=%.1f  edge1=%.1f  distToWater=0.0".format(shoreE0, shoreE1))
+        Log.d(TAG, "║    t=%.3f  1-smoothstep(t)=%.3f  ← 바다메시 투명도 (하늘색 혼합 아님!)".format(shoreT_wl, aWl))
+        Log.d(TAG, "║    COMPOSITED=beach×%.3f + ocean×%.3f = (%.3f, %.3f, %.3f)".format(1f-aWl, aWl, comp[0], comp[1], comp[2]))
+        Log.d(TAG, "║    skyReflect: distNorm=%.3f → smoothstep(0.58,0.92)=0  ← 수평선 먼바다만 적용".format(dNorm_wl))
+        Log.d(TAG, "║  horizonColor    = (%.3f, %.3f, %.3f)  ← 비교용 하늘색 (skyReflect 경로)".format(hc[0], hc[1], hc[2]))
         Log.d(TAG, "╚══════════════════════════════════════")
     }
 

@@ -130,9 +130,13 @@ void main() {
     vec3  V  = normalize(u_CamPos - v_World);
     vec3  L  = u_LightDir;
 
-    // ── 3. Diffuse body ───────────────────────────────────────────────────────
+    // ── 3. Diffuse body + surface micro-texture ──────────────────────────────
     float NdotL = max(dot(N, L), 0.0);
     vec3  col   = water * (NdotL * 0.44 + 0.56);
+    // Cross-correlate two normal-map octaves to produce a coherent ripple pattern
+    // visible as fine wave surface texture before the major lighting effects apply.
+    float waveDetail = (nm1.x * nm3.x + nm1.z * nm3.z) * 0.5 + 0.5;  // 0..1
+    col *= 0.87 + 0.13 * waveDetail;
 
     // ── 4. SSS — backlit crests glow cyan-green ──────────────────────────────
     float sss = pow(max(dot(L, -V), 0.0), 5.0) * max(waveH, 0.0) * 0.9;
@@ -214,8 +218,11 @@ void main() {
     float shoreNoise = sin(v_World.x * 0.25 + u_Time * 0.40) * 1.4
                      + sin(v_World.x * 0.11 - u_Time * 0.28) * 0.9
                      + sin(v_World.x * 0.58 + u_Time * 0.62) * 0.5;
-    // Alpha only — wide fade so boundary reads as a gradual colour transition.
-    float shoreAlpha = 1.0 - smoothstep(shoreNoise - 4.0, shoreNoise + 3.5, distToWater);
+    // shoreAlpha = ocean fragment opacity (NOT a sky/horizon mixer).
+    // Smoothstep shifted 1 m toward beach so the waterline itself is ~65% opaque
+    // (was ~45%) — reduces the visible color band where semi-transparent ocean
+    // meets the beach.  Beach side fade is wider (4.5 m) for a softer transition.
+    float shoreAlpha = 1.0 - smoothstep(shoreNoise - 3.0, shoreNoise + 4.5, distToWater);
 
     // ── 8. Sky reflection + noisy horizon seam ───────────────────────────────
     // Grazing-angle Fresnel: far water reflects sky (physically correct).
