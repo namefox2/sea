@@ -184,6 +184,18 @@
                 android:textColor="@android:color/white"
                 app:strokeColor="#55FFFFFF" />
 
+            <!-- [DEBUG] Logcat snapshot — remove before release -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnDebugDump"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="[DEBUG] Logcat 값 출력"
+                android:textColor="#FFAA44"
+                android:textSize="11sp"
+                android:visibility="gone" />
+
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 

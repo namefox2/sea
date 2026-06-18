@@ -8,6 +8,8 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.SeekBar
+import android.widget.Toast
+import com.koretide.app.BuildConfig
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.fragment.app.viewModels
@@ -75,6 +77,7 @@ class TideWatchFragment : Fragment() {
         setupSliders()
         setupSound()
         setupImmersiveButton()
+        setupDebugButton()
 
         // Tap background to toggle immersive; slider panel consumes its own touches
         binding.root.setOnClickListener { toggleImmersive() }
@@ -139,6 +142,15 @@ class TideWatchFragment : Fragment() {
                 .getSharedPreferences(PREFS_WATCH, Context.MODE_PRIVATE)
                 .edit().putBoolean(KEY_WAVE_SOUND, isChecked).apply()
             if (isChecked) oceanSound.start() else oceanSound.stop()
+        }
+    }
+
+    private fun setupDebugButton() {
+        if (!BuildConfig.DEBUG) return
+        binding.btnDebugDump.visibility = View.VISIBLE
+        binding.btnDebugDump.setOnClickListener {
+            binding.tideWatchView.requestDebugDump()
+            Toast.makeText(requireContext(), "Logcat → tag:OceanDebug", Toast.LENGTH_SHORT).show()
         }
     }
 

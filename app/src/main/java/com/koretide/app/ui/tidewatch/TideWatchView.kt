@@ -81,6 +81,8 @@ class TideWatchView @JvmOverloads constructor(
         }
     }
 
+    fun requestDebugDump() { renderer.debugDumpRequested = true }
+
     val initError: String? get() = renderer.initError
 
     // Called from Fragment.onDestroyView to free GPU resources while context is still alive

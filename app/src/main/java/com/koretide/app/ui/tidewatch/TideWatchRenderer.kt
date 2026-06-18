@@ -12,6 +12,7 @@ import java.util.Calendar
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 import kotlin.math.PI
+import kotlin.math.asin
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.math.sqrt
@@ -87,6 +88,17 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
 
     // Reused every frame to avoid per-frame Calendar allocation at 60 fps
     private val calendar = Calendar.getInstance()
+
+    // ── Debug dump ────────────────────────────────────────────────────────────
+    // Set from UI thread; consumed on GL thread in onDrawFrame.
+    @Volatile var debugDumpRequested = false
+    // Last-frame computed values written on GL thread, read by performDebugDump().
+    private var dbgRawT          = 0f
+    private var dbgT             = 0f
+    private var dbgWaterlineZ    = 0f
+    private var dbgWaterlineBase = 0f
+    private var dbgShoreWave     = 0f
+    private var dbgWindSurge     = 0f
 
     // Pre-allocated — never replaced in onDrawFrame to avoid per-frame GC pressure
     private val lightDir   = FloatArray(3)
@@ -272,6 +284,16 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         val windSurge  = wAmp * 0.22f
         val waterlineZ = waterlineBase + shoreWave + windSurge * (34f / 1.4f)
 
+        // Track for debug dump (GL thread only — no sync needed)
+        dbgRawT = rawT; dbgT = t
+        dbgWaterlineBase = waterlineBase; dbgShoreWave = shoreWave
+        dbgWindSurge = windSurge; dbgWaterlineZ = waterlineZ
+
+        if (debugDumpRequested) {
+            debugDumpRequested = false
+            performDebugDump()
+        }
+
         // ── Pass 1: Sky (no depth write) ─────────────────────────────────────
         sky.draw(lutHorizon, lutZenith, lutLight, lightUV, lutIsDark, t, aspect)
 
@@ -392,6 +414,135 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_T,     GLES20.GL_REPEAT)
         GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, 0)
         return texId[0]
+    }
+
+    // ── Debug snapshot (called on GL thread when debugDumpRequested is set) ────
+
+    @Suppress("LocalVariableName")
+    private fun performDebugDump() {
+        val wAmp  = windAmp
+        val tide  = tidePercent
+        val T     = dbgT
+        val rawT  = dbgRawT
+        val wzZ   = dbgWaterlineZ
+        val TAG   = "OceanDebug"
+
+        // --- Reproduce shader math on CPU ---
+        val wind  = run { val w = wAmp.coerceIn(0f, 1f); w * w }   // smoothstep² like shader
+        val amp   = 0.05f + (0.50f - 0.05f) * wind                  // mix(0.05, 0.50, wind)
+        val tideY = tide * 1.4f - 0.7f + dbgWindSurge
+        val minAmp = wAmp * wAmp * 0.62f + wAmp * 0.18f + 0.06f
+
+        val L0   = 8f + (16f - 8f) * wAmp
+        val spd0 = 0.85f + (1.65f - 0.85f) * wAmp
+        val k0   = (2.0 * PI / L0).toFloat()
+        val om0  = spd0 * k0
+
+        // Beach wave cycle at current t (no per-column noise, centre column)
+        val t1raw = (sin((k0 * wzZ - om0 * T).toDouble()) * 0.5 + 0.5).toFloat().coerceAtLeast(0f)
+        val t1    = t1raw * t1raw
+        val t2raw = (sin((k0 / 0.58f * wzZ - om0 * 1.25f * T).toDouble()) * 0.5 + 0.5).toFloat().coerceAtLeast(0f)
+        val t2    = t2raw * t2raw
+        val minReach  = 0.25f + wAmp * 0.8f
+        val waveReach = maxOf(t1 * (1.8f + wAmp * 3.2f) + t2 * (0.7f + wAmp * 1.5f), minReach)
+
+        // Approximate wave height at the waterline (beach side)
+        val waveH_crest = 1.0f                    // crest is always waveH=+1
+        val waveH_trough = -1.0f
+
+        // Lighting geometry at the waterline (world pos ≈ (0, tideY, wzZ))
+        val Lx = lightDir[0]; val Ly = lightDir[1]; val Lz = lightDir[2]
+        val wx = 0f; val wy = tideY; val wz = wzZ
+        val cx = eyePos[0]; val cy = eyePos[1]; val cz = eyePos[2]
+        val vx = cx-wx; val vy = cy-wy; val vz = cz-wz
+        val vLen = sqrt(vx*vx + vy*vy + vz*vz).coerceAtLeast(1e-6f)
+        val Vx = vx/vLen; val Vy = vy/vLen; val Vz = vz/vLen
+
+        // Half vector H = normalize(L + V) with flat normal (0,1,0)
+        val hx = Lx+Vx; val hy = Ly+Vy; val hz = Lz+Vz
+        val hLen = sqrt(hx*hx + hy*hy + hz*hz).coerceAtLeast(1e-6f)
+        val Hx = hx/hLen; val Hy = hy/hLen; val Hz = hz/hLen
+
+        val NdotL      = Ly.coerceAtLeast(0f)           // N=(0,1,0) dot L
+        val NdotH      = Hy.coerceAtLeast(0f)           // N=(0,1,0) dot H
+        val LdotNegV   = (-Lx*Vx - Ly*Vy - Lz*Vz).coerceAtLeast(0f)
+
+        val sheenExp   = 20f - (20f-9f) * (wAmp*wAmp*0.40f+0.04f).coerceAtMost(0.40f)
+        val sheen      = Math.pow(NdotH.toDouble(), sheenExp.toDouble()).toFloat()
+
+        // SSS — backlit crest glow (only when waveH > 0 and L ≈ opposite of V)
+        val sss_crest  = Math.pow(LdotNegV.toDouble(), 5.0).toFloat() * waveH_crest * 0.9f
+
+        // Beach runup water specular (flat N=(0,1,0))
+        val wSpec_flat = Math.pow(NdotH.toDouble(), 90.0).toFloat() * 0.38f
+
+        // Foam at waterline crest
+        val vFoam_waterline = (1.575f * amp).coerceIn(0f, 1f)
+        val waveMask        = smoothstep(0.42f, 0.85f, vFoam_waterline)
+        val foam_at_wl      = 1.0f * waveMask * (0.16f + wind * 0.60f)   // shoreBand=1
+
+        // Crest colour boost in ocean_frag
+        val crestBoost = waveH_crest * 0.55f  // mix factor for water*1.26 branch
+
+        // Roughness / yunseul
+        val roughness  = (wAmp*wAmp*0.40f + 0.04f).coerceAtMost(0.40f)
+        val yunseulStr = (1f - wAmp*0.9f).coerceIn(0f, 1f)
+
+        val sep = "─────────────────────────────────"
+        Log.d(TAG, "╔══ OCEAN DEBUG SNAPSHOT ══════════════")
+        Log.d(TAG, "║ Logcat filter: tag:OceanDebug")
+        Log.d(TAG, "╠$sep")
+        Log.d(TAG, "║ [INPUT]")
+        Log.d(TAG, "║  t(GPU)     = %.2f s  (rawT = %.1f s)".format(T, rawT))
+        Log.d(TAG, "║  windAmp    = %.3f  (%.1f bft)".format(wAmp, wAmp*12f))
+        Log.d(TAG, "║  windDir    = %.3f rad  (%.0f°)".format(windDirRad, Math.toDegrees(windDirRad.toDouble())))
+        Log.d(TAG, "║  tide       = %.3f  (%.0f%%)".format(tide, tide*100f))
+        Log.d(TAG, "║  mudflatExp = %.3f".format(mudflatExposure))
+        Log.d(TAG, "╠$sep")
+        Log.d(TAG, "║ [WATERLINE GEOMETRY]")
+        Log.d(TAG, "║  waterlineBase = %.2f m".format(dbgWaterlineBase))
+        Log.d(TAG, "║  shoreWave     = %.2f m   windSurge = %.3f m".format(dbgShoreWave, dbgWindSurge))
+        Log.d(TAG, "║  waterlineZ    = %.2f m  ← ocean-beach boundary Z".format(wzZ))
+        Log.d(TAG, "╠$sep")
+        Log.d(TAG, "║ [WAVE PHYSICS]")
+        Log.d(TAG, "║  wind²     = %.3f  amp = %.3f m  tideY = %.3f m".format(wind, amp, tideY))
+        Log.d(TAG, "║  minAmp    = %.3f  foamStartY = %.3f m (tideY + amp*0.55)".format(minAmp, tideY + amp*0.55f))
+        Log.d(TAG, "║  L0 = %.1f m  spd0 = %.3f rad/s  k0 = %.4f".format(L0, spd0, k0))
+        Log.d(TAG, "╠$sep")
+        Log.d(TAG, "║ [BEACH RUNUP CYCLE  (centre col, no noise)]")
+        Log.d(TAG, "║  t1 = %.3f  t2 = %.3f  waveReach = %.2f m  minReach = %.2f m".format(t1, t2, waveReach, minReach))
+        Log.d(TAG, "║  → wave covers %.2f m of beach from waterlineZ".format(waveReach))
+        Log.d(TAG, "╠$sep")
+        Log.d(TAG, "║ [LIGHTING AT WATERLINE  world=(0, %.2f, %.2f)]".format(tideY, wzZ))
+        Log.d(TAG, "║  lightDir = (%.3f, %.3f, %.3f)  elev = %.1f°".format(
+            Lx, Ly, Lz, Math.toDegrees(asin(Ly.toDouble()))))
+        Log.d(TAG, "║  hour = %.1f  useDefaultSun = $useDefaultSun".format(defaultHour))
+        Log.d(TAG, "║  NdotL (diffuse, flat N)  = %.3f".format(NdotL))
+        Log.d(TAG, "║  NdotH (specular, flat N) = %.3f  → sheen = %.4f (exp %.0f)".format(NdotH, sheen, sheenExp))
+        Log.d(TAG, "║  L·(-V)                   = %.3f  → SSS@crest = %.4f".format(LdotNegV, sss_crest))
+        Log.d(TAG, "╠$sep")
+        Log.d(TAG, "║ [CREST vs TROUGH  (ocean_frag contributions)]")
+        Log.d(TAG, "║  crest brightening mix  = %.3f  (water × 1.26 + tint)".format(crestBoost))
+        Log.d(TAG, "║  SSS at crest           = %.4f × lightColor".format(sss_crest))
+        Log.d(TAG, "║  beach wSpec (flat N)   = %.4f  → +%.3f to runup color".format(wSpec_flat, wSpec_flat*0.32f))
+        Log.d(TAG, "╠$sep")
+        Log.d(TAG, "║ [FOAM at waterlineZ crest]")
+        Log.d(TAG, "║  v_Foam estimate  = %.3f  waveMask = %.3f  foam = %.3f".format(vFoam_waterline, waveMask, foam_at_wl))
+        Log.d(TAG, "╠$sep")
+        Log.d(TAG, "║ [SPECULAR / GLITTER]")
+        Log.d(TAG, "║  roughness   = %.3f  yunseulStr = %.3f".format(roughness, yunseulStr))
+        Log.d(TAG, "║  fineExp     = %.0f".format(280f - (280f-100f)*roughness))
+        Log.d(TAG, "╠$sep")
+        Log.d(TAG, "║ [COLORS]")
+        Log.d(TAG, "║  shallowColor = (%.3f, %.3f, %.3f)".format(shallowColor[0], shallowColor[1], shallowColor[2]))
+        Log.d(TAG, "║  deepColor    = (%.3f, %.3f, %.3f)".format(deepColor[0], deepColor[1], deepColor[2]))
+        Log.d(TAG, "║  sandDry      = (%.3f, %.3f, %.3f)".format(sandDry[0], sandDry[1], sandDry[2]))
+        Log.d(TAG, "╚══════════════════════════════════════")
+    }
+
+    private fun smoothstep(edge0: Float, edge1: Float, x: Float): Float {
+        val t = ((x - edge0) / (edge1 - edge0)).coerceIn(0f, 1f)
+        return t * t * (3f - 2f * t)
     }
 
     // ── Resource cleanup (called from GL thread via TideWatchView.release()) ──
