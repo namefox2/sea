@@ -105,8 +105,11 @@ void main() {
     water = mix(water, vec3(0.20, 0.54, 0.42), tidalZone * tidalFade * (1.0 - depthBlend) * 0.45);
 
     // ── 2. Wave volume shading ────────────────────────────────────────────────
-    water = mix(water, water * 1.26 + vec3(0.00, 0.04, 0.03), max(waveH, 0.0) * 0.55); // crest
-    water = mix(water, u_DeepColor * 0.55, max(-waveH, 0.0) * 0.38);                    // trough
+    water = mix(water, water * 1.26 + vec3(0.00, 0.04, 0.03), max(waveH, 0.0) * 0.45); // crest
+    // Trough darkening fades to zero near the waterline so dark-navy color doesn't
+    // bleed through the semi-transparent ocean alpha zone and create a hard band.
+    float troughDepth = clamp(-v_DistToWater / 10.0, 0.0, 1.0);
+    water = mix(water, u_DeepColor * 0.55, max(-waveH, 0.0) * 0.38 * troughDepth);    // trough
 
     // ── Normal maps (4 scales — LOD: uv4 fine layer fades in near camera) ────
     vec2 uv1 = v_World.xz * 0.12 + u_Time * vec2( 0.011,  0.007);
