@@ -495,8 +495,9 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         val foam_max     = waveMask_max * foamBase
         val foam_at_wl   = foam_max   // max-crest foam for pixel trace (shoreBand=1)
 
-        // Crest colour boost — smoothstep(0,1,waveH) × 0.32  (ocean_frag.glsl; was 0.45)
-        val crestFac = smoothstep(0f, 1f, waveH_crest) * 0.32f
+        // Crest colour boost — smoothstep(0,1,waveH) × 0.20  (reduced from 0.32 to avoid
+        // double-whitening when foam also peaks at crest)
+        val crestFac = smoothstep(0f, 1f, waveH_crest) * 0.20f
 
         // Roughness / yunseul
         val roughness  = (wAmp*wAmp*0.40f + 0.04f).coerceAtMost(0.40f)
@@ -519,8 +520,8 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         // troughDepth=0 at distToWater=0 → no trough effect
         val dFac = NdotL * 0.38f + 0.62f
         val cA   = floatArrayOf(wCr[0] * dFac, wCr[1] * dFac, wCr[2] * dFac)
-        // foam:
-        val fM   = foam_at_wl * 0.58f
+        // foam: attenuated when crest is high (1-crestFac*0.5) to avoid double-whitening
+        val fM   = foam_at_wl * 0.58f * (1f - crestFac * 0.5f)
         val cB   = floatArrayOf(cA[0] + fM*(0.96f-cA[0]), cA[1] + fM*(0.98f-cA[1]), cA[2] + fM*(1f-cA[2]))
         // Fresnel (deepZone=0 at waterline → yunseul=0; skyReflect≈0 at this dist):
         val fTgt = floatArrayOf(
@@ -574,7 +575,7 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         Log.d(TAG, "║  L·(-V)                   = %.3f  → SSS@crest = %.4f".format(LdotNegV, sss_crest))
         Log.d(TAG, "╠$sep")
         Log.d(TAG, "║ [CREST vs TROUGH  (ocean_frag contributions)]")
-        Log.d(TAG, "║  crest brightening mix  = %.3f  (smoothstep(0,1,waveH) × 0.32)".format(crestFac))
+        Log.d(TAG, "║  crest brightening mix  = %.3f  (smoothstep(0,1,waveH) × 0.20)".format(crestFac))
         Log.d(TAG, "║  SSS at crest           = %.4f × lightColor".format(sss_crest))
         Log.d(TAG, "║  beach wSpec (flat N)   = %.4f  → +%.3f to runup color".format(wSpec_flat, wSpec_flat*0.32f))
         Log.d(TAG, "╠$sep")
@@ -623,9 +624,9 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         // Camera at eyePos=(0,1.8,18). Reference point: X=0, Z=eyeZ-dist (straight ahead).
         // For each distNorm sample: decompose final color into 3 additive contributions:
         //   (A) water base × diffuse  (B) skyReflect Δ  (C) yunseul Δ (in corridor centre)
-        Log.d(TAG, "║ [FAR-OCEAN SCAN  skyReflect zone  smoothstep(0.58, 0.92)]")
-        Log.d(TAG, "║  horizonColor×1.05 = (%.3f, %.3f, %.3f)  deepColor = (%.3f, %.3f, %.3f)".format(
-            hc[0]*1.05f, hc[1]*1.05f, hc[2]*1.05f, deepColor[0], deepColor[1], deepColor[2]))
+        Log.d(TAG, "║ [FAR-OCEAN SCAN  skyReflect×0.28 (was 0.38×1.05)  pathLight×0.22]")
+        Log.d(TAG, "║  horizonColor = (%.3f, %.3f, %.3f)  deepColor = (%.3f, %.3f, %.3f)  (no ×1.05)".format(
+            hc[0], hc[1], hc[2], deepColor[0], deepColor[1], deepColor[2]))
         Log.d(TAG, "║  roughness=%.3f  yunseulStr=%.3f  (foam≈0 all: shoreBand→0 far from shore)".format(roughness, yunseulStr))
 
         // Sun corridor geometry: perpendicular direction to light XZ projection
@@ -677,12 +678,15 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
             val yunBrtIn  = lBrt * yunseulStr * sparkleSc * corrBoostIn
             val yunBrtAct = lBrt * yunseulStr * sparkleSc * corrBoostAct
 
-            // skyReflect
+            // skyReflect: reduced to 0.28 (was 0.38), no ×1.05
             val skyReflSc = smoothstep(0.58f, 0.92f, dn)
-            val skyBlendSc = skyReflSc * 0.38f   // (1-foam)≈1
+            val skyBlendSc = skyReflSc * 0.28f   // (1-foam)≈1
 
-            // Depth blend (shoreProx≈0 at far distance → blendInput ≈ distFactor)
-            val depthBlendSc = smoothstep(0.04f, 0.66f, (sqrt(dn) + tide * 0.38f).coerceIn(0f, 1f))
+            // Depth blend — new formula: shoreZ/100 single driver, no crossover
+            val distToWaterSc_f = wZscan - wzZ   // negative = seaward
+            val shoreZsc  = (-distToWaterSc_f / 100f).coerceIn(0f, 1f)
+            val sBsc      = smoothstep(0f, 1f, shoreZsc)
+            val depthBlendSc = smoothstep(0.05f, 0.95f, sBsc + tide * 0.15f + dn * 0.08f)
             val wRsc = shallowColor[0] + depthBlendSc * (deepColor[0] - shallowColor[0])
             val wGsc = shallowColor[1] + depthBlendSc * (deepColor[1] - shallowColor[1])
             val wBsc = shallowColor[2] + depthBlendSc * (deepColor[2] - shallowColor[2])
@@ -690,11 +694,19 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
             val dFsc = NdotLsc * 0.44f + 0.56f
             val bR = wRsc * dFsc; val bG = wGsc * dFsc; val bB = wBsc * dFsc  // water base
 
-            // After skyReflect
-            val sR = bR + skyBlendSc * (hc[0]*1.05f - bR)
-            val sG = bG + skyBlendSc * (hc[1]*1.05f - bG)
-            val sB = bB + skyBlendSc * (hc[2]*1.05f - bB)
+            // After skyReflect (no ×1.05)
+            val sR = bR + skyBlendSc * (hc[0] - bR)
+            val sG = bG + skyBlendSc * (hc[1] - bG)
+            val sB = bB + skyBlendSc * (hc[2] - bB)
             val lumDeltaSky = 0.299f*(sR-bR) + 0.587f*(sG-bG) + 0.114f*(sB-bB)
+
+            // pathLight (corridor only): in-corridor contribution at this distNorm
+            val pathLightIn  = 1f * (0.05f + 0.22f * dn)   // corrMask=1 in corridor
+            val pathTintR = lc[0] + (1f-lc[0]) * 0.20f*dn; val pathTintG = lc[1] + (1f-lc[1]) * 0.20f*dn; val pathTintB = lc[2] + (1f-lc[2]) * 0.20f*dn
+            val pathMix  = pathLightIn.coerceAtMost(0.38f)
+            val pInnerR  = bR + 0.22f*(pathTintR-bR); val pInnerG = bG + 0.22f*(pathTintG-bG); val pInnerB = bB + 0.22f*(pathTintB-bB)
+            val pR = bR + pathMix*(pInnerR-bR); val pG = bG + pathMix*(pInnerG-bG); val pB = bB + pathMix*(pInnerB-bB)
+            val pathDeltaR = pR - bR
 
             // yunseul delta (in corridor, deepZone=1)
             val yR = lc[0] * yunseulStr * sparkleSc * corrBoostIn
@@ -703,26 +715,76 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
             val lumDeltaYun = 0.299f*yR + 0.587f*yG + 0.114f*yB
 
             // Foam: shoreBand ≈ 0 far from shore
-            val distToWaterSc = wZscan - wzZ
-            val shoreBandSc = kotlin.math.exp((kotlin.math.abs(distToWaterSc) * (-0.35)).toDouble()).toFloat()
+            val distToWaterSc_loc = wZscan - wzZ
+            val shoreBandSc = kotlin.math.exp((kotlin.math.abs(distToWaterSc_loc) * (-0.35)).toDouble()).toFloat()
 
             // seam: smoothstep(0.90,1.0,dn)*(1-corrMask*0.6)*0.55
             val seamSc = smoothstep(0.90f, 1.0f, dn) * (1f - corrMaskSc * 0.6f) * 0.55f
 
-            Log.d(TAG, "║  %.2f  |%4.0fm |  %.3f | %.3f    |  %.3f  |  %.4f   | (%.3f,%.3f,%.3f) | (%.3f,%.3f,%.3f) | (%.3f,%.3f,%.3f) | +%.3f   | +%.4f".format(
-                dn, dist, skyReflSc, corrMaskSc, corrBoostIn, yunBrtIn,
-                bR, bG, bB, sR, sG, sB, sR+yR, sG+yG, sB+yB,
-                lumDeltaSky, lumDeltaYun))
+            Log.d(TAG, "║  %.2f  |%4.0fm |sky%.3f|path+%.3f| (%.3f,%.3f,%.3f)base | +sky→(%.3f,%.3f,%.3f) | Δlum_sky=+%.3f  Δpath_R=+%.3f  Δyun=+%.4f".format(
+                dn, dist, skyReflSc, pathDeltaR,
+                bR, bG, bB, sR, sG, sB,
+                lumDeltaSky, pathDeltaR, lumDeltaYun))
             if (shoreBandSc > 0.001f) {
-                Log.d(TAG, "║    ⚠ foam: distToWater=%.1f  shoreBand=%.4f  (not zero!)".format(distToWaterSc, shoreBandSc))
+                Log.d(TAG, "║    ⚠ foam: distToWater=%.1f  shoreBand=%.4f  (not zero!)".format(distToWaterSc_loc, shoreBandSc))
             }
             if (seamSc > 0.01f) {
                 Log.d(TAG, "║    seam blend %.3f × horizonColor×0.85 active here".format(seamSc))
             }
         }
         Log.d(TAG, "║")
-        Log.d(TAG, "║  NOTE: yunseul col above = in sun-corridor centre (corrMask=1).")
-        Log.d(TAG, "║        Out-of-corridor actual corrMask shown; corrBoost(actual)=corrSharp²×range.")
+        Log.d(TAG, "║  NOTE: path+X = pathLight R-channel delta IN sun corridor (corrMask=1)")
+        Log.d(TAG, "║        sky+X  = skyReflect colour delta (mix×0.28 toward horizonColor)")
+        Log.d(TAG, "╠$sep")
+
+        // ── Depth blend gradient scan ──────────────────────────────────────────────
+        // Shows depthBlend at each distance seaward of the waterline.
+        val camToWL = eyePos[2] - wzZ   // camera-to-waterline distance
+        Log.d(TAG, "║ [DEPTH BLEND SCAN  shoreZ/100 + tideBoost(%.3f) + distBias(×0.08)]".format(tide * 0.15f))
+        Log.d(TAG, "║  camera→WL = %.1f m  (ocean starts here)".format(camToWL))
+        Log.d(TAG, "║  seaward | dist  | shoreZ | sBlend | depthBlend | waterG  (%.3f→%.3f)".format(shallowColor[1], deepColor[1]))
+        for (extra in floatArrayOf(2f, 5f, 10f, 15f, 20f, 30f, 40f, 55f)) {
+            val distM  = camToWL + extra
+            val dtw    = -extra    // distToWater (negative = seaward)
+            val dNormV = (distM / 68f).coerceIn(0f, 1f)
+            val szV    = (extra / 100f).coerceIn(0f, 1f)
+            val sbV    = smoothstep(0f, 1f, szV)
+            val dBlend = smoothstep(0.05f, 0.95f, sbV + tide * 0.15f + dNormV * 0.08f)
+            val wG     = shallowColor[1] + dBlend * (deepColor[1] - shallowColor[1])
+            Log.d(TAG, "║  %+5.0fm    %5.1fm  %.3f   %.3f   %.3f       %.3f".format(dtw, distM, szV, sbV, dBlend, wG))
+        }
+        Log.d(TAG, "╠$sep")
+
+        // ── Near-shore multi-point scan: crest × foam contribution breakdown ──────
+        // Shows how crest brightening and foam mix vary across dNorm 0.10–0.30
+        // (roughly 7–20 m from camera, spanning the waterline zone).
+        val sc2 = shallowColor
+        Log.d(TAG, "║ [NEAR-SHORE SCAN  crest×0.20 / foam×0.58×(1-crest×0.5) — crest+foam breakdown]")
+        Log.d(TAG, "║  dNorm | dist  | depBlend | waterG | +crest | after_dif | +foam | finalG | COMP_G")
+        for (dn2 in floatArrayOf(0.10f, 0.15f, 0.20f, 0.25f, 0.30f)) {
+            val distM2   = 68f * dn2
+            val wZ2      = eyePos[2] - distM2
+            val dtw2     = wZ2 - wzZ    // positive=inland, negative=seaward
+            val szV2     = (-dtw2 / 100f).coerceIn(0f, 1f)
+            val sbV2     = smoothstep(0f, 1f, szV2)
+            val dBlend2  = smoothstep(0.05f, 0.95f, sbV2 + tide * 0.15f + dn2 * 0.08f)
+            val waterG   = sc2[1] + dBlend2 * (deepColor[1] - sc2[1])
+            // crest at maximum (waveH=+1)
+            val crest2   = 0.20f
+            val wCrG2    = waterG * (1f - crest2) + (waterG * 1.26f + 0.04f) * crest2
+            // diffuse (flat N, NdotL=Ly)
+            val dFac2    = Ly.coerceAtLeast(0f) * 0.44f + 0.56f
+            val colG2    = wCrG2 * dFac2 * (0.87f + 0.13f * 0.5f)  // waveDetail≈0.5
+            // foam (max, lacyMask=1)
+            val foamAmt2 = 1f * 1f * (0.16f + windS * 0.42f) * 1f  // waveMask=1,lacyMask=1
+            val foamMix2 = foamAmt2 * 0.58f * (1f - crest2 * 0.5f)
+            val fG2      = colG2 + foamMix2 * (0.98f - colG2)
+            // shoreAlpha at this distToWater
+            val sAlpha2  = 1f - smoothstep(-0.5f, 3.0f, dtw2)
+            val compG2   = sandDry[1] * (1f - sAlpha2) + fG2 * sAlpha2
+            Log.d(TAG, "║  %.2f   |%5.1fm | %.3f    | %.3f  | %.3f  | %.3f     | %.3f | %.3f  | %.3f (dtw=%+.1f)".format(
+                dn2, distM2, dBlend2, waterG, crest2, colG2, foamMix2, fG2, compG2, dtw2))
+        }
         Log.d(TAG, "╠$sep")
         val trailGrdStart = maxOf(1.0f, waveReach * 0.5f + 0.6f)
         Log.d(TAG, "║ [BEACH FOAM through OCEAN EDGE  beach_frag §4 × (1 - shoreAlpha)]")
