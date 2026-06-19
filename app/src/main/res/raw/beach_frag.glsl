@@ -272,11 +272,15 @@ void main() {
     float bB      = bN(v_World.xz * 5.8 - vec2( u_Time * 0.10,  u_Time * 0.18));
     float bubbles = smoothstep(0.60, 0.84, bA * 0.55 + bB * 0.45) * trailFade * 0.60;
 
-    // Allow foam up to 10 m past the waterline so the wave tip is always visible.
-    // edge1 = 0.0 (was -1.0): foam now peaks at the waterline (distToWater=0) and
-    // decreases inland, so shorelineMask × (1-oceanAlpha) is highest at dtw=0 and
-    // falls off — eliminating the bell-curve peak that appeared at dtw≈1m.
-    float shorelineMask = smoothstep(waveReach + 1.2, 0.0, distToWater);
+    // shorelineMask: two-part envelope.
+    // Near-shore zone (dtw 0 → 2.5 m): fixed-width falloff independent of waveReach.
+    // Previously smoothstep(waveReach+1.2, 0) made the foam zone grow proportionally
+    // with swell height (waveReach=5m → mask still 0.76 at dtw=3m → too wide).
+    // Wave-tip belt (±1.5 m around waveReach): keeps the active foam front visible
+    // regardless of how far the wave has travelled up the beach.
+    float shoreMask2   = smoothstep(2.5, 0.0, distToWater);
+    float tipZoneMask  = smoothstep(1.5, 0.0, abs(distToWater - waveReach));
+    float shorelineMask = max(shoreMask2, tipZoneMask * 0.75);
     float beachGuard = smoothstep(-0.5, 0.4, distToWater);
     float foamFront  = tipBand   * laceMask * beachGuard;
     float foamTrail  = trailFade * laceMask * 0.38 * beachGuard;

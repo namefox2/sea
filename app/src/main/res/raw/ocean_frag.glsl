@@ -60,22 +60,22 @@ void main() {
 
     // ── 1. Depth-based water colour — smooth, wave-linked, noise-perturbed ────
     //
-    // Single depth driver: shoreZ = distance seaward from waterline, normalised
-    // over 50 m.  tideBoost = u_Tide × 0.28 shifts the whole curve upward so
-    // high-tide water appears deeper at the same distance (tide=0 → 5 m ≈ 0%,
-    // tide=0.9 → 5 m ≈ 18%).  distBias adds a gentle horizon push.
-    float shoreZ = clamp((-v_DistToWater) / 50.0, 0.0, 1.0);
+    // tide-linked normalisation distance: tide=0(간조)→60m, tide=1(만조)→25m.
+    // Scaling the range (not just offsetting) means the ENTIRE depth gradient
+    // compresses toward shore at high tide — deep colour reaches closer AND
+    // shallow zone narrows, matching real physics (high tide = deeper everywhere).
+    float normDist = mix(60.0, 25.0, u_Tide);
+    float shoreZ   = clamp((-v_DistToWater) / normDist, 0.0, 1.0);
 
     float waveDepthMod = waveH * 0.10;
     float boundNoise = sin(v_World.x * 0.07 + u_Time * 0.03) * 0.08
                      + sin(v_World.x * 0.19 - u_Time * 0.02 + v_World.z * 0.04) * 0.05;
     float shoreBlend = smoothstep(0.0, 1.0, shoreZ + waveDepthMod + boundNoise);
 
-    float tideBoost  = u_Tide * 0.28;   // tide shifts the mid-tone point
-    float distBias   = distNorm * 0.09; // horizon push toward deep
+    float distBias   = distNorm * 0.09; // gentle horizon push toward deep
 
     // Wide range [0.05 → 0.95]: S-curve spans the full scene without plateauing.
-    float depthBlend = smoothstep(0.05, 0.95, shoreBlend + tideBoost + distBias);
+    float depthBlend = smoothstep(0.05, 0.95, shoreBlend + distBias);
     vec3 water = mix(u_ShallowColor, u_DeepColor, depthBlend);
 
     // Caustics: animated refraction light-patterns visible in the shallow zone.
@@ -204,9 +204,10 @@ void main() {
     float alongWave = sin(foamUV.y * 0.2 + u_Time * 2.0);
     foam *= 0.75 + 0.25 * alongWave;
 
-    // Attenuate foam when crest is already bright: prevents double-whitening
-    // (crestFac=0.20 brightens water → foam adds more white on top → near-white result).
-    col = mix(col, vec3(0.96, 0.98, 1.00), foam * 0.58 * (1.0 - crestFac * 0.5));
+    // Attenuate foam when crest is already bright: prevents double-whitening.
+    // Coefficient 0.58→0.50, crest attenuation 0.5→0.8: when crest and foam both
+    // peak together, combined mix = foam×0.50×0.84 = foam×0.42 (was foam×0.52).
+    col = mix(col, vec3(0.96, 0.98, 1.00), foam * 0.50 * (1.0 - crestFac * 0.8));
 
     // Fresnel near-surface sheen (near water only).
     float fres = pow(1.0 - max(dot(N, V), 0.0), 5.0);

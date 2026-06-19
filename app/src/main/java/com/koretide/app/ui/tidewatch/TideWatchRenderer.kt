@@ -682,11 +682,12 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
             val skyReflSc = smoothstep(0.35f, 0.95f, dn)
             val skyBlendSc = skyReflSc * 0.14f   // (1-foam)≈1
 
-            // Depth blend — shoreZ/50 single driver, tideBoost=tide×0.28
+            // Depth blend — normDist=mix(60,25,tide) scaling, no additive tideBoost
             val distToWaterSc_f = wZscan - wzZ   // negative = seaward
-            val shoreZsc  = (-distToWaterSc_f / 50f).coerceIn(0f, 1f)
+            val normDistSc = 60f + tide * (25f - 60f)
+            val shoreZsc  = (-distToWaterSc_f / normDistSc).coerceIn(0f, 1f)
             val sBsc      = smoothstep(0f, 1f, shoreZsc)
-            val depthBlendSc = smoothstep(0.05f, 0.95f, sBsc + tide * 0.28f + dn * 0.09f)
+            val depthBlendSc = smoothstep(0.05f, 0.95f, sBsc + dn * 0.09f)
             val wRsc = shallowColor[0] + depthBlendSc * (deepColor[0] - shallowColor[0])
             val wGsc = shallowColor[1] + depthBlendSc * (deepColor[1] - shallowColor[1])
             val wBsc = shallowColor[2] + depthBlendSc * (deepColor[2] - shallowColor[2])
@@ -740,31 +741,34 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         // ── Depth blend gradient scan ──────────────────────────────────────────────
         // Shows depthBlend at each distance seaward of the waterline.
         val camToWL = eyePos[2] - wzZ   // camera-to-waterline distance
-        Log.d(TAG, "║ [DEPTH BLEND SCAN  shoreZ/50 + tideBoost(%.3f) + distBias(×0.09)]".format(tide * 0.28f))
+        val normDistDb = 60f + tide * (25f - 60f)  // mix(60,25,tide)
+        Log.d(TAG, "║ [DEPTH BLEND SCAN  normDist=%.1fm(mix 60→25 by tide=%.2f) + distBias(×0.09)]".format(normDistDb, tide))
         Log.d(TAG, "║  camera→WL = %.1f m  (ocean starts here)".format(camToWL))
         Log.d(TAG, "║  seaward | dist  | shoreZ | sBlend | depthBlend | waterG  (%.3f→%.3f)".format(shallowColor[1], deepColor[1]))
         for (extra in floatArrayOf(2f, 5f, 10f, 15f, 20f, 30f, 40f, 55f)) {
             val distM  = camToWL + extra
             val dtw    = -extra    // distToWater (negative = seaward)
             val dNormV = (distM / 68f).coerceIn(0f, 1f)
-            val szV    = (extra / 50f).coerceIn(0f, 1f)
+            val szV    = (extra / normDistDb).coerceIn(0f, 1f)
             val sbV    = smoothstep(0f, 1f, szV)
-            val dBlend = smoothstep(0.05f, 0.95f, sbV + tide * 0.28f + dNormV * 0.09f)
+            val dBlend = smoothstep(0.05f, 0.95f, sbV + dNormV * 0.09f)
             val wG     = shallowColor[1] + dBlend * (deepColor[1] - shallowColor[1])
             Log.d(TAG, "║  %+5.0fm    %5.1fm  %.3f   %.3f   %.3f       %.3f".format(dtw, distM, szV, sbV, dBlend, wG))
         }
         Log.d(TAG, "╠$sep")
 
         // ── Tide comparison table: low tide vs high tide depthBlend ───────────────
-        Log.d(TAG, "║ [TIDE vs DEPTH  tide=0.2(간조) vs tide=0.9(만조)]")
+        Log.d(TAG, "║ [TIDE vs DEPTH  tide=0.2(간조, normDist=53m) vs tide=0.9(만조, normDist=28.5m)]")
         Log.d(TAG, "║  seaward | tide=0.2 | tide=0.9 | Δ depthBlend")
         for (extra2 in floatArrayOf(5f, 20f, 30f, 50f)) {
-            val distM2 = camToWL + extra2
-            val dNrm2  = (distM2 / 68f).coerceIn(0f, 1f)
-            val sz2    = (extra2 / 50f).coerceIn(0f, 1f)
-            val sb2    = smoothstep(0f, 1f, sz2)
-            val db02   = smoothstep(0.05f, 0.95f, sb2 + 0.2f * 0.28f + dNrm2 * 0.09f)
-            val db09   = smoothstep(0.05f, 0.95f, sb2 + 0.9f * 0.28f + dNrm2 * 0.09f)
+            val distM2    = camToWL + extra2
+            val dNrm2     = (distM2 / 68f).coerceIn(0f, 1f)
+            val nd02      = 60f + 0.2f * (25f - 60f)   // 53m
+            val nd09      = 60f + 0.9f * (25f - 60f)   // 28.5m
+            val sz02      = (extra2 / nd02).coerceIn(0f, 1f)
+            val sz09      = (extra2 / nd09).coerceIn(0f, 1f)
+            val db02      = smoothstep(0.05f, 0.95f, smoothstep(0f, 1f, sz02) + dNrm2 * 0.09f)
+            val db09      = smoothstep(0.05f, 0.95f, smoothstep(0f, 1f, sz09) + dNrm2 * 0.09f)
             Log.d(TAG, "║  %+5.0fm      %5.1f%%     %5.1f%%     %+.1f%%".format(
                 -extra2, db02 * 100f, db09 * 100f, (db09 - db02) * 100f))
         }
@@ -774,25 +778,28 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         // Shows how crest brightening and foam mix vary across dNorm 0.10–0.30
         // (roughly 7–20 m from camera, spanning the waterline zone).
         val sc2 = shallowColor
-        Log.d(TAG, "║ [NEAR-SHORE SCAN  crest×0.20 / foam×0.58×(1-crest×0.5) — crest+foam breakdown]")
+        Log.d(TAG, "║ [NEAR-SHORE SCAN  crest×0.20(MAX waveH!) / foam×0.50×(1-crest×0.8) — crest+foam breakdown]")
+        Log.d(TAG, "║  NOTE: crest=0.200 = worst-case max waveH=1; actual varies 0→0.200 with wave height.")
+        Log.d(TAG, "║        foam also uses shoreAtten=exp(-dtw²×0.45) → foam≈0 beyond ±2m from waterline.")
         Log.d(TAG, "║  dNorm | dist  | depBlend | waterG | +crest | after_dif | +foam | finalG | COMP_G")
         for (dn2 in floatArrayOf(0.10f, 0.15f, 0.20f, 0.25f, 0.30f)) {
             val distM2   = 68f * dn2
             val wZ2      = eyePos[2] - distM2
             val dtw2     = wZ2 - wzZ    // positive=inland, negative=seaward
-            val szV2     = (-dtw2 / 50f).coerceIn(0f, 1f)
+            val nd2      = 60f + tide * (25f - 60f)
+            val szV2     = (-dtw2 / nd2).coerceIn(0f, 1f)
             val sbV2     = smoothstep(0f, 1f, szV2)
-            val dBlend2  = smoothstep(0.05f, 0.95f, sbV2 + tide * 0.28f + dn2 * 0.09f)
+            val dBlend2  = smoothstep(0.05f, 0.95f, sbV2 + dn2 * 0.09f)
             val waterG   = sc2[1] + dBlend2 * (deepColor[1] - sc2[1])
-            // crest at maximum (waveH=+1)
+            // crest at maximum (waveH=+1) — scan always shows worst case
             val crest2   = 0.20f
             val wCrG2    = waterG * (1f - crest2) + (waterG * 1.26f + 0.04f) * crest2
             // diffuse (flat N, NdotL=Ly)
             val dFac2    = Ly.coerceAtLeast(0f) * 0.44f + 0.56f
             val colG2    = wCrG2 * dFac2 * (0.87f + 0.13f * 0.5f)  // waveDetail≈0.5
-            // foam (max, lacyMask=1)
+            // foam (max, lacyMask=1) — NEW: coeff 0.50, crest-attenuation 0.8
             val foamAmt2 = 1f * 1f * (0.16f + windS * 0.42f) * 1f  // waveMask=1,lacyMask=1
-            val foamMix2 = foamAmt2 * 0.58f * (1f - crest2 * 0.5f)
+            val foamMix2 = foamAmt2 * 0.50f * (1f - crest2 * 0.8f)
             val fG2      = colG2 + foamMix2 * (0.98f - colG2)
             // shoreAlpha at this distToWater
             val sAlpha2  = 1f - smoothstep(-0.5f, 3.0f, dtw2)
@@ -804,13 +811,15 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         val trailGrdStart = maxOf(1.0f, waveReach * 0.5f + 0.6f)
         Log.d(TAG, "║ [BEACH FOAM through OCEAN EDGE  beach_frag §4 × (1 - shoreAlpha)]")
         Log.d(TAG, "║  waveReach = %.2f m  (t1=%.3f t2=%.3f, no per-column noise)".format(waveReach, t1, t2))
-        Log.d(TAG, "║  shorelineMask = smoothstep(waveReach+1.2, 0.0, dtw)  ← peaks at dtw=0")
+        Log.d(TAG, "║  shorelineMask = max(smoothstep(2.5,0,dtw), smoothstep(1.5,0,|dtw-wR|)×0.75)  ← NEW fixed-width")
         Log.d(TAG, "║  trailGrdStart = max(1.0, wR×0.5+0.6) = %.3f m  (staggered after shorelineMask midpoint)".format(trailGrdStart))
         Log.d(TAG, "║  trailGuard    = smoothstep(%.3f, %.3f, dtw)".format(trailGrdStart, trailGrdStart + 2.0f))
         Log.d(TAG, "║  oceanAlpha    = 1 - smoothstep(-0.5, 3.0, dtw)  ← transparent 0→3 m inland")
         Log.d(TAG, "║  dtw  | shoreMask | trailGrd | effective | oceanAlpha | vis×0.38 (trail foam)")
         for (dtw in floatArrayOf(0f, 0.5f, 1.0f, 1.5f, 2.0f, 2.5f, 3.0f, 3.5f, 4.0f)) {
-            val foamMaskB   = smoothstep(waveReach + 1.2f, 0.0f, dtw)
+            val nearZone    = smoothstep(2.5f, 0.0f, dtw)
+            val tipZone     = smoothstep(1.5f, 0.0f, kotlin.math.abs(dtw - waveReach))
+            val foamMaskB   = maxOf(nearZone, tipZone * 0.75f)
             val trailGuard  = smoothstep(trailGrdStart, trailGrdStart + 2.0f, dtw)
             val effective   = foamMaskB * trailGuard
             val oceanAlpB   = 1f - smoothstep(-0.5f, 3.0f, dtw)
