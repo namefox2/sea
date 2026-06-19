@@ -38,8 +38,8 @@ float vnoise(vec2 p) {
 }
 
 void main() {
-    float wind = smoothstep(0.0, 1.0, u_WindAmp);
-    wind = wind * wind;
+    float windS = smoothstep(0.0, 1.0, u_WindAmp);   // [0..1] pre-square; used for foam
+    float wind  = windS * windS;                       // squared for wave perturbation
     float dist     = length(v_World.xz - u_CamPos.xz);
     float distNorm = clamp(dist / 68.0, 0.0, 1.0);
     float nearFactor = 1.0 - clamp(dist / 20.0, 0.0, 1.0);
@@ -205,7 +205,7 @@ void main() {
     float n2 = fract(sin(foamUV.x *  5.1  - foamUV.y * 11.3) * 31415.9265);
     float lacyN   = n1 * 0.6 + n2 * 0.4;
     float lacyMask = smoothstep(0.30, 0.70, lacyN);
-    float foam  = shoreBand * waveMask * (0.16 + wind * 0.60) * lacyMask;
+    float foam  = shoreBand * waveMask * (0.16 + windS * 0.42) * lacyMask;
     // Wave-aligned modulation: brightens foam at crest front (positive z-drift side)
     float alongWave = sin(foamUV.y * 0.2 + u_Time * 2.0);
     foam *= 0.75 + 0.25 * alongWave;

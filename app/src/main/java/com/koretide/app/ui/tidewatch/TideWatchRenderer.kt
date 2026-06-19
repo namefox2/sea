@@ -480,9 +480,12 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         // Beach runup water specular (flat N=(0,1,0))
         val wSpec_flat = Math.pow(NdotH.toDouble(), 90.0).toFloat() * 0.38f
 
-        // Foam — new smoothstep formula matching ocean_vert.glsl:
-        //   v_Foam = smoothstep(tideY + amp*0.45, tideY + amp*1.05, p.y)
-        val foamBase     = 0.16f + wind * 0.60f
+        // windS = smoothstep(wAmp) before squaring — gentler curve than wind²
+        // foamBase uses windS (not wind²) to prevent over-amplification at high wind.
+        // Old: 0.16 + wind² × 0.60 → foamBase up to 0.76 at wAmp=1.0
+        // New: 0.16 + windS  × 0.42 → foamBase capped at 0.58 at wAmp=1.0
+        val windS        = smoothstep(0f, 1f, wAmp)
+        val foamBase     = 0.16f + windS * 0.42f
         val vFoam_low    = smoothstep(tideY + amp * 0.45f, tideY + amp * 1.05f, tideY + amp * 0.55f)
         val vFoam_mid    = smoothstep(tideY + amp * 0.45f, tideY + amp * 1.05f, tideY + amp * 0.75f)
         val vFoam_max    = smoothstep(tideY + amp * 0.45f, tideY + amp * 1.05f, tideY + amp * 1.50f)
@@ -575,7 +578,17 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         Log.d(TAG, "║  SSS at crest           = %.4f × lightColor".format(sss_crest))
         Log.d(TAG, "║  beach wSpec (flat N)   = %.4f  → +%.3f to runup color".format(wSpec_flat, wSpec_flat*0.32f))
         Log.d(TAG, "╠$sep")
+        Log.d(TAG, "║ [FOAM WIND CURVE  foamBase = 0.16 + smoothstep(wAmp) × 0.42  (max 0.58)]")
+        Log.d(TAG, "║  wAmp  | windS  | foamBase | foam×0.58 (ocean mix coeff)")
+        for (wa in floatArrayOf(0.25f, 0.50f, 0.75f, 1.00f)) {
+            val ws = smoothstep(0f, 1f, wa)
+            val fb = 0.16f + ws * 0.42f
+            val mark = if (wa == wAmp) "  ← current" else ""
+            Log.d(TAG, "║  %.2f   | %.3f  | %.3f    | %.3f%s".format(wa, ws, fb, fb * 0.58f, mark))
+        }
+        Log.d(TAG, "╠$sep")
         Log.d(TAG, "║ [FOAM at waterlineZ  (onset tideY+amp×0.45 → full tideY+amp×1.05)]")
+        Log.d(TAG, "║  windS=%.3f  foamBase=%.3f  (old formula would be %.3f)".format(windS, foamBase, 0.16f + wind * 0.60f))
         Log.d(TAG, "║  v_Foam  low=%.3f mid=%.3f max=%.3f  waveMask(mid/max)=%.3f/%.3f  foam(max)=%.3f".format(
             vFoam_low, vFoam_mid, vFoam_max, waveMask_mid, waveMask_max, foam_max))
         Log.d(TAG, "╠$sep")
