@@ -61,26 +61,18 @@ void main() {
     // ── 1. Depth-based water colour — smooth, wave-linked, noise-perturbed ────
     //
     // Single depth driver: shoreZ = distance seaward from waterline, normalised
-    // over 60 m (was 40 m with a cross-blend against camera distance).  The old
-    // mix(distFactor, shoreBlend, shoreProx²) crossover caused a visible band at
-    // ~5-15 m seaward: shoreProx² dropped fast while distFactor (inflated by
-    // tideBoost=0.38) was already high, snapping depthBlend from ~0.2 to ~0.7
-    // over just 5 m.  Removing the crossover eliminates that band entirely.
-    //
-    // 100 m range (was 40 m) → 2.5× wider transition so shallow→deep is a long
-    // gradual gradient rather than a band that snaps within a few metres.
-    // distBias: mild camera-distance push so the horizon stays slightly deeper even
-    // at low tide.  tideBoost reduced to 0.15 so tide shifts the mid-tone smoothly
-    // without hard-clipping at the ends.
-    float shoreZ = clamp((-v_DistToWater) / 100.0, 0.0, 1.0);
+    // over 50 m.  tideBoost = u_Tide × 0.28 shifts the whole curve upward so
+    // high-tide water appears deeper at the same distance (tide=0 → 5 m ≈ 0%,
+    // tide=0.9 → 5 m ≈ 18%).  distBias adds a gentle horizon push.
+    float shoreZ = clamp((-v_DistToWater) / 50.0, 0.0, 1.0);
 
     float waveDepthMod = waveH * 0.10;
     float boundNoise = sin(v_World.x * 0.07 + u_Time * 0.03) * 0.08
                      + sin(v_World.x * 0.19 - u_Time * 0.02 + v_World.z * 0.04) * 0.05;
     float shoreBlend = smoothstep(0.0, 1.0, shoreZ + waveDepthMod + boundNoise);
 
-    float tideBoost  = u_Tide * 0.15;    // gentle: tide shifts midpoint, not saturation
-    float distBias   = distNorm * 0.08;  // subtle horizon push toward deep
+    float tideBoost  = u_Tide * 0.28;   // tide shifts the mid-tone point
+    float distBias   = distNorm * 0.09; // horizon push toward deep
 
     // Wide range [0.05 → 0.95]: S-curve spans the full scene without plateauing.
     float depthBlend = smoothstep(0.05, 0.95, shoreBlend + tideBoost + distBias);
@@ -242,18 +234,20 @@ void main() {
                                          shoreNoise + 3.0 + waveEdgeShift, distToWater);
 
     // ── 8. Sky reflection + noisy horizon seam ───────────────────────────────
-    // Grazing-angle Fresnel: far water reflects sky (physically correct).
-    // Reduced mix ratio 0.38→0.28 and removed ×1.05 multiplier:
-    //   - ×1.05 could push B>1.0 (horizonColor.b=0.990 → 1.040) causing white fringe.
-    //   - 0.28 (-26%) reduces the bright sky band near the horizon.
-    float skyReflect = smoothstep(0.58, 0.92, distNorm);
-    col = mix(col, u_HorizonColor, skyReflect * (1.0 - foam) * 0.28);
+    // Grazing-angle Fresnel: far water reflects sky.
+    // Widened smoothstep 0.58→0.92 (width 0.34) → 0.35→0.95 (width 0.60) for a
+    // gradual tint instead of a snapping band.  Mix ratio cut 0.28→0.14 to keep
+    // Δlum_sky ≤ 0.07 (was +0.131 at dNorm=0.97).
+    float skyReflect = smoothstep(0.35, 0.95, distNorm);
+    col = mix(col, u_HorizonColor, skyReflect * (1.0 - foam) * 0.14);
 
     // Sinusoidal wobble breaks the perfectly-straight horizon line.
+    // Gate seam by (1 - skyReflect×0.8) so it doesn't double-brighten on top
+    // of skyReflect where both are active near the horizon (dNorm > 0.90).
     float horizNoise = sin(v_World.x * 0.09 + u_Time * 0.012) * 0.022
                      + sin(v_World.x * 0.25 - u_Time * 0.007) * 0.011;
     float seam = smoothstep(0.90, 1.0, distNorm + horizNoise) * (1.0 - corrMask * 0.6);
-    col = mix(col, u_HorizonColor * 0.85, seam * 0.55);
+    col = mix(col, u_HorizonColor * 0.85, seam * (1.0 - skyReflect * 0.8) * 0.55);
 
     gl_FragColor = vec4(col, shoreAlpha);
 }
