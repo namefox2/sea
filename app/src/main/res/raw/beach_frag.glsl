@@ -250,10 +250,16 @@ void main() {
     float trailFade = smoothstep(waveReach * 0.65 + 0.4, 0.0, swashDist)
                     * smoothstep(1.0, 3.5, distToWater);
 
+    // Curl base UV: lateral oscillation + slow shoreward drift gives rolling feel
+    float curlT2 = u_Time * 0.65;
+    vec2  curlUV = v_World.xz + vec2(
+        sin(curlT2 * 1.1 + v_World.z * 0.55) * 0.35,
+        -curlT2 * 0.16
+    );
     // Lacy texture: coarse → cluster structure, fine → bubble holes
-    float fA = bN(v_World.xz * 0.45 + vec2( u_Time * 0.04, -u_Time * 0.03));
-    float fB = bN(v_World.xz * 1.50 - vec2( u_Time * 0.09,  u_Time * 0.06));
-    float fC = bN(v_World.xz * 3.80 + vec2( u_Time * 0.19, -u_Time * 0.12));
+    float fA = bN(curlUV * 0.45 + vec2( u_Time * 0.04, -u_Time * 0.03));
+    float fB = bN(curlUV * 1.50 - vec2( u_Time * 0.09,  u_Time * 0.06));
+    float fC = bN(curlUV * 3.80 + vec2( u_Time * 0.19, -u_Time * 0.12));
     float foamNoise = fA * 0.45 + fB * 0.35 + fC * 0.20;
     float thresh    = 0.38 - u_WindAmp * 0.15;    // windier → more foam area
     float laceMask  = smoothstep(thresh, thresh + 0.22, foamNoise);

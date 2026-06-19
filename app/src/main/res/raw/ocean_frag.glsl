@@ -194,13 +194,20 @@ void main() {
     // (reference shows wide turbulent foam sheet near the break point).
     float shoreBand = exp(-abs(v_DistToWater) * 0.35);
     float waveMask  = smoothstep(0.42, 0.85, v_Foam);
-    // Lacy noise to break foam into patches (not solid white sheet)
-    float n1 = fract(sin(v_World.x * 12.3  + v_World.z * 7.7)  * 43758.5453);
-    float n2 = fract(sin(v_World.x *  5.1  - v_World.z * 11.3) * 31415.9265);
-    float lacyN  = n1 * 0.6 + n2 * 0.4;
-    float lacyMask = smoothstep(0.30, 0.70, lacyN);       // punches holes for realism
+    // Curl-animated foam UV: lateral sin() oscillation simulates the rolling/curling
+    // motion as a wave breaks; slow -z drift = foam advancing shoreward with the wave.
+    float curlT  = u_Time * 0.7;
+    vec2  foamUV = v_World.xz + vec2(
+        sin(curlT * 1.1 + v_World.z * 0.55) * 0.40,   // lateral curl
+        -curlT * 0.18                                    // shoreward drift
+    );
+    float n1 = fract(sin(foamUV.x * 12.3  + foamUV.y * 7.7)  * 43758.5453);
+    float n2 = fract(sin(foamUV.x *  5.1  - foamUV.y * 11.3) * 31415.9265);
+    float lacyN   = n1 * 0.6 + n2 * 0.4;
+    float lacyMask = smoothstep(0.30, 0.70, lacyN);
     float foam  = shoreBand * waveMask * (0.16 + wind * 0.60) * lacyMask;
-    float alongWave = sin(v_World.x * 0.2 + u_Time * 2.0);
+    // Wave-aligned modulation: brightens foam at crest front (positive z-drift side)
+    float alongWave = sin(foamUV.y * 0.2 + u_Time * 2.0);
     foam *= 0.75 + 0.25 * alongWave;
 
     col = mix(col, vec3(0.96, 0.98, 1.00), foam * 0.58);
