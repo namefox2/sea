@@ -64,7 +64,7 @@ void main() {
     // Scaling the range (not just offsetting) means the ENTIRE depth gradient
     // compresses toward shore at high tide — deep colour reaches closer AND
     // shallow zone narrows, matching real physics (high tide = deeper everywhere).
-    float normDist = mix(60.0, 25.0, u_Tide);
+    float normDist = mix(42.0, 17.0, u_Tide);
     float shoreZ   = clamp((-v_DistToWater) / normDist, 0.0, 1.0);
 
     float waveDepthMod = waveH * 0.10;
