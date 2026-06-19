@@ -236,7 +236,7 @@ void main() {
     // trough → more transparent (beach shows between waves).
     float waveEdgeShift = waveH * 2.5;
     float shoreAlpha = 1.0 - smoothstep(shoreNoise - 0.5 + waveEdgeShift,
-                                         shoreNoise + 5.0 + waveEdgeShift, distToWater);
+                                         shoreNoise + 7.0 + waveEdgeShift, distToWater);
 
     // ── 8. Sky reflection + noisy horizon seam ───────────────────────────────
     // Grazing-angle Fresnel: far water reflects sky.

@@ -134,7 +134,7 @@ void main() {
     // Vivid turquoise tint matching reference photo shallow water (#00CED1 area)
     vec3 waterTint = vec3(0.28, 0.82, 0.76);
     float shoreBlend = smoothstep(5.0, -0.5, distToWater);
-    baseColor = mix(baseColor, waterTint * 0.85, shoreBlend * 0.18);
+    baseColor = mix(baseColor, waterTint * 0.85, shoreBlend * 0.28);
 
     // ── Caustics ──────────────────────────────────────────────────────────────
     float caust = sin(v_World.x * 3.8 + u_Time * 1.4) * sin(v_World.z * 4.3 - u_Time * 1.1);
