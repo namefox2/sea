@@ -713,16 +713,19 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         Log.d(TAG, "╠$sep")
         Log.d(TAG, "║ [BEACH FOAM through OCEAN EDGE  beach_frag §4 × (1 - shoreAlpha)]")
         Log.d(TAG, "║  waveReach = %.2f m  (t1=%.3f t2=%.3f, no per-column noise)".format(waveReach, t1, t2))
-        Log.d(TAG, "║  shorelineMask = smoothstep(waveReach+1.2, -1.0, distToWater)  — peaks near waterline")
-        Log.d(TAG, "║  oceanAlpha    = 1 - smoothstep(-0.5, 3.0, distToWater)        — transparent 0→3 m inland")
-        Log.d(TAG, "║  dtw(m) | beachFoamMask | oceanAlpha | visible=(mask×(1-alpha))")
+        Log.d(TAG, "║  shorelineMask = smoothstep(waveReach+1.2, 0.0, dtw)  ← peaks at dtw=0 (waterline)")
+        Log.d(TAG, "║  trailGuard    = smoothstep(1.0, 3.5, dtw)             ← no trail below 1 m")
+        Log.d(TAG, "║  oceanAlpha    = 1 - smoothstep(-0.5, 3.0, dtw)        ← transparent 0→3 m inland")
+        Log.d(TAG, "║  dtw  | shoreMask | trailGrd | effective | oceanAlpha | vis×0.38 (trail foam)")
         for (dtw in floatArrayOf(0f, 0.5f, 1.0f, 1.5f, 2.0f, 2.5f, 3.0f)) {
-            val foamMaskB  = smoothstep(waveReach + 1.2f, -1.0f, dtw)
-            val oceanAlpB  = 1f - smoothstep(-0.5f, 3.0f, dtw)
-            val visible    = foamMaskB * (1f - oceanAlpB)
-            val flag = if (visible > 0.15f) "  ← WHITE BAND" else ""
-            Log.d(TAG, "║    %+.1f m      %.3f         %.3f        %.3f%s".format(
-                dtw, foamMaskB, oceanAlpB, visible, flag))
+            val foamMaskB   = smoothstep(waveReach + 1.2f, 0.0f, dtw)   // new edge1=0
+            val trailGuard  = smoothstep(1.0f, 3.5f, dtw)
+            val effective   = foamMaskB * trailGuard                     // actual trail limit
+            val oceanAlpB   = 1f - smoothstep(-0.5f, 3.0f, dtw)
+            val visTrail    = effective * (1f - oceanAlpB) * 0.38f       // foamTrail coeff × visible
+            val flag = if (visTrail > 0.08f) "  ← high" else ""
+            Log.d(TAG, "║  %+.1f m   %.3f      %.3f      %.3f       %.3f       %.3f%s".format(
+                dtw, foamMaskB, trailGuard, effective, oceanAlpB, visTrail, flag))
         }
         Log.d(TAG, "╚══════════════════════════════════════")
     }

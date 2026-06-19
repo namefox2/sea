@@ -244,7 +244,11 @@ void main() {
     float tipBand   = smoothstep(2.0, 0.0, abs(distToWave)) * (0.5 + 0.5 * reachNorm);
 
     // Trail: foam persists 0..8 m behind wave tip (reference shows extensive coverage)
-    float trailFade = smoothstep(waveReach * 0.65 + 0.4, 0.0, swashDist) * step(0.0, distToWater);
+    // Guard: zero trail foam below 1 m inland (where ocean is still ≥60% opaque) so
+    // dissolved foam can't bleed through the transparent ocean edge and create a white
+    // band.  tipBand in foamFront is unaffected — wave-tip foam stays fully visible.
+    float trailFade = smoothstep(waveReach * 0.65 + 0.4, 0.0, swashDist)
+                    * smoothstep(1.0, 3.5, distToWater);
 
     // Lacy texture: coarse → cluster structure, fine → bubble holes
     float fA = bN(v_World.xz * 0.45 + vec2( u_Time * 0.04, -u_Time * 0.03));
@@ -260,7 +264,10 @@ void main() {
     float bubbles = smoothstep(0.60, 0.84, bA * 0.55 + bB * 0.45) * trailFade * 0.60;
 
     // Allow foam up to 10 m past the waterline so the wave tip is always visible.
-    float shorelineMask = smoothstep(waveReach + 1.2, -1.0, distToWater);
+    // edge1 = 0.0 (was -1.0): foam now peaks at the waterline (distToWater=0) and
+    // decreases inland, so shorelineMask × (1-oceanAlpha) is highest at dtw=0 and
+    // falls off — eliminating the bell-curve peak that appeared at dtw≈1m.
+    float shorelineMask = smoothstep(waveReach + 1.2, 0.0, distToWater);
     float beachGuard = smoothstep(-0.5, 0.4, distToWater);
     float foamFront  = tipBand   * laceMask * beachGuard;
     float foamTrail  = trailFade * laceMask * 0.38 * beachGuard;
