@@ -243,12 +243,15 @@ void main() {
     // Wider tip band (2 m vs 0.9 m): matches the broad white front in reference
     float tipBand   = smoothstep(2.0, 0.0, abs(distToWave)) * (0.5 + 0.5 * reachNorm);
 
-    // Trail: foam persists 0..8 m behind wave tip (reference shows extensive coverage)
-    // Guard: zero trail foam below 1 m inland (where ocean is still ≥60% opaque) so
-    // dissolved foam can't bleed through the transparent ocean edge and create a white
-    // band.  tipBand in foamFront is unaffected — wave-tip foam stays fully visible.
+    // Trail: foam persists behind wave tip.
+    // Guard: trailGrd starts rising at (waveReach×0.5+0.6), which is the approximate
+    // midpoint of shorelineMask's fall-off curve — so the two transition zones are
+    // staggered and never overlap.  When shorelineMask is still high (dtw small),
+    // trailGrd is zero; when trailGrd finally rises, shorelineMask has already fallen.
+    // This eliminates the bell-curve product peak seen at dtw≈2.5-3.0m for large waveReach.
+    float trailGrdStart = max(1.0, waveReach * 0.5 + 0.6);
     float trailFade = smoothstep(waveReach * 0.65 + 0.4, 0.0, swashDist)
-                    * smoothstep(1.0, 3.5, distToWater);
+                    * smoothstep(trailGrdStart, trailGrdStart + 2.0, distToWater);
 
     // Curl base UV: lateral oscillation + slow shoreward drift gives rolling feel
     float curlT2 = u_Time * 0.65;

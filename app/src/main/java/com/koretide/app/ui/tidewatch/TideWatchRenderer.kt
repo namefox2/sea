@@ -711,18 +711,20 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         Log.d(TAG, "║  NOTE: yunseul col above = in sun-corridor centre (corrMask=1).")
         Log.d(TAG, "║        Out-of-corridor actual corrMask shown; corrBoost(actual)=corrSharp²×range.")
         Log.d(TAG, "╠$sep")
+        val trailGrdStart = maxOf(1.0f, waveReach * 0.5f + 0.6f)
         Log.d(TAG, "║ [BEACH FOAM through OCEAN EDGE  beach_frag §4 × (1 - shoreAlpha)]")
         Log.d(TAG, "║  waveReach = %.2f m  (t1=%.3f t2=%.3f, no per-column noise)".format(waveReach, t1, t2))
-        Log.d(TAG, "║  shorelineMask = smoothstep(waveReach+1.2, 0.0, dtw)  ← peaks at dtw=0 (waterline)")
-        Log.d(TAG, "║  trailGuard    = smoothstep(1.0, 3.5, dtw)             ← no trail below 1 m")
-        Log.d(TAG, "║  oceanAlpha    = 1 - smoothstep(-0.5, 3.0, dtw)        ← transparent 0→3 m inland")
+        Log.d(TAG, "║  shorelineMask = smoothstep(waveReach+1.2, 0.0, dtw)  ← peaks at dtw=0")
+        Log.d(TAG, "║  trailGrdStart = max(1.0, wR×0.5+0.6) = %.3f m  (staggered after shorelineMask midpoint)".format(trailGrdStart))
+        Log.d(TAG, "║  trailGuard    = smoothstep(%.3f, %.3f, dtw)".format(trailGrdStart, trailGrdStart + 2.0f))
+        Log.d(TAG, "║  oceanAlpha    = 1 - smoothstep(-0.5, 3.0, dtw)  ← transparent 0→3 m inland")
         Log.d(TAG, "║  dtw  | shoreMask | trailGrd | effective | oceanAlpha | vis×0.38 (trail foam)")
-        for (dtw in floatArrayOf(0f, 0.5f, 1.0f, 1.5f, 2.0f, 2.5f, 3.0f)) {
-            val foamMaskB   = smoothstep(waveReach + 1.2f, 0.0f, dtw)   // new edge1=0
-            val trailGuard  = smoothstep(1.0f, 3.5f, dtw)
-            val effective   = foamMaskB * trailGuard                     // actual trail limit
+        for (dtw in floatArrayOf(0f, 0.5f, 1.0f, 1.5f, 2.0f, 2.5f, 3.0f, 3.5f, 4.0f)) {
+            val foamMaskB   = smoothstep(waveReach + 1.2f, 0.0f, dtw)
+            val trailGuard  = smoothstep(trailGrdStart, trailGrdStart + 2.0f, dtw)
+            val effective   = foamMaskB * trailGuard
             val oceanAlpB   = 1f - smoothstep(-0.5f, 3.0f, dtw)
-            val visTrail    = effective * (1f - oceanAlpB) * 0.38f       // foamTrail coeff × visible
+            val visTrail    = effective * (1f - oceanAlpB) * 0.38f
             val flag = if (visTrail > 0.08f) "  ← high" else ""
             Log.d(TAG, "║  %+.1f m   %.3f      %.3f      %.3f       %.3f       %.3f%s".format(
                 dtw, foamMaskB, trailGuard, effective, oceanAlpB, visTrail, flag))
