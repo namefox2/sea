@@ -520,8 +520,8 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         // troughDepth=0 at distToWater=0 → no trough effect
         val dFac = NdotL * 0.38f + 0.62f
         val cA   = floatArrayOf(wCr[0] * dFac, wCr[1] * dFac, wCr[2] * dFac)
-        // foam: attenuated when crest is high (1-crestFac*0.5) to avoid double-whitening
-        val fM   = foam_at_wl * 0.58f * (1f - crestFac * 0.5f)
+        // foam: coeff 0.50, crest attenuation 0.8 (matches shader line 210)
+        val fM   = foam_at_wl * 0.50f * (1f - crestFac * 0.8f)
         val cB   = floatArrayOf(cA[0] + fM*(0.96f-cA[0]), cA[1] + fM*(0.98f-cA[1]), cA[2] + fM*(1f-cA[2]))
         // Fresnel (deepZone=0 at waterline → yunseul=0; skyReflect≈0 at this dist):
         val fTgt = floatArrayOf(
@@ -580,12 +580,14 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         Log.d(TAG, "║  beach wSpec (flat N)   = %.4f  → +%.3f to runup color".format(wSpec_flat, wSpec_flat*0.32f))
         Log.d(TAG, "╠$sep")
         Log.d(TAG, "║ [FOAM WIND CURVE  foamBase = 0.16 + smoothstep(wAmp) × 0.42  (max 0.58)]")
-        Log.d(TAG, "║  wAmp  | windS  | foamBase | foam×0.58 (ocean mix coeff)")
+        Log.d(TAG, "║  셰이더 최종 mix = foam × 0.50 × (1-crestFac×0.8)  [crestFac=0→0.50, crestFac=0.20→0.42 of foam]")
+        Log.d(TAG, "║  wAmp  | windS  | foamBase | mix(crest=0) | mix(crest=max)")
         for (wa in floatArrayOf(0.25f, 0.50f, 0.75f, 1.00f)) {
             val ws = smoothstep(0f, 1f, wa)
             val fb = 0.16f + ws * 0.42f
             val mark = if (wa == wAmp) "  ← current" else ""
-            Log.d(TAG, "║  %.2f   | %.3f  | %.3f    | %.3f%s".format(wa, ws, fb, fb * 0.58f, mark))
+            Log.d(TAG, "║  %.2f   | %.3f  | %.3f    | %.3f         | %.3f%s".format(
+                wa, ws, fb, fb * 0.50f, fb * 0.50f * (1f - 0.20f * 0.8f), mark))
         }
         Log.d(TAG, "╠$sep")
         Log.d(TAG, "║ [FOAM at waterlineZ  (onset tideY+amp×0.45 → full tideY+amp×1.05)]")
