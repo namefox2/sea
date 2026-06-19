@@ -132,7 +132,7 @@ void main() {
     // Cross-correlate two normal-map octaves to produce a coherent ripple pattern
     // visible as fine wave surface texture before the major lighting effects apply.
     float waveDetail = (nm1.x * nm3.x + nm1.z * nm3.z) * 0.5 + 0.5;  // 0..1
-    col *= 0.87 + 0.13 * waveDetail;
+    col *= 0.80 + 0.20 * waveDetail;
 
     // ── 4. SSS — backlit crests glow cyan-green ──────────────────────────────
     float sss = pow(max(dot(L, -V), 0.0), 5.0) * max(waveH, 0.0) * 0.9;
@@ -165,6 +165,10 @@ void main() {
     // Half-vector for Blinn-Phong specular.
     vec3  H = normalize(L + V);
 
+    // Near-shore surface ripple highlights — wave-normal variation adds visible texture
+    float nearSheen = pow(max(dot(N, H), 0.0), 14.0) * max(0.0, 0.8 - distNorm * 2.5);
+    col += u_LightColor * nearSheen * 0.38;
+
     // Near glints: large, individual — broad lobe from wave macro-normal N.
     float sheenExp = mix(20.0, 9.0, u_Roughness);
     float sheen    = pow(max(dot(N, H), 0.0), sheenExp);
@@ -187,7 +191,7 @@ void main() {
     // Shore band: decays away from waterline but covers a wider strip than before
     // (reference shows wide turbulent foam sheet near the break point).
     float shoreBand = exp(-abs(v_DistToWater) * 0.35);
-    float waveMask  = smoothstep(0.42, 0.85, v_Foam);
+    float waveMask  = smoothstep(0.25, 0.85, v_Foam);
     // Curl-animated foam UV: lateral sin() oscillation simulates the rolling/curling
     // motion as a wave breaks; slow -z drift = foam advancing shoreward with the wave.
     float curlT  = u_Time * 0.7;
@@ -232,7 +236,7 @@ void main() {
     // trough → more transparent (beach shows between waves).
     float waveEdgeShift = waveH * 2.5;
     float shoreAlpha = 1.0 - smoothstep(shoreNoise - 0.5 + waveEdgeShift,
-                                         shoreNoise + 3.0 + waveEdgeShift, distToWater);
+                                         shoreNoise + 5.0 + waveEdgeShift, distToWater);
 
     // ── 8. Sky reflection + noisy horizon seam ───────────────────────────────
     // Grazing-angle Fresnel: far water reflects sky.

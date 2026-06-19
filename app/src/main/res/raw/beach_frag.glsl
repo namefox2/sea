@@ -133,8 +133,8 @@ void main() {
     }
     // Vivid turquoise tint matching reference photo shallow water (#00CED1 area)
     vec3 waterTint = vec3(0.28, 0.82, 0.76);
-    float shoreBlend = smoothstep(0.5, -0.5, distToWater);
-    baseColor = mix(baseColor, waterTint, shoreBlend * 0.08);
+    float shoreBlend = smoothstep(5.0, -0.5, distToWater);
+    baseColor = mix(baseColor, waterTint * 0.85, shoreBlend * 0.18);
 
     // ── Caustics ──────────────────────────────────────────────────────────────
     float caust = sin(v_World.x * 3.8 + u_Time * 1.4) * sin(v_World.z * 4.3 - u_Time * 1.1);
@@ -180,8 +180,8 @@ void main() {
     // Per-column reach noise breaks up the straight wave front
     float reachNoise = bN(vec2(wx * 0.7, u_Time * 0.05)) * 0.55
                      + bN(vec2(wx * 0.25 + 3.0, u_Time * 0.03)) * 0.45;
-    float waveReach = max(t1 * (1.8 + u_WindAmp * 3.2) + t2 * (0.7 + u_WindAmp * 1.5),
-                          minReach) * (0.65 + reachNoise * 0.70);
+    float waveReach = max(t1 * (1.2 + u_WindAmp * 2.0) + t2 * (0.5 + u_WindAmp * 1.0),
+                          minReach) * (0.65 + reachNoise * 0.55);
 
     // distToWave: <0 = wave is here (wet), >0 = wave tip hasn't arrived yet
     float distToWave       = distToWater - waveReach;
@@ -228,7 +228,7 @@ void main() {
 
     // ── 3. Wet sand: dark reflective strip behind swash ───────────────────────
     // Reference shows very dark wet sand with sky reflection — make it prominent.
-    float wetSandFactor = smoothstep(3.5, 0.0, max(distToWave - 2.5, 0.0)) * step(0.0, distToWater);
+    float wetSandFactor = smoothstep(5.0, 0.0, max(distToWave - 1.0, 0.0)) * step(0.0, distToWater);
     if (wetSandFactor > 0.001) {
         baseColor = mix(baseColor, wetSand * 0.72, wetSandFactor * 0.52);
         // Wet sand sky reflection + sun glint through ripple normal
