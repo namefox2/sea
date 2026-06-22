@@ -243,44 +243,31 @@ void main() {
     float foamGrain = bubShape;
 
     // Shore foam: two wave trains at slightly different wavelengths.
-    // Their product peaks at constructive interference (both cresting together),
-    // creating alternating foam bands / ocean gaps marching toward shore.
-    // beat spatial period ≈ 20m, beat time period ≈ 37s → foam zones drift slowly.
+    // Used as a MODULATOR (not a gate): foam is always present near shore
+    // in bubble cells; wave crests boost it, troughs dim it.
     float swash1 = sin(-v_DistToWater * 1.26 - u_Time * 0.72) * 0.5 + 0.5;
     float swash2 = sin(-v_DistToWater * 0.94 - u_Time * 0.55) * 0.5 + 0.5;
-    float swashCrest = smoothstep(0.38, 0.72, swash1 * swash2);
-    // Foam lingers ~5 s after the wave passes then gradually dissolves.
-    // Slow noise drift models foam lifetime: patches build up, then fade away.
+    float swashCrest = smoothstep(0.25, 0.65, swash1 * swash2);
+    float swashMod   = 0.40 + 0.60 * swashCrest; // [0.40 .. 1.00] — never zero
+    // Foam lifecycle noise: patches build up (~2.5s) then slowly dissolve.
+    // Also a modulator — dimmer when fading, brighter when fresh.
     float foamLifeN = vnoise(foamUV * 0.30 + u_Time * vec2(0.06, 0.04)) * 0.60
                     + vnoise(foamUV * 0.80 - u_Time * vec2(0.03, 0.07)) * 0.40;
-    float foamLife  = smoothstep(0.30, 0.70, foamLifeN);
-    // Density falls exponentially with distance from waterline — dense at shore,
-    // sparse further out. Cut off past 1.5m inland (ocean alpha takes over there).
+    float foamMod   = 0.40 + 0.60 * smoothstep(0.25, 0.72, foamLifeN); // [0.40 .. 1.00]
+    // Density falls exponentially from waterline; cut off past 1.5m inland.
     float nearShore = exp(min(v_DistToWater, 0.0) * 0.18) * step(v_DistToWater, 1.5);
-    // Clumping breaks each swash line into natural foam patches.
-    float clumpN = vnoise(foamUV * 0.6 + u_Time * vec2(0.05, 0.03)) * 0.6
-                 + vnoise(foamUV * 1.5 - u_Time * vec2(0.03, 0.06)) * 0.4;
-    float clump  = smoothstep(0.30, 0.70, clumpN);
-    float shoreFoam = swashCrest * nearShore * foamLife
-                    * (0.28 + windS * 0.55) * foamGrain * clump;
-
-    // Permanent swash-line suds: always present where waves lap the shore,
-    // independent of the interference timing so the waterline is never bare.
-    // Gaussian peaks at dtw=0, fades ±2m. Base (0.18) gives frothy film even
-    // between bubble dots; foamGrain adds the dot texture on top.
-    float wlGauss = exp(-v_DistToWater * v_DistToWater * 0.55);
-    float wlFoam  = wlGauss * (foamGrain * 0.65 + 0.18) * (0.60 + windS * 0.45);
+    float shoreFoam = nearShore * swashMod * foamMod * (0.35 + windS * 0.55) * foamGrain;
 
     // Open-ocean whitecaps: v_Foam is high far from shore where waves aren't damped.
     float whitecapMask = smoothstep(0.60, 0.90, v_Foam);
     float whitecap     = whitecapMask * foamGrain * (windS * windS * 0.30);
     whitecap *= 1.0 - exp(-abs(v_DistToWater) * 0.40) * 0.90; // suppress near shore
 
-    float foam = clamp(shoreFoam + wlFoam + whitecap, 0.0, 1.0);
+    float foam = clamp(shoreFoam + whitecap, 0.0, 1.0);
 
     // Tinted foam: blend toward blue-white rather than pure white so foam
     // sits naturally in the water without looking like a floating overlay.
-    float foamAlpha = smoothstep(0.05, 0.30, foam);
+    float foamAlpha = smoothstep(0.03, 0.25, foam);
     vec3  foamColor = mix(col * 1.12, vec3(0.94, 0.97, 1.00), 0.62);
     col = mix(col, foamColor, foamAlpha);
 
