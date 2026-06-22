@@ -455,21 +455,21 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
             deepColor[0], deepColor[1], deepColor[2], lc[0], lc[1], lc[2]))
         Log.d(TAG, "╠$sep")
         // ── Waterline zone scan ───────────────────────────────────────────────────
-        // ocean = shallowColor pulled toward (0.21,0.71,0.61) by chromaBridge (ss(-8,1)×0.65)
+        // ocean = shallowColor pulled toward sandDry by chromaBridge (ss(-4,1)×0.90)
         // beach = sandDry pulled toward waterTint×0.85 by ss(5,-0.5)×0.28
         // comp  = beach×(1-shoreAlpha) + ocean×shoreAlpha   shoreAlpha=1-ss(-0.5,7.0,dtw)
         Log.d(TAG, "║ [WATERLINE ZONE SCAN  dtw -4→8m]")
-        Log.d(TAG, "║  shoreAlpha=1-ss(-0.5,7,dtw)  beach:waterTint ss(5,-0.5)×0.28  ocean:bridge ss(-8,1)×0.65→(0.21,0.71,0.61)")
+        Log.d(TAG, "║  shoreAlpha=1-ss(-0.5,7,dtw)  beach:waterTint ss(5,-0.5)×0.28  ocean:bridge ss(-4,1)×0.90→sandDry(%.2f,%.2f,%.2f)".format(sandDry[0],sandDry[1],sandDry[2]))
         Log.d(TAG, "║  dtw   | α     | br    | ocean(R,G,B)        | comp(R,G,B)")
         val waterTintR = 0.28f; val waterTintG = 0.82f; val waterTintB = 0.76f
-        val brC = floatArrayOf(0.21f, 0.71f, 0.61f)
+        val brC = floatArrayOf(sandDry[0], sandDry[1], sandDry[2])
         for (dtwZ in floatArrayOf(-4f, -2f, 0f, 0.5f, 1.0f, 1.5f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f)) {
             val sAlpha = 1f - smoothstep(-0.5f, 7.0f, dtwZ)
             val tintStr = smoothstep(5.0f, -0.5f, dtwZ) * 0.28f
             val bR = sandDry[0] + tintStr * (waterTintR * 0.85f - sandDry[0])
             val bG = sandDry[1] + tintStr * (waterTintG * 0.85f - sandDry[1])
             val bB = sandDry[2] + tintStr * (waterTintB * 0.85f - sandDry[2])
-            val brStr = smoothstep(-8f, 1f, dtwZ) * 0.65f
+            val brStr = smoothstep(-4f, 1f, dtwZ) * 0.90f
             val oR = sc[0] + brStr * (brC[0] - sc[0])
             val oG = sc[1] + brStr * (brC[1] - sc[1])
             val oB = sc[2] + brStr * (brC[2] - sc[2])
