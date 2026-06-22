@@ -236,16 +236,19 @@ void main() {
         -curlT * 0.18
     );
 
-    // Bubble grain: 3 Voronoi octaves → sharp dots, max-blended.
-    float bub1 = foamCells(foamUV * 9.0);
-    float bub2 = foamCells(foamUV * 16.0 + vec2(2.3, 1.7));
-    float bub3 = foamCells(foamUV * 26.0 + vec2(5.1, 3.9));
+    // Distance-based bubble scale: large dots near camera, finer texture far away.
+    // Near (dist≈0): bubScale≈3.0 → cells ≈33cm → bubbles ≈10cm radius (clearly visible)
+    // Far (dist≈40m): bubScale≈9.0 → cells ≈11cm → fine foam texture at horizon
+    float bubScale  = mix(3.0, 9.0, clamp(dist / 40.0, 0.0, 1.0));
+    float bub1 = foamCells(foamUV * bubScale);
+    float bub2 = foamCells(foamUV * (bubScale * 1.8) + vec2(2.3, 1.7));
+    float bub3 = foamCells(foamUV * (bubScale * 2.9) + vec2(5.1, 3.9));
     float densN = vnoise(foamUV * 1.8 + u_Time * vec2(0.08, 0.05)) * 0.55
                 + vnoise(foamUV * 4.5 - u_Time * vec2(0.04, 0.09)) * 0.45;
-    float density   = smoothstep(0.15, 0.55, densN);
+    float density   = smoothstep(0.10, 0.50, densN);
     float bubbleTex = max(bub3, max(bub2 * 0.88, bub1 * 0.74)) * density;
-    float bubShape  = smoothstep(0.18, 0.50, bubbleTex);
-    float foamGrain = bubShape * bubShape;
+    float bubShape  = smoothstep(0.08, 0.45, bubbleTex);
+    float foamGrain = bubShape; // linear, not squared — keeps dots opaque rather than ghostly
 
     // Shore foam: concentrated at waterline, time-animated wave pulse.
     // waveH gate removed — near-shore waveH averages ~0 (50% trough cycle) and
@@ -265,7 +268,7 @@ void main() {
     // Binary-contrast threshold: foam either shows as a sharp white bubble dot or
     // is fully transparent — no hazy smearing. smoothstep(0.08, 0.35) gives a
     // crisp on/off within the Voronoi cell radius range.
-    float foamAlpha = smoothstep(0.08, 0.35, foam);
+    float foamAlpha = smoothstep(0.05, 0.28, foam);
     col = mix(col, vec3(0.97, 0.99, 1.00), foamAlpha);
 
     // Fresnel near-surface sheen (near water only).
