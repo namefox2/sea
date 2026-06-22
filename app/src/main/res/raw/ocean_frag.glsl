@@ -338,7 +338,9 @@ void main() {
     // extends 0→3m inland; ramps in over 0.5m so it doesn't start on the foam edge.
     float wetSheen = (1.0 - smoothstep(0.0, 3.0, frontDist))
                    * smoothstep(-0.5, 0.5, frontDist);
-    col = mix(col, u_SandWetColor * 0.80, wetSheen * (1.0 - foamAlpha) * 0.60);
+
+    // DIAGNOSTIC: wet zone → bright green so its position/size is visible.
+    col = mix(col, vec3(0.0, 1.0, 0.4), wetSheen * 0.90);
 
     // Edge foam visible through thin/transparent water; wet sheen adds faint alpha
     // on the dry beach to show the damp surface where the wave retreated.
@@ -347,6 +349,6 @@ void main() {
     // foamBoostZone multiplier also scales with wind so calm seas show minimal foam.
     float finalAlpha    = min(shoreAlpha
                             + foamAlpha  * foamBoostZone * (0.18 + windS * 0.62)
-                            + wetSheen   * (0.06 + windS * 0.08), 1.0);
+                            + wetSheen   * 0.70, 1.0);
     gl_FragColor = vec4(col, finalAlpha);
 }
