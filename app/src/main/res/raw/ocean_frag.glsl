@@ -224,6 +224,14 @@ void main() {
     vec3  yunseul   = u_LightColor * u_YunseulStr * sparkle * corrBoost;
 
     // ── 6. Wave-crest foam ────────────────────────────────────────────────────
+    // Wave front: the actual inland tip of the current wave, computed the same
+    // way as section 7's shoreAlpha upper bound so foam tracks the real boundary.
+    float sNoiseF   = sin(v_World.x * 0.25 + u_Time * 0.40) * 1.4
+                    + sin(v_World.x * 0.11 - u_Time * 0.28) * 0.9
+                    + sin(v_World.x * 0.58 + u_Time * 0.62) * 0.5;
+    float waveFront = sNoiseF + 7.0 + waveH * 2.5; // dtw at wave's inland tip
+    float frontDist = v_DistToWater - waveFront;    // +ve = dry land, -ve = in water
+
     float curlT  = u_Time * 0.7;
     vec2  foamUV = v_World.xz + vec2(
         sin(curlT * 1.1 + v_World.z * 0.55) * 0.40,
@@ -263,10 +271,20 @@ void main() {
     float whitecap     = whitecapMask * foamGrain * (windS * windS * 0.30);
     whitecap *= 1.0 - exp(-abs(v_DistToWater) * 0.40) * 0.90; // suppress near shore
 
-    float foam = clamp(shoreFoam + whitecap, 0.0, 1.0);
+    // Edge foam: concentrated along the irregular wave-front boundary.
+    // Tracks waveFront so it follows the actual rendered water edge, not a fixed
+    // waterline. Gaussian (±1.5m) creates a natural frothy band at the tip.
+    float edgeFoam = exp(-frontDist * frontDist * 0.45) * foamGrain * (0.65 + windS * 0.45);
 
-    // Tinted foam: blend toward blue-white rather than pure white so foam
-    // sits naturally in the water without looking like a floating overlay.
+    float foam = clamp(shoreFoam + edgeFoam + whitecap, 0.0, 1.0);
+
+    // Thin water near the wave tip: blend col toward a pale sandy tint in the last
+    // 3m before the wave front. Ultra-shallow water over mudflat shows the bottom
+    // through — almost no colour of its own.
+    float thinZone = smoothstep(-3.5, 0.0, frontDist) * step(frontDist, 0.0);
+    col = mix(col, mix(u_SandWetColor, u_SandDryColor, 0.45) * 1.05, thinZone * 0.60);
+
+    // Tinted foam: blue-white near open ocean, warmer near swash tip.
     float foamAlpha = smoothstep(0.03, 0.25, foam);
     vec3  foamColor = mix(col * 1.12, vec3(0.94, 0.97, 1.00), 0.62);
     col = mix(col, foamColor, foamAlpha);
@@ -288,6 +306,10 @@ void main() {
     float waveEdgeShift = waveH * 2.5;
     float shoreAlpha = 1.0 - smoothstep(shoreNoise - 0.5 + waveEdgeShift,
                                          shoreNoise + 7.0 + waveEdgeShift, distToWater);
+    // Thin film: make the last 3m before the wave front extra transparent so
+    // the retreating wave looks like it's losing water, not fading colour.
+    float thinAlpha = smoothstep(-3.5, 0.0, frontDist) * step(frontDist, 0.0);
+    shoreAlpha *= 1.0 - thinAlpha * 0.75;
 
     // ── 8. Sky reflection + noisy horizon seam ───────────────────────────────
     // Grazing-angle Fresnel: far water reflects sky.
@@ -305,10 +327,11 @@ void main() {
     float seam = smoothstep(0.90, 1.0, distNorm + horizNoise) * (1.0 - corrMask * 0.6);
     col = mix(col, u_HorizonColor * 0.85, seam * (1.0 - skyReflect * 0.8) * 0.55);
 
-    // Foam pixels near the waterline must be visible even when shoreAlpha is low
-    // (ocean mesh is semi-transparent at the beach boundary). Boost alpha by the
-    // foam signal so bubble dots punch through regardless of ocean transparency.
-    float foamBoostZone = 1.0 - smoothstep(-1.0, 3.0, v_DistToWater);
-    float finalAlpha    = min(shoreAlpha + foamAlpha * foamBoostZone * 0.65, 1.0);
+    // Edge foam at the wave front must be visible through thin/transparent water.
+    // foamBoostZone peaks at the wave tip (frontDist=0), falls off ±3m so the
+    // foam band tracks the actual wave boundary rather than a fixed waterline.
+    float foamBoostZone = smoothstep(-3.5, 0.0, frontDist)
+                        * (1.0 - smoothstep(0.0, 2.0, frontDist));
+    float finalAlpha    = min(shoreAlpha + foamAlpha * foamBoostZone * 0.80, 1.0);
     gl_FragColor = vec4(col, finalAlpha);
 }
