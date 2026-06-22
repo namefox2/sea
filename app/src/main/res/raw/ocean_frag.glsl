@@ -43,22 +43,22 @@ vec2 h21v(vec2 p) {
     p += dot(p, p + 43.2);
     return fract(vec2(p.x * p.y, p.x + p.y));
 }
-// Voronoi cellular noise → sharp bright dot at each cell's random point.
-// rp confined to [0.10, 0.90] so bubbles are always complete circles (not half-circles
-// split across cell edges). Smoothstep 0.02→0.30: tight dot, rapid falloff.
+// Voronoi cellular noise — fully unrolled 3×3 neighbourhood, zero loops.
+// Loops caused silent no-ops on some GLSL ES 2.0 drivers (md stayed 8.0 →
+// sqrt(8)=2.83 > 0.30 → always returns 0). Explicit 9-sample version is
+// guaranteed to execute on any conformant GLSL implementation.
 float foamCells(vec2 p) {
     vec2 ip = floor(p); vec2 fp = fract(p);
-    float md = 8.0;
-    // Non-negative loop indices for GLSL ES 2.0 compatibility
-    // (ix,iy) in [0,2] → offset = float(ix)-1 in [-1,0,1]
-    for (int ix = 0; ix < 3; ix++) {
-        for (int iy = 0; iy < 3; iy++) {
-            vec2 nb = vec2(float(ix) - 1.0, float(iy) - 1.0);
-            vec2 rp = h21v(ip + nb) * 0.80 + 0.10;
-            vec2 d  = nb + rp - fp;
-            md = min(md, dot(d, d));
-        }
-    }
+    vec2 rp; vec2 d; float md = 8.0;
+    rp=h21v(ip+vec2(-1,-1))*0.80+0.10; d=vec2(-1,-1)+rp-fp; md=min(md,dot(d,d));
+    rp=h21v(ip+vec2( 0,-1))*0.80+0.10; d=vec2( 0,-1)+rp-fp; md=min(md,dot(d,d));
+    rp=h21v(ip+vec2( 1,-1))*0.80+0.10; d=vec2( 1,-1)+rp-fp; md=min(md,dot(d,d));
+    rp=h21v(ip+vec2(-1, 0))*0.80+0.10; d=vec2(-1, 0)+rp-fp; md=min(md,dot(d,d));
+    rp=h21v(ip+vec2( 0, 0))*0.80+0.10; d=vec2( 0, 0)+rp-fp; md=min(md,dot(d,d));
+    rp=h21v(ip+vec2( 1, 0))*0.80+0.10; d=vec2( 1, 0)+rp-fp; md=min(md,dot(d,d));
+    rp=h21v(ip+vec2(-1, 1))*0.80+0.10; d=vec2(-1, 1)+rp-fp; md=min(md,dot(d,d));
+    rp=h21v(ip+vec2( 0, 1))*0.80+0.10; d=vec2( 0, 1)+rp-fp; md=min(md,dot(d,d));
+    rp=h21v(ip+vec2( 1, 1))*0.80+0.10; d=vec2( 1, 1)+rp-fp; md=min(md,dot(d,d));
     return 1.0 - smoothstep(0.02, 0.30, sqrt(md));
 }
 

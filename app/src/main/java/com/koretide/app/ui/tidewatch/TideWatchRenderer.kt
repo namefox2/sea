@@ -471,10 +471,11 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
             Math.exp(-10.0 * 0.40).toFloat(), Math.exp(-5.0 * 0.40).toFloat(),
             Math.exp(-2.0 * 0.40).toFloat(), 1.0f,
             Math.exp(-2.0 * 0.40).toFloat()))
-        Log.d(TAG, "║  waveMask=ss(0.25+edgeN×0.18, 0.85+edgeN×0.08, v_Foam)")
-        Log.d(TAG, "║   → needs v_Foam > ~0.25 (threshold can shift ±0.23 from edgeN noise)")
-        Log.d(TAG, "║  EXPECT: R=red near waterline, G=green at wave crests, B=magenta overlap")
-        Log.d(TAG, "║  IF NO COLOR VISIBLE: ocean mesh hidden behind beach or shoreAlpha=0")
+        Log.d(TAG, "║  shoreWaveMask=ss(0.05,0.65,waveH)  waveH_max_shore≈retain×1.5/1.4")
+        val retain = 0.08f + (0.45f - 0.08f) * tide
+        val waveHMaxShore = retain * 1.5f / 1.4f
+        Log.d(TAG, "║  retain=%.3f  waveH_max_shore≈%.3f  shoreWaveMask≈%.3f".format(
+            retain, waveHMaxShore, smoothstep(0.05f, 0.65f, waveHMaxShore)))
         Log.d(TAG, "╚══════════════════════════════════════")
     }
 
