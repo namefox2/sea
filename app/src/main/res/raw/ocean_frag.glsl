@@ -256,15 +256,19 @@ void main() {
     float swash1 = sin(-v_DistToWater * 1.26 - u_Time * 0.72) * 0.5 + 0.5;
     float swash2 = sin(-v_DistToWater * 0.94 - u_Time * 0.55) * 0.5 + 0.5;
     float swashCrest = smoothstep(0.25, 0.65, swash1 * swash2);
-    float swashMod   = 0.40 + 0.60 * swashCrest; // [0.40 .. 1.00] — never zero
-    // Foam lifecycle noise: patches build up (~2.5s) then slowly dissolve.
-    // Also a modulator — dimmer when fading, brighter when fresh.
+    // Swash base scales with wind: calm = barely any base, windy = 0.40 base.
+    float swashBase = mix(0.08, 0.40, windS);
+    float swashMod  = swashBase + (1.0 - swashBase) * swashCrest;
+    // Foam lifecycle noise: patches build up then slowly dissolve (~5s period).
     float foamLifeN = vnoise(foamUV * 0.30 + u_Time * vec2(0.06, 0.04)) * 0.60
                     + vnoise(foamUV * 0.80 - u_Time * vec2(0.03, 0.07)) * 0.40;
-    float foamMod   = 0.40 + 0.60 * smoothstep(0.25, 0.72, foamLifeN); // [0.40 .. 1.00]
-    // Density falls exponentially from waterline; cut off past 1.5m inland.
-    float nearShore = exp(min(v_DistToWater, 0.0) * 0.18) * step(v_DistToWater, 1.5);
-    float shoreFoam = nearShore * swashMod * foamMod * (0.35 + windS * 0.55) * foamGrain;
+    float foamMod   = 0.40 + 0.60 * smoothstep(0.25, 0.72, foamLifeN);
+    // Foam band WIDTH scales with wind: calm = tight (decay 0.40), windy = wide (0.14).
+    // Calm sea barely breaks → narrow foam band; rough sea = wide churning zone.
+    float shoreDecay = mix(0.40, 0.14, windS);
+    float nearShore  = exp(min(v_DistToWater, 0.0) * shoreDecay) * step(v_DistToWater, 1.5);
+    // Overall intensity nearly zero at calm, bright at full wind.
+    float shoreFoam = nearShore * swashMod * foamMod * (0.08 + windS * 0.82) * foamGrain;
 
     // Open-ocean whitecaps: v_Foam is high far from shore where waves aren't damped.
     float whitecapMask = smoothstep(0.60, 0.90, v_Foam);
@@ -274,7 +278,8 @@ void main() {
     // Edge foam: concentrated along the irregular wave-front boundary.
     // Tracks waveFront so it follows the actual rendered water edge, not a fixed
     // waterline. Gaussian (±1.5m) creates a natural frothy band at the tip.
-    float edgeFoam = exp(-frontDist * frontDist * 0.45) * foamGrain * (0.65 + windS * 0.45);
+    // Edge foam faint at calm (just a thin line at the break), bright and white in wind.
+    float edgeFoam = exp(-frontDist * frontDist * 0.45) * foamGrain * (0.12 + windS * 0.83);
 
     float foam = clamp(shoreFoam + edgeFoam + whitecap, 0.0, 1.0);
 
@@ -327,11 +332,19 @@ void main() {
     float seam = smoothstep(0.90, 1.0, distNorm + horizNoise) * (1.0 - corrMask * 0.6);
     col = mix(col, u_HorizonColor * 0.85, seam * (1.0 - skyReflect * 0.8) * 0.55);
 
-    // Edge foam at the wave front must be visible through thin/transparent water.
-    // foamBoostZone peaks at the wave tip (frontDist=0), falls off ±3m so the
-    // foam band tracks the actual wave boundary rather than a fixed waterline.
+    // Wet mudflat: where the wave has just passed, the exposed mud is darker and
+    // slightly reflective. frontDist>0 = past the wave tip (dry land). Wet zone
+    // extends 0→3m inland; ramps in over 0.5m so it doesn't start on the foam edge.
+    float wetSheen = (1.0 - smoothstep(0.0, 3.0, frontDist))
+                   * smoothstep(-0.5, 0.5, frontDist);
+    col = mix(col, u_SandWetColor * 0.80, wetSheen * (1.0 - foamAlpha) * 0.60);
+
+    // Edge foam visible through thin/transparent water; wet sheen adds faint alpha
+    // on the dry beach to show the damp surface where the wave retreated.
     float foamBoostZone = smoothstep(-3.5, 0.0, frontDist)
                         * (1.0 - smoothstep(0.0, 2.0, frontDist));
-    float finalAlpha    = min(shoreAlpha + foamAlpha * foamBoostZone * 0.80, 1.0);
+    float finalAlpha    = min(shoreAlpha
+                            + foamAlpha  * foamBoostZone * 0.80
+                            + wetSheen   * (0.08 + windS * 0.07), 1.0);
     gl_FragColor = vec4(col, finalAlpha);
 }
