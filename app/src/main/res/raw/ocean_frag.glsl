@@ -220,39 +220,53 @@ void main() {
     vec3  yunseul   = u_LightColor * u_YunseulStr * sparkle * corrBoost;
 
     // ── 6. Wave-crest foam ────────────────────────────────────────────────────
-    float shoreBand = exp(-abs(v_DistToWater) * 0.35);
-    // Curl-animated foam UV
+    // shoreBand: concentrates shore-breaking foam within ~8 m of the waterline.
+    float shoreBand = exp(-abs(v_DistToWater) * 0.40);
+
+    // Curl-animated foam UV: lateral oscillation = curl, -z drift = shoreward advance.
     float curlT  = u_Time * 0.7;
     vec2  foamUV = v_World.xz + vec2(
-        sin(curlT * 1.1 + v_World.z * 0.55) * 0.40,   // lateral curl
-        -curlT * 0.18                                    // shoreward drift
+        sin(curlT * 1.1 + v_World.z * 0.55) * 0.40,
+        -curlT * 0.18
     );
 
-    // Lacy edge: 3-octave value noise perturbs the foam threshold so the boundary
-    // is ragged and irregular rather than a smooth contour.
+    // Lacy edge: 3-octave value noise shifts the foam smoothstep threshold so the
+    // boundary is ragged and finger-like rather than a smooth arc.
     float edgeN  = vnoise(foamUV * 2.5 + vec2(u_Time * 0.25, 0.0)) * 0.50
                  + vnoise(foamUV * 6.0  - vec2(0.0, u_Time * 0.40)) * 0.30
                  + vnoise(foamUV * 13.0 + u_Time * vec2(0.18, 0.12)) * 0.20;
-    edgeN = edgeN * 2.6 - 1.3;   // remap [0,1] → [-1.3, 1.3]
+    edgeN = edgeN * 2.6 - 1.3;
     float waveMask = smoothstep(0.25 + edgeN * 0.18, 0.85 + edgeN * 0.08, v_Foam);
 
-    // Bubble texture: 3 Voronoi octaves give varied grain sizes
-    // (~20 cm coarse clusters, ~9 cm medium, ~5 cm fine) with uneven density.
+    // Bubble grain: 3-octave Voronoi then hard-threshold with smoothstep+pow.
+    // Gap between bubbles → foamGrain = 0 (ocean shows through, NOT blurry grey).
+    // Bubble centre       → foamGrain = 1 (bright white dot).
     float bub1 = foamCells(foamUV * 5.0);
     float bub2 = foamCells(foamUV * 11.0 + vec2(2.3, 1.7));
     float bub3 = foamCells(foamUV * 21.0 + vec2(5.1, 3.9));
     float bubbleTex = bub1 * 0.45 + bub2 * 0.35 + bub3 * 0.20;
-    // Modulate brightness (not alpha): walls are dimmer, centres bright — real
-    // foam is always lit; bubbles just vary in surface curvature/opacity.
-    float foamGrain = mix(0.55, 1.0, bubbleTex);
+    float bubShape  = smoothstep(0.38, 0.62, bubbleTex);  // sharp 0→1 threshold
+    float foamGrain = bubShape * bubShape;                 // power-of-2 → crisp cores
 
-    float foam  = shoreBand * waveMask * (0.16 + windS * 0.42) * foamGrain;
-    // Wave-aligned modulation: brightens foam at crest front
+    // ── Shore foam: dense lacy sheet at the waterline ─────────────────────────
+    float shoreFoam = shoreBand * waveMask * (0.22 + windS * 0.55) * foamGrain;
     float alongWave = sin(foamUV.y * 0.2 + u_Time * 2.0);
-    foam *= 0.75 + 0.25 * alongWave;
+    shoreFoam *= 0.75 + 0.25 * alongWave;
 
-    // Attenuate foam when crest is already bright: prevents double-whitening.
-    col = mix(col, vec3(0.96, 0.98, 1.00), foam * 0.50 * (1.0 - crestFac * 0.8));
+    // ── Open-ocean whitecaps: foam at wave crests throughout the whole mesh ───
+    // v_Foam (from vertex shader) is already 1.0 wherever a Gerstner crest passes,
+    // at ANY distance from shore. Removing shoreBand here lets foam appear at
+    // multiple wave lines simultaneously — the multi-band effect.
+    // windS² keeps whitecaps absent in calm conditions, strong in storms.
+    float whitecapMask = smoothstep(0.60, 0.90, v_Foam);
+    float whitecap     = whitecapMask * foamGrain * (windS * windS * 0.30);
+    whitecap *= 1.0 - shoreBand * 0.90;  // fade where shore foam dominates
+
+    float foam = clamp(shoreFoam + whitecap, 0.0, 1.0);
+
+    // Final composite: boost base strength to compensate for foamGrain zeros;
+    // bubble-centre peak stays bright while gaps are now truly transparent.
+    col = mix(col, vec3(0.96, 0.98, 1.00), foam * 0.62 * (1.0 - crestFac * 0.8));
 
     // Fresnel near-surface sheen (near water only).
     float fres = pow(1.0 - max(dot(N, V), 0.0), 5.0);
