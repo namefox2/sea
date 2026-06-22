@@ -223,7 +223,11 @@ void main() {
     float corrBoost = 0.05 + corrSharp * (0.50 + distNorm * 1.20) + nearFactor * 0.15;
     vec3  yunseul   = u_LightColor * u_YunseulStr * sparkle * corrBoost;
 
-    // ── 6. Wave-crest foam (DIAGNOSTIC) ──────────────────────────────────────
+    // ── 6. Wave-crest foam ────────────────────────────────────────────────────
+    // Root-cause fix: near shore the vertex shader damps wave amplitude to
+    // shoreWaveRetain (8-45%), so v_Foam ≈ 0.25 at crests — too low for
+    // waveMask. Use waveH (height above still water level) instead: it correctly
+    // reflects "wave is above tideY" even for heavily damped near-shore waves.
     float shoreBand = exp(-abs(v_DistToWater) * 0.40);
 
     float curlT  = u_Time * 0.7;
@@ -232,18 +236,41 @@ void main() {
         -curlT * 0.18
     );
 
-    // ── DIAGNOSTIC: identify which stage kills foam ───────────────────────────
-    // R = shoreBand  (bright red strip at the waterline — always non-zero there)
-    // G = v_Foam     (bright green wherever a Gerstner wave crest passes)
-    // B = R×G        (lit where BOTH overlap — the "should be foam" zone)
-    // shoreAlpha is forced to 1.0 below so every ocean fragment is fully opaque.
-    // Read result:
-    //   see R but no G → waves too flat, v_Foam≈0 (minAmp too small for windAmp)
-    //   see G but no R → wave crests are too far seaward for shoreBand window
-    //   see nothing    → ocean mesh occluded by beach or shoreAlpha=0 everywhere
-    float rawFoam = shoreBand * v_Foam;
-    col  = vec3(shoreBand, v_Foam, rawFoam);
-    float foam = 0.0;   // neutralise Fresnel/yunseul/skyReflect below
+    // Lacy edge noise perturbs the foam threshold for a ragged boundary.
+    float edgeN  = vnoise(foamUV * 2.5 + vec2(u_Time * 0.25, 0.0)) * 0.50
+                 + vnoise(foamUV * 6.0  - vec2(0.0, u_Time * 0.40)) * 0.30
+                 + vnoise(foamUV * 13.0 + u_Time * vec2(0.18, 0.12)) * 0.20;
+    edgeN = edgeN * 2.6 - 1.3;
+
+    // Shore mask: waveH (above still water), lacy edge from edgeN.
+    float shoreWaveMask = smoothstep(0.05 + edgeN * 0.08, 0.65 + edgeN * 0.05,
+                                     max(waveH, 0.0));
+
+    // Bubble grain: 3 Voronoi octaves → sharp dots, max-blended.
+    float bub1 = foamCells(foamUV * 9.0);
+    float bub2 = foamCells(foamUV * 16.0 + vec2(2.3, 1.7));
+    float bub3 = foamCells(foamUV * 26.0 + vec2(5.1, 3.9));
+    float densN = vnoise(foamUV * 1.8 + u_Time * vec2(0.08, 0.05)) * 0.55
+                + vnoise(foamUV * 4.5 - u_Time * vec2(0.04, 0.09)) * 0.45;
+    float density   = smoothstep(0.22, 0.60, densN);
+    float bubbleTex = max(bub3, max(bub2 * 0.88, bub1 * 0.74)) * density;
+    float bubShape  = smoothstep(0.28, 0.55, bubbleTex);
+    float foamGrain = bubShape * bubShape;
+
+    // Shore foam: concentrated at waterline, waveH-gated.
+    float shoreFoam = shoreBand * shoreWaveMask * (0.28 + windS * 0.65) * foamGrain;
+    float alongWave = sin(foamUV.y * 0.2 + u_Time * 2.0);
+    shoreFoam *= 0.75 + 0.25 * alongWave;
+
+    // Open-ocean whitecaps: v_Foam is high far from shore where waves aren't
+    // damped. windS² keeps them absent in calm, strong in storms.
+    float whitecapMask = smoothstep(0.60, 0.90, v_Foam);
+    float whitecap     = whitecapMask * foamGrain * (windS * windS * 0.30);
+    whitecap *= 1.0 - shoreBand * 0.90;
+
+    float foam = clamp(shoreFoam + whitecap, 0.0, 1.0);
+
+    col = mix(col, vec3(0.96, 0.98, 1.00), foam * 0.75 * (1.0 - crestFac * 0.8));
 
     // Fresnel near-surface sheen (near water only).
     float fres = pow(1.0 - max(dot(N, V), 0.0), 5.0);
@@ -255,19 +282,13 @@ void main() {
     col += yunseul * (1.0 - foam) * deepZone;
 
     // ── 7. Shore fade — ocean goes transparent near waterline ────────────────
-    // Beach is rendered first (opaque). Ocean fades out with a noisy wavy edge
-    // so the beach wave animation shows through naturally.
     float distToWater = v_DistToWater;
-    // 3-frequency noise — amplitude kept ≤ ±3 m so alpha zone stays within drape range.
     float shoreNoise = sin(v_World.x * 0.25 + u_Time * 0.40) * 1.4
                      + sin(v_World.x * 0.11 - u_Time * 0.28) * 0.9
                      + sin(v_World.x * 0.58 + u_Time * 0.62) * 0.5;
-    // shoreAlpha = ocean fragment opacity (NOT a sky/horizon mixer).
-    // Both smoothstep edges shift with the local wave height so the opacity boundary
-    // pulses in sync with the wave: crest → fully opaque (ocean advancing over beach),
-    // trough → more transparent (beach shows between waves).
     float waveEdgeShift = waveH * 2.5;
-    float shoreAlpha = 1.0; // DIAGNOSTIC: force fully opaque to reveal all ocean fragments
+    float shoreAlpha = 1.0 - smoothstep(shoreNoise - 0.5 + waveEdgeShift,
+                                         shoreNoise + 7.0 + waveEdgeShift, distToWater);
 
     // ── 8. Sky reflection + noisy horizon seam ───────────────────────────────
     // Grazing-angle Fresnel: far water reflects sky.
