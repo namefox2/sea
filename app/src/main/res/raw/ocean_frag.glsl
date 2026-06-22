@@ -224,12 +224,6 @@ void main() {
     vec3  yunseul   = u_LightColor * u_YunseulStr * sparkle * corrBoost;
 
     // ── 6. Wave-crest foam ────────────────────────────────────────────────────
-    // Shore foam uses shoreBand (peaks at waterline) + sinusoidal wave-pulse
-    // animation, not waveH gating. Near-shore v_Foam ≈ 0.25 (vertex shader damps
-    // amplitude to 8-45%) and waveH averages ~0 (50% trough cycle) — both gates
-    // killed shore foam. Open-ocean whitecaps still use v_Foam which is high there.
-    float shoreBand = exp(-abs(v_DistToWater) * 0.40);
-
     float curlT  = u_Time * 0.7;
     vec2  foamUV = v_World.xz + vec2(
         sin(curlT * 1.1 + v_World.z * 0.55) * 0.40,
@@ -237,8 +231,6 @@ void main() {
     );
 
     // Distance-based bubble scale: large dots near camera, finer texture far away.
-    // Near (dist≈0): bubScale≈3.0 → cells ≈33cm → bubbles ≈10cm radius (clearly visible)
-    // Far (dist≈40m): bubScale≈9.0 → cells ≈11cm → fine foam texture at horizon
     float bubScale  = mix(3.0, 9.0, clamp(dist / 40.0, 0.0, 1.0));
     float bub1 = foamCells(foamUV * bubScale);
     float bub2 = foamCells(foamUV * (bubScale * 1.8) + vec2(2.3, 1.7));
@@ -248,28 +240,42 @@ void main() {
     float density   = smoothstep(0.10, 0.50, densN);
     float bubbleTex = max(bub3, max(bub2 * 0.88, bub1 * 0.74)) * density;
     float bubShape  = smoothstep(0.08, 0.45, bubbleTex);
-    float foamGrain = bubShape; // linear, not squared — keeps dots opaque rather than ghostly
+    float foamGrain = bubShape;
 
-    // Shore foam: concentrated at waterline, time-animated wave pulse.
-    // waveH gate removed — near-shore waveH averages ~0 (50% trough cycle) and
-    // vertex-shader amplitude damping keeps v_Foam≈0.25, so gating killed all
-    // shore foam. Replace with sinusoidal wave sweep animation instead.
-    float wavePhase = sin(foamUV.y * 0.15 + u_Time * 1.8) * 0.5 + 0.5;
-    float shoreFoam = shoreBand * (0.35 + windS * 0.65) * foamGrain * (0.45 + 0.55 * wavePhase);
+    // Shore foam: two wave trains at slightly different wavelengths.
+    // Their product peaks at constructive interference (both cresting together),
+    // creating alternating foam bands / ocean gaps marching toward shore.
+    // beat spatial period ≈ 20m, beat time period ≈ 37s → foam zones drift slowly.
+    float swash1 = sin(-v_DistToWater * 1.26 - u_Time * 0.72) * 0.5 + 0.5;
+    float swash2 = sin(-v_DistToWater * 0.94 - u_Time * 0.55) * 0.5 + 0.5;
+    float swashCrest = smoothstep(0.38, 0.72, swash1 * swash2);
+    // Foam lingers ~5 s after the wave passes then gradually dissolves.
+    // Slow noise drift models foam lifetime: patches build up, then fade away.
+    float foamLifeN = vnoise(foamUV * 0.30 + u_Time * vec2(0.06, 0.04)) * 0.60
+                    + vnoise(foamUV * 0.80 - u_Time * vec2(0.03, 0.07)) * 0.40;
+    float foamLife  = smoothstep(0.30, 0.70, foamLifeN);
+    // Density falls exponentially with distance from waterline — dense at shore,
+    // sparse further out. Cut off past 1.5m inland (ocean alpha takes over there).
+    float nearShore = exp(min(v_DistToWater, 0.0) * 0.18) * step(v_DistToWater, 1.5);
+    // Clumping breaks each swash line into natural foam patches.
+    float clumpN = vnoise(foamUV * 0.6 + u_Time * vec2(0.05, 0.03)) * 0.6
+                 + vnoise(foamUV * 1.5 - u_Time * vec2(0.03, 0.06)) * 0.4;
+    float clump  = smoothstep(0.30, 0.70, clumpN);
+    float shoreFoam = swashCrest * nearShore * foamLife
+                    * (0.28 + windS * 0.55) * foamGrain * clump;
 
-    // Open-ocean whitecaps: v_Foam is high far from shore where waves aren't
-    // damped. windS² keeps them absent in calm, strong in storms.
+    // Open-ocean whitecaps: v_Foam is high far from shore where waves aren't damped.
     float whitecapMask = smoothstep(0.60, 0.90, v_Foam);
     float whitecap     = whitecapMask * foamGrain * (windS * windS * 0.30);
-    whitecap *= 1.0 - shoreBand * 0.90;
+    whitecap *= 1.0 - exp(-abs(v_DistToWater) * 0.40) * 0.90; // suppress near shore
 
     float foam = clamp(shoreFoam + whitecap, 0.0, 1.0);
 
-    // Binary-contrast threshold: foam either shows as a sharp white bubble dot or
-    // is fully transparent — no hazy smearing. smoothstep(0.08, 0.35) gives a
-    // crisp on/off within the Voronoi cell radius range.
-    float foamAlpha = smoothstep(0.05, 0.28, foam);
-    col = mix(col, vec3(0.97, 0.99, 1.00), foamAlpha);
+    // Tinted foam: blend toward blue-white rather than pure white so foam
+    // sits naturally in the water without looking like a floating overlay.
+    float foamAlpha = smoothstep(0.05, 0.30, foam);
+    vec3  foamColor = mix(col * 1.12, vec3(0.94, 0.97, 1.00), 0.62);
+    col = mix(col, foamColor, foamAlpha);
 
     // Fresnel near-surface sheen (near water only).
     float fres = pow(1.0 - max(dot(N, V), 0.0), 5.0);
