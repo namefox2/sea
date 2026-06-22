@@ -264,12 +264,19 @@ void main() {
     float shoreFoam = swashCrest * nearShore * foamLife
                     * (0.28 + windS * 0.55) * foamGrain * clump;
 
+    // Permanent swash-line suds: always present where waves lap the shore,
+    // independent of the interference timing so the waterline is never bare.
+    // Gaussian peaks at dtw=0, fades ±2m. Base (0.18) gives frothy film even
+    // between bubble dots; foamGrain adds the dot texture on top.
+    float wlGauss = exp(-v_DistToWater * v_DistToWater * 0.55);
+    float wlFoam  = wlGauss * (foamGrain * 0.65 + 0.18) * (0.60 + windS * 0.45);
+
     // Open-ocean whitecaps: v_Foam is high far from shore where waves aren't damped.
     float whitecapMask = smoothstep(0.60, 0.90, v_Foam);
     float whitecap     = whitecapMask * foamGrain * (windS * windS * 0.30);
     whitecap *= 1.0 - exp(-abs(v_DistToWater) * 0.40) * 0.90; // suppress near shore
 
-    float foam = clamp(shoreFoam + whitecap, 0.0, 1.0);
+    float foam = clamp(shoreFoam + wlFoam + whitecap, 0.0, 1.0);
 
     // Tinted foam: blend toward blue-white rather than pure white so foam
     // sits naturally in the water without looking like a floating overlay.
@@ -311,5 +318,10 @@ void main() {
     float seam = smoothstep(0.90, 1.0, distNorm + horizNoise) * (1.0 - corrMask * 0.6);
     col = mix(col, u_HorizonColor * 0.85, seam * (1.0 - skyReflect * 0.8) * 0.55);
 
-    gl_FragColor = vec4(col, shoreAlpha);
+    // Foam pixels near the waterline must be visible even when shoreAlpha is low
+    // (ocean mesh is semi-transparent at the beach boundary). Boost alpha by the
+    // foam signal so bubble dots punch through regardless of ocean transparency.
+    float foamBoostZone = 1.0 - smoothstep(-1.0, 3.0, v_DistToWater);
+    float finalAlpha    = min(shoreAlpha + foamAlpha * foamBoostZone * 0.65, 1.0);
+    gl_FragColor = vec4(col, finalAlpha);
 }
