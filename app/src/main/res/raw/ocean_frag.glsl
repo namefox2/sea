@@ -49,15 +49,17 @@ vec2 h21v(vec2 p) {
 float foamCells(vec2 p) {
     vec2 ip = floor(p); vec2 fp = fract(p);
     float md = 8.0;
-    for (int ix = -1; ix <= 1; ix++) {
-        for (int iy = -1; iy <= 1; iy++) {
-            vec2 nb = vec2(float(ix), float(iy));
-            vec2 rp = h21v(ip + nb) * 0.80 + 0.10;   // avoid cell edges
+    // Non-negative loop indices for GLSL ES 2.0 compatibility
+    // (ix,iy) in [0,2] → offset = float(ix)-1 in [-1,0,1]
+    for (int ix = 0; ix < 3; ix++) {
+        for (int iy = 0; iy < 3; iy++) {
+            vec2 nb = vec2(float(ix) - 1.0, float(iy) - 1.0);
+            vec2 rp = h21v(ip + nb) * 0.80 + 0.10;
             vec2 d  = nb + rp - fp;
             md = min(md, dot(d, d));
         }
     }
-    return 1.0 - smoothstep(0.02, 0.30, sqrt(md));    // was 0.6 → half the radius
+    return 1.0 - smoothstep(0.02, 0.30, sqrt(md));
 }
 
 void main() {
@@ -221,65 +223,34 @@ void main() {
     float corrBoost = 0.05 + corrSharp * (0.50 + distNorm * 1.20) + nearFactor * 0.15;
     vec3  yunseul   = u_LightColor * u_YunseulStr * sparkle * corrBoost;
 
-    // ── 6. Wave-crest foam ────────────────────────────────────────────────────
-    // shoreBand: concentrates shore-breaking foam within ~8 m of the waterline.
+    // ── 6. Wave-crest foam (DIAGNOSTIC) ──────────────────────────────────────
     float shoreBand = exp(-abs(v_DistToWater) * 0.40);
 
-    // Curl-animated foam UV: lateral oscillation = curl, -z drift = shoreward advance.
     float curlT  = u_Time * 0.7;
     vec2  foamUV = v_World.xz + vec2(
         sin(curlT * 1.1 + v_World.z * 0.55) * 0.40,
         -curlT * 0.18
     );
 
-    // Lacy edge: 3-octave value noise shifts the foam smoothstep threshold so the
-    // boundary is ragged and finger-like rather than a smooth arc.
-    float edgeN  = vnoise(foamUV * 2.5 + vec2(u_Time * 0.25, 0.0)) * 0.50
-                 + vnoise(foamUV * 6.0  - vec2(0.0, u_Time * 0.40)) * 0.30
-                 + vnoise(foamUV * 13.0 + u_Time * vec2(0.18, 0.12)) * 0.20;
-    edgeN = edgeN * 2.6 - 1.3;
-    float waveMask = smoothstep(0.25 + edgeN * 0.18, 0.85 + edgeN * 0.08, v_Foam);
-
-    // Bubble grain: 3 independent Voronoi layers, max-blended so every size
-    // stands alone as a sharp dot. Scales: ~11 cm / ~6 cm / ~4 cm per bubble.
-    float bub1 = foamCells(foamUV * 9.0);
-    float bub2 = foamCells(foamUV * 16.0 + vec2(2.3, 1.7));
-    float bub3 = foamCells(foamUV * 26.0 + vec2(5.1, 3.9));
-
-    // Density mask: patchy streaks like real foam — some spots dense, some bare.
-    float densN = vnoise(foamUV * 1.8 + u_Time * vec2(0.08, 0.05)) * 0.55
-                + vnoise(foamUV * 4.5 - u_Time * vec2(0.04, 0.09)) * 0.45;
-    float density = smoothstep(0.22, 0.60, densN);
-
-    // Max-blend: fine bubbles (bub3) dominate locally; coarse (bub1) fills gaps.
-    // Each scale contributes independently — no scale drowns another out.
-    float bubbleTex = max(bub3, max(bub2 * 0.88, bub1 * 0.74)) * density;
-
-    // Hard threshold: gap → 0 (ocean colour), dot centre → 1 (white).
-    float bubShape  = smoothstep(0.28, 0.55, bubbleTex);
-    float foamGrain = bubShape * bubShape;
-
-    // ── Shore foam ─────────────────────────────────────────────────────────────
-    float shoreFoam = shoreBand * waveMask * (0.28 + windS * 0.65) * foamGrain;
-    float alongWave = sin(foamUV.y * 0.2 + u_Time * 2.0);
-    shoreFoam *= 0.75 + 0.25 * alongWave;
-
-    // ── Open-ocean whitecaps (foam at every wave crest, no shoreBand limit) ───
-    float whitecapMask = smoothstep(0.60, 0.90, v_Foam);
-    float whitecap     = whitecapMask * foamGrain * (windS * windS * 0.30);
-    whitecap *= 1.0 - shoreBand * 0.90;
-
-    float foam = clamp(shoreFoam + whitecap, 0.0, 1.0);
-
-    // DEBUG: red foam to check visibility
-    col = mix(col, vec3(1.00, 0.00, 0.00), foam * 0.75 * (1.0 - crestFac * 0.8));
+    // ── DIAGNOSTIC: identify which stage kills foam ───────────────────────────
+    // R = shoreBand  (bright red strip at the waterline — always non-zero there)
+    // G = v_Foam     (bright green wherever a Gerstner wave crest passes)
+    // B = R×G        (lit where BOTH overlap — the "should be foam" zone)
+    // shoreAlpha is forced to 1.0 below so every ocean fragment is fully opaque.
+    // Read result:
+    //   see R but no G → waves too flat, v_Foam≈0 (minAmp too small for windAmp)
+    //   see G but no R → wave crests are too far seaward for shoreBand window
+    //   see nothing    → ocean mesh occluded by beach or shoreAlpha=0 everywhere
+    float rawFoam = shoreBand * v_Foam;
+    col  = vec3(shoreBand, v_Foam, rawFoam);
+    float foam = 0.0;   // neutralise Fresnel/yunseul/skyReflect below
 
     // Fresnel near-surface sheen (near water only).
     float fres = pow(1.0 - max(dot(N, V), 0.0), 5.0);
     col = mix(col, mix(u_ShallowColor, u_HorizonColor, 0.4) * 0.75,
               fres * 0.14 * (1.0 - distNorm) * (1.0 - foam));
 
-    // Suppress 윤슬 near shore — only sparkle in open water (갯벌에서 안 보이도록)
+    // Suppress 윤슬 near shore
     float deepZone = clamp(-v_DistToWater / 12.0, 0.0, 1.0);
     col += yunseul * (1.0 - foam) * deepZone;
 
@@ -296,8 +267,7 @@ void main() {
     // pulses in sync with the wave: crest → fully opaque (ocean advancing over beach),
     // trough → more transparent (beach shows between waves).
     float waveEdgeShift = waveH * 2.5;
-    float shoreAlpha = 1.0 - smoothstep(shoreNoise - 0.5 + waveEdgeShift,
-                                         shoreNoise + 7.0 + waveEdgeShift, distToWater);
+    float shoreAlpha = 1.0; // DIAGNOSTIC: force fully opaque to reveal all ocean fragments
 
     // ── 8. Sky reflection + noisy horizon seam ───────────────────────────────
     // Grazing-angle Fresnel: far water reflects sky.

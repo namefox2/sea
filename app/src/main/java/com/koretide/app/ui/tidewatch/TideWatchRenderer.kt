@@ -454,31 +454,27 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         Log.d(TAG, "║  deepColor    = (%.3f, %.3f, %.3f)  lightColor = (%.3f, %.3f, %.3f)".format(
             deepColor[0], deepColor[1], deepColor[2], lc[0], lc[1], lc[2]))
         Log.d(TAG, "╠$sep")
-        // ── Waterline zone scan ───────────────────────────────────────────────────
-        // ocean = shallowColor pulled toward sandDry by chromaBridge (ss(-4,1)×0.90)
-        // beach = sandDry pulled toward waterTint×0.85 by ss(5,-0.5)×0.28
-        // comp  = beach×(1-shoreAlpha) + ocean×shoreAlpha   shoreAlpha=1-ss(-0.5,7.0,dtw)
-        Log.d(TAG, "║ [WATERLINE ZONE SCAN  dtw -4→8m]")
-        Log.d(TAG, "║  shoreAlpha=1-ss(-0.5,7,dtw)  beach:waterTint ss(5,-0.5)×0.28  ocean:bridge ss(-4,1)×0.90→sandDry(%.2f,%.2f,%.2f)".format(sandDry[0],sandDry[1],sandDry[2]))
-        Log.d(TAG, "║  dtw   | α     | br    | ocean(R,G,B)        | comp(R,G,B)")
-        val waterTintR = 0.28f; val waterTintG = 0.82f; val waterTintB = 0.76f
-        val brC = floatArrayOf(sandDry[0], sandDry[1], sandDry[2])
-        for (dtwZ in floatArrayOf(-4f, -2f, 0f, 0.5f, 1.0f, 1.5f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f)) {
-            val sAlpha = 1f - smoothstep(-0.5f, 7.0f, dtwZ)
-            val tintStr = smoothstep(5.0f, -0.5f, dtwZ) * 0.28f
-            val bR = sandDry[0] + tintStr * (waterTintR * 0.85f - sandDry[0])
-            val bG = sandDry[1] + tintStr * (waterTintG * 0.85f - sandDry[1])
-            val bB = sandDry[2] + tintStr * (waterTintB * 0.85f - sandDry[2])
-            val brStr = smoothstep(-4f, 1f, dtwZ) * 0.90f
-            val oR = sc[0] + brStr * (brC[0] - sc[0])
-            val oG = sc[1] + brStr * (brC[1] - sc[1])
-            val oB = sc[2] + brStr * (brC[2] - sc[2])
-            val cR = bR * (1f - sAlpha) + oR * sAlpha
-            val cG = bG * (1f - sAlpha) + oG * sAlpha
-            val cB = bB * (1f - sAlpha) + oB * sAlpha
-            Log.d(TAG, "║  %+.1fm | α%.3f br%.3f  o(%.2f,%.2f,%.2f) c(%.2f,%.2f,%.2f)".format(
-                dtwZ, sAlpha, brStr, oR, oG, oB, cR, cG, cB))
-        }
+        // ── Foam pipeline diagnostic ──────────────────────────────────────────────
+        // shader col = (shoreBand, v_Foam, shoreBand×v_Foam), shoreAlpha forced=1
+        // shoreBand = exp(-|dtw|×0.40)
+        // v_Foam    = ss(tideY+amp×0.45, tideY+amp×1.05, p.y)  [GPU-side, no CPU mirror]
+        // minAmp    = windAmp²×0.62 + windAmp×0.18 + 0.06   (always ≥ 0.06 m)
+        val wS    = wAmp.coerceIn(0f, 1f)
+        val mAmp  = wAmp * wAmp * 0.62f + wAmp * 0.18f + 0.06f
+        val tideY = tide * 1.4f - 0.7f + dbgWindSurge
+        Log.d(TAG, "║ [FOAM PIPELINE DIAGNOSTIC]")
+        Log.d(TAG, "║  windS=%.3f  minAmp=%.4fm  tideY=%.3fm  waterlineZ=%.2fm".format(wS, mAmp, tideY, wzZ))
+        Log.d(TAG, "║  v_Foam>0 when p.y > tideY+amp×0.45 = %.4fm".format(tideY + mAmp * 0.45f))
+        Log.d(TAG, "║  v_Foam=1 when p.y > tideY+amp×1.05 = %.4fm  (wave crest ceiling=tideY+amp×1.5=%.4fm)".format(
+            tideY + mAmp * 1.05f, tideY + mAmp * 1.5f))
+        Log.d(TAG, "║  shoreBand=exp(-|dtw|×0.40): dtw -10=%.3f  -5=%.3f  -2=%.3f  0=%.3f  +2=%.3f".format(
+            Math.exp(-10.0 * 0.40).toFloat(), Math.exp(-5.0 * 0.40).toFloat(),
+            Math.exp(-2.0 * 0.40).toFloat(), 1.0f,
+            Math.exp(-2.0 * 0.40).toFloat()))
+        Log.d(TAG, "║  waveMask=ss(0.25+edgeN×0.18, 0.85+edgeN×0.08, v_Foam)")
+        Log.d(TAG, "║   → needs v_Foam > ~0.25 (threshold can shift ±0.23 from edgeN noise)")
+        Log.d(TAG, "║  EXPECT: R=red near waterline, G=green at wave crests, B=magenta overlap")
+        Log.d(TAG, "║  IF NO COLOR VISIBLE: ocean mesh hidden behind beach or shoreAlpha=0")
         Log.d(TAG, "╚══════════════════════════════════════")
     }
 
