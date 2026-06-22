@@ -271,9 +271,8 @@ void main() {
 
     float foam = clamp(shoreFoam + whitecap, 0.0, 1.0);
 
-    // Peak bubble centre: 0.93 × 0.75 = 0.70 mix → clearly white.
-    // Gap between bubbles: 0 mix → ocean colour shows through.
-    col = mix(col, vec3(0.96, 0.98, 1.00), foam * 0.75 * (1.0 - crestFac * 0.8));
+    // DEBUG: red foam to check visibility
+    col = mix(col, vec3(1.00, 0.00, 0.00), foam * 0.75 * (1.0 - crestFac * 0.8));
 
     // Fresnel near-surface sheen (near water only).
     float fres = pow(1.0 - max(dot(N, V), 0.0), 5.0);
