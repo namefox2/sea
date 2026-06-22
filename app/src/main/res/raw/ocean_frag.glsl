@@ -107,7 +107,7 @@ void main() {
     // keeps its vivid saturated teal (the teal→bridge transition then lives over
     // deep water where there is no beach beneath = no seam).
     float shoreEdgeBridge = smoothstep(-8.0, 1.0, v_DistToWater);
-    water = mix(water, vec3(0.21, 0.71, 0.61), shoreEdgeBridge * 0.55);
+    water = mix(water, vec3(0.21, 0.71, 0.61), shoreEdgeBridge * 0.65);
 
     // ── 2. Wave volume shading ────────────────────────────────────────────────
     // crestFac 0.20 (was 0.32): wave-crest colour brightening is now milder because
