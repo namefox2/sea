@@ -742,23 +742,33 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         }
         Log.d(TAG, "╠$sep")
 
-        // ── Waterline zone scan: compositing boundary dtw=0..8m ──────────────────
-        Log.d(TAG, "║ [WATERLINE ZONE SCAN  dtw 0→8m: shoreAlpha(noise=0) + waterTint blend + composite]")
-        Log.d(TAG, "║  shoreAlpha = 1 - smoothstep(-0.5, 7.0, dtw)  | waterTint = smoothstep(5.0,-0.5,dtw)×0.28")
-        Log.d(TAG, "║  dtw   | shoreAlpha | tintStr | beachTinted→           | composited(beach+ocean)")
+        // ── Waterline zone scan: compositing boundary dtw=-4..8m ─────────────────
+        // ocean side now carries the shore-edge chroma bridge (ocean_frag): shallow
+        // water is pulled toward a desaturated sandy-teal near/inland of the waterline
+        // and fades back to vivid teal seaward — shrinking the composite chroma gap.
+        Log.d(TAG, "║ [WATERLINE ZONE SCAN  dtw -4→8m: shoreAlpha + waterTint(beach) + chromaBridge(ocean)]")
+        Log.d(TAG, "║  shoreAlpha = 1-smoothstep(-0.5,7.0,dtw)  waterTint = smoothstep(5,-0.5,dtw)×0.28")
+        Log.d(TAG, "║  chromaBridge = smoothstep(-8,1,dtw)×0.55 → (0.21,0.71,0.61)  (fades vivid teal seaward)")
+        Log.d(TAG, "║  dtw   | shoreAlpha | bridge | oceanBridged→          | composited(beach+ocean)")
         val waterTintR = 0.28f; val waterTintG = 0.82f; val waterTintB = 0.76f
-        for (dtwZ in floatArrayOf(0f, 0.5f, 1.0f, 1.5f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f)) {
+        val brC = floatArrayOf(0.21f, 0.71f, 0.61f)
+        for (dtwZ in floatArrayOf(-4f, -2f, 0f, 0.5f, 1.0f, 1.5f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f)) {
             val sAlpha   = 1f - smoothstep(-0.5f, 7.0f, dtwZ)
             val sBl      = smoothstep(5.0f, -0.5f, dtwZ)
             val tintStr  = sBl * 0.28f
             val bR = sandDry[0] + tintStr * (waterTintR * 0.85f - sandDry[0])
             val bG = sandDry[1] + tintStr * (waterTintG * 0.85f - sandDry[1])
             val bB = sandDry[2] + tintStr * (waterTintB * 0.85f - sandDry[2])
-            val cR = bR * (1f - sAlpha) + sc[0] * sAlpha
-            val cG = bG * (1f - sAlpha) + sc[1] * sAlpha
-            val cB = bB * (1f - sAlpha) + sc[2] * sAlpha
-            Log.d(TAG, "║  %+.1fm | α=%.3f    tint=%.3f  beach(%.2f,%.2f,%.2f) → comp(%.2f,%.2f,%.2f)".format(
-                dtwZ, sAlpha, tintStr, bR, bG, bB, cR, cG, cB))
+            // ocean color with shore-edge chroma bridge
+            val brStr = smoothstep(-8f, 1f, dtwZ) * 0.55f
+            val oR = sc[0] + brStr * (brC[0] - sc[0])
+            val oG = sc[1] + brStr * (brC[1] - sc[1])
+            val oB = sc[2] + brStr * (brC[2] - sc[2])
+            val cR = bR * (1f - sAlpha) + oR * sAlpha
+            val cG = bG * (1f - sAlpha) + oG * sAlpha
+            val cB = bB * (1f - sAlpha) + oB * sAlpha
+            Log.d(TAG, "║  %+.1fm | α=%.3f    br=%.3f  ocean(%.2f,%.2f,%.2f) → comp(%.2f,%.2f,%.2f)".format(
+                dtwZ, sAlpha, brStr, oR, oG, oB, cR, cG, cB))
         }
         Log.d(TAG, "╚══════════════════════════════════════")
     }
