@@ -278,8 +278,9 @@ void main() {
     // Edge foam: concentrated along the irregular wave-front boundary.
     // Tracks waveFront so it follows the actual rendered water edge, not a fixed
     // waterline. Gaussian (±1.5m) creates a natural frothy band at the tip.
-    // Edge foam faint at calm (just a thin line at the break), bright and white in wind.
-    float edgeFoam = exp(-frontDist * frontDist * 0.45) * foamGrain * (0.12 + windS * 0.83);
+    // Edge foam: windS² so it's near-zero at calm and grows quickly with wind.
+    // Calm seas barely break → hair-thin faint line; rough seas → wide white band.
+    float edgeFoam = exp(-frontDist * frontDist * 0.45) * foamGrain * (windS * windS * 0.90 + 0.04);
 
     float foam = clamp(shoreFoam + edgeFoam + whitecap, 0.0, 1.0);
 
@@ -343,8 +344,9 @@ void main() {
     // on the dry beach to show the damp surface where the wave retreated.
     float foamBoostZone = smoothstep(-3.5, 0.0, frontDist)
                         * (1.0 - smoothstep(0.0, 2.0, frontDist));
+    // foamBoostZone multiplier also scales with wind so calm seas show minimal foam.
     float finalAlpha    = min(shoreAlpha
-                            + foamAlpha  * foamBoostZone * 0.80
-                            + wetSheen   * (0.08 + windS * 0.07), 1.0);
+                            + foamAlpha  * foamBoostZone * (0.18 + windS * 0.62)
+                            + wetSheen   * (0.06 + windS * 0.08), 1.0);
     gl_FragColor = vec4(col, finalAlpha);
 }
