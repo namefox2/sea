@@ -43,19 +43,21 @@ vec2 h21v(vec2 p) {
     p += dot(p, p + 43.2);
     return fract(vec2(p.x * p.y, p.x + p.y));
 }
-// Voronoi cellular noise: returns 1 at cell centres, 0 at cell edges → bubble texture
+// Voronoi cellular noise → sharp bright dot at each cell's random point.
+// rp confined to [0.10, 0.90] so bubbles are always complete circles (not half-circles
+// split across cell edges). Smoothstep 0.02→0.30: tight dot, rapid falloff.
 float foamCells(vec2 p) {
     vec2 ip = floor(p); vec2 fp = fract(p);
     float md = 8.0;
     for (int ix = -1; ix <= 1; ix++) {
         for (int iy = -1; iy <= 1; iy++) {
             vec2 nb = vec2(float(ix), float(iy));
-            vec2 rp = h21v(ip + nb);
+            vec2 rp = h21v(ip + nb) * 0.80 + 0.10;   // avoid cell edges
             vec2 d  = nb + rp - fp;
             md = min(md, dot(d, d));
         }
     }
-    return 1.0 - smoothstep(0.0, 0.6, sqrt(md));
+    return 1.0 - smoothstep(0.02, 0.30, sqrt(md));    // was 0.6 → half the radius
 }
 
 void main() {
@@ -238,35 +240,40 @@ void main() {
     edgeN = edgeN * 2.6 - 1.3;
     float waveMask = smoothstep(0.25 + edgeN * 0.18, 0.85 + edgeN * 0.08, v_Foam);
 
-    // Bubble grain: 3-octave Voronoi then hard-threshold with smoothstep+pow.
-    // Gap between bubbles → foamGrain = 0 (ocean shows through, NOT blurry grey).
-    // Bubble centre       → foamGrain = 1 (bright white dot).
-    float bub1 = foamCells(foamUV * 5.0);
-    float bub2 = foamCells(foamUV * 11.0 + vec2(2.3, 1.7));
-    float bub3 = foamCells(foamUV * 21.0 + vec2(5.1, 3.9));
-    float bubbleTex = bub1 * 0.45 + bub2 * 0.35 + bub3 * 0.20;
-    float bubShape  = smoothstep(0.38, 0.62, bubbleTex);  // sharp 0→1 threshold
-    float foamGrain = bubShape * bubShape;                 // power-of-2 → crisp cores
+    // Bubble grain: 3 independent Voronoi layers, max-blended so every size
+    // stands alone as a sharp dot. Scales: ~11 cm / ~6 cm / ~4 cm per bubble.
+    float bub1 = foamCells(foamUV * 9.0);
+    float bub2 = foamCells(foamUV * 16.0 + vec2(2.3, 1.7));
+    float bub3 = foamCells(foamUV * 26.0 + vec2(5.1, 3.9));
 
-    // ── Shore foam: dense lacy sheet at the waterline ─────────────────────────
-    float shoreFoam = shoreBand * waveMask * (0.22 + windS * 0.55) * foamGrain;
+    // Density mask: patchy streaks like real foam — some spots dense, some bare.
+    float densN = vnoise(foamUV * 1.8 + u_Time * vec2(0.08, 0.05)) * 0.55
+                + vnoise(foamUV * 4.5 - u_Time * vec2(0.04, 0.09)) * 0.45;
+    float density = smoothstep(0.22, 0.60, densN);
+
+    // Max-blend: fine bubbles (bub3) dominate locally; coarse (bub1) fills gaps.
+    // Each scale contributes independently — no scale drowns another out.
+    float bubbleTex = max(bub3, max(bub2 * 0.88, bub1 * 0.74)) * density;
+
+    // Hard threshold: gap → 0 (ocean colour), dot centre → 1 (white).
+    float bubShape  = smoothstep(0.28, 0.55, bubbleTex);
+    float foamGrain = bubShape * bubShape;
+
+    // ── Shore foam ─────────────────────────────────────────────────────────────
+    float shoreFoam = shoreBand * waveMask * (0.28 + windS * 0.65) * foamGrain;
     float alongWave = sin(foamUV.y * 0.2 + u_Time * 2.0);
     shoreFoam *= 0.75 + 0.25 * alongWave;
 
-    // ── Open-ocean whitecaps: foam at wave crests throughout the whole mesh ───
-    // v_Foam (from vertex shader) is already 1.0 wherever a Gerstner crest passes,
-    // at ANY distance from shore. Removing shoreBand here lets foam appear at
-    // multiple wave lines simultaneously — the multi-band effect.
-    // windS² keeps whitecaps absent in calm conditions, strong in storms.
+    // ── Open-ocean whitecaps (foam at every wave crest, no shoreBand limit) ───
     float whitecapMask = smoothstep(0.60, 0.90, v_Foam);
     float whitecap     = whitecapMask * foamGrain * (windS * windS * 0.30);
-    whitecap *= 1.0 - shoreBand * 0.90;  // fade where shore foam dominates
+    whitecap *= 1.0 - shoreBand * 0.90;
 
     float foam = clamp(shoreFoam + whitecap, 0.0, 1.0);
 
-    // Final composite: boost base strength to compensate for foamGrain zeros;
-    // bubble-centre peak stays bright while gaps are now truly transparent.
-    col = mix(col, vec3(0.96, 0.98, 1.00), foam * 0.62 * (1.0 - crestFac * 0.8));
+    // Peak bubble centre: 0.93 × 0.75 = 0.70 mix → clearly white.
+    // Gap between bubbles: 0 mix → ocean colour shows through.
+    col = mix(col, vec3(0.96, 0.98, 1.00), foam * 0.75 * (1.0 - crestFac * 0.8));
 
     // Fresnel near-surface sheen (near water only).
     float fres = pow(1.0 - max(dot(N, V), 0.0), 5.0);
