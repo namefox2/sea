@@ -37,6 +37,27 @@ float vnoise(vec2 p) {
                mix(h21(i+vec2(0,1)), h21(i+vec2(1,1)), u.x), u.y);
 }
 
+// 2-D hash → vec2 point in [0,1]² (used by Voronoi below)
+vec2 h21v(vec2 p) {
+    p = fract(p * vec2(127.1, 311.7));
+    p += dot(p, p + 43.2);
+    return fract(vec2(p.x * p.y, p.x + p.y));
+}
+// Voronoi cellular noise: returns 1 at cell centres, 0 at cell edges → bubble texture
+float foamCells(vec2 p) {
+    vec2 ip = floor(p); vec2 fp = fract(p);
+    float md = 8.0;
+    for (int ix = -1; ix <= 1; ix++) {
+        for (int iy = -1; iy <= 1; iy++) {
+            vec2 nb = vec2(float(ix), float(iy));
+            vec2 rp = h21v(ip + nb);
+            vec2 d  = nb + rp - fp;
+            md = min(md, dot(d, d));
+        }
+    }
+    return 1.0 - smoothstep(0.0, 0.6, sqrt(md));
+}
+
 void main() {
     float windS = smoothstep(0.0, 1.0, u_WindAmp);   // [0..1] pre-square; used for foam
     float wind  = windS * windS;                       // squared for wave perturbation
@@ -199,29 +220,38 @@ void main() {
     vec3  yunseul   = u_LightColor * u_YunseulStr * sparkle * corrBoost;
 
     // ── 6. Wave-crest foam ────────────────────────────────────────────────────
-    // Shore band: decays away from waterline but covers a wider strip than before
-    // (reference shows wide turbulent foam sheet near the break point).
     float shoreBand = exp(-abs(v_DistToWater) * 0.35);
-    float waveMask  = smoothstep(0.25, 0.85, v_Foam);
-    // Curl-animated foam UV: lateral sin() oscillation simulates the rolling/curling
-    // motion as a wave breaks; slow -z drift = foam advancing shoreward with the wave.
+    // Curl-animated foam UV
     float curlT  = u_Time * 0.7;
     vec2  foamUV = v_World.xz + vec2(
         sin(curlT * 1.1 + v_World.z * 0.55) * 0.40,   // lateral curl
         -curlT * 0.18                                    // shoreward drift
     );
-    float n1 = fract(sin(foamUV.x * 12.3  + foamUV.y * 7.7)  * 43758.5453);
-    float n2 = fract(sin(foamUV.x *  5.1  - foamUV.y * 11.3) * 31415.9265);
-    float lacyN   = n1 * 0.6 + n2 * 0.4;
-    float lacyMask = smoothstep(0.30, 0.70, lacyN);
-    float foam  = shoreBand * waveMask * (0.16 + windS * 0.42) * lacyMask;
-    // Wave-aligned modulation: brightens foam at crest front (positive z-drift side)
+
+    // Lacy edge: 3-octave value noise perturbs the foam threshold so the boundary
+    // is ragged and irregular rather than a smooth contour.
+    float edgeN  = vnoise(foamUV * 2.5 + vec2(u_Time * 0.25, 0.0)) * 0.50
+                 + vnoise(foamUV * 6.0  - vec2(0.0, u_Time * 0.40)) * 0.30
+                 + vnoise(foamUV * 13.0 + u_Time * vec2(0.18, 0.12)) * 0.20;
+    edgeN = edgeN * 2.6 - 1.3;   // remap [0,1] → [-1.3, 1.3]
+    float waveMask = smoothstep(0.25 + edgeN * 0.18, 0.85 + edgeN * 0.08, v_Foam);
+
+    // Bubble texture: 3 Voronoi octaves give varied grain sizes
+    // (~20 cm coarse clusters, ~9 cm medium, ~5 cm fine) with uneven density.
+    float bub1 = foamCells(foamUV * 5.0);
+    float bub2 = foamCells(foamUV * 11.0 + vec2(2.3, 1.7));
+    float bub3 = foamCells(foamUV * 21.0 + vec2(5.1, 3.9));
+    float bubbleTex = bub1 * 0.45 + bub2 * 0.35 + bub3 * 0.20;
+    // Modulate brightness (not alpha): walls are dimmer, centres bright — real
+    // foam is always lit; bubbles just vary in surface curvature/opacity.
+    float foamGrain = mix(0.55, 1.0, bubbleTex);
+
+    float foam  = shoreBand * waveMask * (0.16 + windS * 0.42) * foamGrain;
+    // Wave-aligned modulation: brightens foam at crest front
     float alongWave = sin(foamUV.y * 0.2 + u_Time * 2.0);
     foam *= 0.75 + 0.25 * alongWave;
 
     // Attenuate foam when crest is already bright: prevents double-whitening.
-    // Coefficient 0.58→0.50, crest attenuation 0.5→0.8: when crest and foam both
-    // peak together, combined mix = foam×0.50×0.84 = foam×0.42 (was foam×0.52).
     col = mix(col, vec3(0.96, 0.98, 1.00), foam * 0.50 * (1.0 - crestFac * 0.8));
 
     // Fresnel near-surface sheen (near water only).
