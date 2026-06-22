@@ -224,10 +224,10 @@ void main() {
     vec3  yunseul   = u_LightColor * u_YunseulStr * sparkle * corrBoost;
 
     // ── 6. Wave-crest foam ────────────────────────────────────────────────────
-    // Root-cause fix: near shore the vertex shader damps wave amplitude to
-    // shoreWaveRetain (8-45%), so v_Foam ≈ 0.25 at crests — too low for
-    // waveMask. Use waveH (height above still water level) instead: it correctly
-    // reflects "wave is above tideY" even for heavily damped near-shore waves.
+    // Shore foam uses shoreBand (peaks at waterline) + sinusoidal wave-pulse
+    // animation, not waveH gating. Near-shore v_Foam ≈ 0.25 (vertex shader damps
+    // amplitude to 8-45%) and waveH averages ~0 (50% trough cycle) — both gates
+    // killed shore foam. Open-ocean whitecaps still use v_Foam which is high there.
     float shoreBand = exp(-abs(v_DistToWater) * 0.40);
 
     float curlT  = u_Time * 0.7;
@@ -236,31 +236,23 @@ void main() {
         -curlT * 0.18
     );
 
-    // Lacy edge noise perturbs the foam threshold for a ragged boundary.
-    float edgeN  = vnoise(foamUV * 2.5 + vec2(u_Time * 0.25, 0.0)) * 0.50
-                 + vnoise(foamUV * 6.0  - vec2(0.0, u_Time * 0.40)) * 0.30
-                 + vnoise(foamUV * 13.0 + u_Time * vec2(0.18, 0.12)) * 0.20;
-    edgeN = edgeN * 2.6 - 1.3;
-
-    // Shore mask: waveH (above still water), lacy edge from edgeN.
-    float shoreWaveMask = smoothstep(0.05 + edgeN * 0.08, 0.65 + edgeN * 0.05,
-                                     max(waveH, 0.0));
-
     // Bubble grain: 3 Voronoi octaves → sharp dots, max-blended.
     float bub1 = foamCells(foamUV * 9.0);
     float bub2 = foamCells(foamUV * 16.0 + vec2(2.3, 1.7));
     float bub3 = foamCells(foamUV * 26.0 + vec2(5.1, 3.9));
     float densN = vnoise(foamUV * 1.8 + u_Time * vec2(0.08, 0.05)) * 0.55
                 + vnoise(foamUV * 4.5 - u_Time * vec2(0.04, 0.09)) * 0.45;
-    float density   = smoothstep(0.22, 0.60, densN);
+    float density   = smoothstep(0.15, 0.55, densN);
     float bubbleTex = max(bub3, max(bub2 * 0.88, bub1 * 0.74)) * density;
-    float bubShape  = smoothstep(0.28, 0.55, bubbleTex);
+    float bubShape  = smoothstep(0.18, 0.50, bubbleTex);
     float foamGrain = bubShape * bubShape;
 
-    // Shore foam: concentrated at waterline, waveH-gated.
-    float shoreFoam = shoreBand * shoreWaveMask * (0.28 + windS * 0.65) * foamGrain;
-    float alongWave = sin(foamUV.y * 0.2 + u_Time * 2.0);
-    shoreFoam *= 0.75 + 0.25 * alongWave;
+    // Shore foam: concentrated at waterline, time-animated wave pulse.
+    // waveH gate removed — near-shore waveH averages ~0 (50% trough cycle) and
+    // vertex-shader amplitude damping keeps v_Foam≈0.25, so gating killed all
+    // shore foam. Replace with sinusoidal wave sweep animation instead.
+    float wavePhase = sin(foamUV.y * 0.15 + u_Time * 1.8) * 0.5 + 0.5;
+    float shoreFoam = shoreBand * (0.35 + windS * 0.65) * foamGrain * (0.45 + 0.55 * wavePhase);
 
     // Open-ocean whitecaps: v_Foam is high far from shore where waves aren't
     // damped. windS² keeps them absent in calm, strong in storms.
@@ -270,20 +262,20 @@ void main() {
 
     float foam = clamp(shoreFoam + whitecap, 0.0, 1.0);
 
-    // DIAGNOSTIC: foam areas → pure magenta, amplified ×5 so even faint foam is vivid.
-    // If result = small bright magenta dots → Voronoi bubble grain is working.
-    // If result = soft magenta band (no dot structure) → foamGrain still blurry.
-    // If result = nothing → foam signal is 0 (pipeline broken upstream).
-    col = mix(col, vec3(1.0, 0.0, 1.0), clamp(foam * 5.0, 0.0, 1.0));
+    // Binary-contrast threshold: foam either shows as a sharp white bubble dot or
+    // is fully transparent — no hazy smearing. smoothstep(0.08, 0.35) gives a
+    // crisp on/off within the Voronoi cell radius range.
+    float foamAlpha = smoothstep(0.08, 0.35, foam);
+    col = mix(col, vec3(0.97, 0.99, 1.00), foamAlpha);
 
     // Fresnel near-surface sheen (near water only).
     float fres = pow(1.0 - max(dot(N, V), 0.0), 5.0);
     col = mix(col, mix(u_ShallowColor, u_HorizonColor, 0.4) * 0.75,
-              fres * 0.14 * (1.0 - distNorm) * (1.0 - foam));
+              fres * 0.14 * (1.0 - distNorm) * (1.0 - foamAlpha));
 
     // Suppress 윤슬 near shore
     float deepZone = clamp(-v_DistToWater / 12.0, 0.0, 1.0);
-    col += yunseul * (1.0 - foam) * deepZone;
+    col += yunseul * (1.0 - foamAlpha) * deepZone;
 
     // ── 7. Shore fade — ocean goes transparent near waterline ────────────────
     float distToWater = v_DistToWater;
@@ -300,7 +292,7 @@ void main() {
     // gradual tint instead of a snapping band.  Mix ratio cut 0.28→0.14 to keep
     // Δlum_sky ≤ 0.07 (was +0.131 at dNorm=0.97).
     float skyReflect = smoothstep(0.35, 0.95, distNorm);
-    col = mix(col, u_HorizonColor, skyReflect * (1.0 - foam) * 0.14);
+    col = mix(col, u_HorizonColor, skyReflect * (1.0 - foamAlpha) * 0.14);
 
     // Sinusoidal wobble breaks the perfectly-straight horizon line.
     // Gate seam by (1 - skyReflect×0.8) so it doesn't double-brighten on top
