@@ -270,7 +270,11 @@ void main() {
 
     float foam = clamp(shoreFoam + whitecap, 0.0, 1.0);
 
-    col = mix(col, vec3(0.96, 0.98, 1.00), foam * 0.75 * (1.0 - crestFac * 0.8));
+    // DIAGNOSTIC: foam areas → pure magenta, amplified ×5 so even faint foam is vivid.
+    // If result = small bright magenta dots → Voronoi bubble grain is working.
+    // If result = soft magenta band (no dot structure) → foamGrain still blurry.
+    // If result = nothing → foam signal is 0 (pipeline broken upstream).
+    col = mix(col, vec3(1.0, 0.0, 1.0), clamp(foam * 5.0, 0.0, 1.0));
 
     // Fresnel near-surface sheen (near water only).
     float fres = pow(1.0 - max(dot(N, V), 0.0), 5.0);
