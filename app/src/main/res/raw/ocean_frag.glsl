@@ -279,9 +279,6 @@ void main() {
     // Thin water near the wave tip: blend col toward a pale sandy tint in the last
     // 3m before the wave front. Ultra-shallow water over mudflat shows the bottom
     // through — almost no colour of its own.
-    float thinZone = smoothstep(-3.5, 0.0, frontDist) * step(frontDist, 0.0);
-    col = mix(col, mix(u_SandWetColor, u_SandDryColor, 0.45) * 1.05, thinZone * 0.60);
-
     // Tinted foam: blue-white near open ocean, warmer near swash tip.
     float foamAlpha = smoothstep(0.03, 0.25, foam);
     vec3  foamColor = mix(col * 1.12, vec3(0.94, 0.97, 1.00), 0.62);
@@ -304,10 +301,6 @@ void main() {
     float waveEdgeShift = waveH * 1.5;
     float shoreAlpha = 1.0 - smoothstep(shoreNoise - 0.5 + waveEdgeShift,
                                          shoreNoise + 3.5 + waveEdgeShift, distToWater);
-    // Thin film: make the last 3m before the wave front extra transparent so
-    // the retreating wave looks like it's losing water, not fading colour.
-    float thinAlpha = smoothstep(-3.5, 0.0, frontDist) * step(frontDist, 0.0);
-    shoreAlpha *= 1.0 - thinAlpha * 0.75;
 
     // ── 8. Sky reflection + noisy horizon seam ───────────────────────────────
     // Grazing-angle Fresnel: far water reflects sky.
@@ -334,10 +327,6 @@ void main() {
     // DEBUG: green stripe at ocean wave front (frontDist=0)
     float dbgOcean = exp(-frontDist * frontDist * 3.0);
     col = mix(col, vec3(0.0, 1.0, 0.1), dbgOcean * 0.85);
-
-    // DEBUG: white stripe at thinZone edge (frontDist=-3.5)
-    float dbgThin = exp(-(frontDist + 3.5) * (frontDist + 3.5) * 3.0);
-    col = mix(col, vec3(1.0, 1.0, 1.0), dbgThin * 0.85);
 
     // DEBUG: purple stripe at shoreEdgeBridge start (v_DistToWater=-4.0)
     float dbgBridge = exp(-(v_DistToWater + 4.0) * (v_DistToWater + 4.0) * 3.0);
