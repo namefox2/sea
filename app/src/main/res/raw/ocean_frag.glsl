@@ -229,7 +229,7 @@ void main() {
     float sNoiseF   = sin(v_World.x * 0.25 + u_Time * 0.40) * 1.4
                     + sin(v_World.x * 0.11 - u_Time * 0.28) * 0.9
                     + sin(v_World.x * 0.58 + u_Time * 0.62) * 0.5;
-    float waveFront = sNoiseF + 7.0 + waveH * 2.5; // dtw at wave's inland tip
+    float waveFront = sNoiseF + 3.5 + waveH * 1.5; // dtw at wave's inland tip
     float frontDist = v_DistToWater - waveFront;    // +ve = dry land, -ve = in water
 
     float curlT  = u_Time * 0.7;
@@ -302,9 +302,9 @@ void main() {
     float shoreNoise = sin(v_World.x * 0.25 + u_Time * 0.40) * 1.4
                      + sin(v_World.x * 0.11 - u_Time * 0.28) * 0.9
                      + sin(v_World.x * 0.58 + u_Time * 0.62) * 0.5;
-    float waveEdgeShift = waveH * 2.5;
+    float waveEdgeShift = waveH * 1.5;
     float shoreAlpha = 1.0 - smoothstep(shoreNoise - 0.5 + waveEdgeShift,
-                                         shoreNoise + 7.0 + waveEdgeShift, distToWater);
+                                         shoreNoise + 3.5 + waveEdgeShift, distToWater);
     // Thin film: make the last 3m before the wave front extra transparent so
     // the retreating wave looks like it's losing water, not fading colour.
     float thinAlpha = smoothstep(-3.5, 0.0, frontDist) * step(frontDist, 0.0);
