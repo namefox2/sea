@@ -328,18 +328,10 @@ void main() {
     float seam = smoothstep(0.90, 1.0, distNorm + horizNoise) * (1.0 - corrMask * 0.6);
     col = mix(col, u_HorizonColor * 0.85, seam * (1.0 - skyReflect * 0.8) * 0.55);
 
-    // ── Wet mudflat: dark right after wave retreats, gradually dries ─────────
-    // Structure: 파도/거품 (at frontDist≈0) → 갯벌 (frontDist > 0, wet→dry)
-    float mudBase    = exp(-frontDist * 0.20) * step(0.0, frontDist);
-    float dryAnim    = sin(u_Time * 0.10 + frontDist * 0.28) * 0.35 + 0.65;
-    float mudWetness = mudBase * dryAnim;
-    col = mix(col, u_SandWetColor * 0.70, mudWetness * (1.0 - foamAlpha));
-
-    // Single foam band at wave front; mudflat starts right behind it
+    // Foam boost at wave front: shoreAlpha→0 at frontDist=0 so foam needs its own alpha.
     float foamBoostZone = smoothstep(-3.5, 0.0, frontDist)
                         * (1.0 - smoothstep(0.0, 2.0, frontDist));
     float finalAlpha = min(shoreAlpha
-                          + foamAlpha  * foamBoostZone * (0.18 + windS * 0.62)
-                          + mudWetness * 0.85, 1.0);
+                          + foamAlpha * foamBoostZone * (0.18 + windS * 0.62), 1.0);
     gl_FragColor = vec4(col, finalAlpha);
 }
