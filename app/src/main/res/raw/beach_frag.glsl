@@ -201,6 +201,10 @@ void main() {
     float waveReach = max(t1 * (1.2 + u_WindAmp * 2.0) + t2 * (0.5 + u_WindAmp * 1.0),
                           minReach) * (0.65 + reachNoise * 0.55);
 
+    // Wave gate: 0 between waves, 1 when wave actively arrives.
+    // Prevents shallowZone/swash/wetSand from firing on minReach alone.
+    float waveActive = smoothstep(0.05, 0.40, t1 + t2 * 0.5);
+
     // distToWave: <0 = wave is here (wet), >0 = wave tip hasn't arrived yet
     float distToWave       = distToWater - waveReach;
     float waterSurfaceMask = smoothstep(1.5, -1.0, distToWave);
@@ -226,7 +230,7 @@ void main() {
         float bodyW    = waveReach * 1.3 + 1.5;
         edgeFade   = smoothstep(bodyW, 0.0, abs(distToWave));
         // Quadratic alpha: very transparent near surface, opaque in deeper water
-        waterAlpha = mix(0.08, 0.58, depth * depth) * edgeFade;
+        waterAlpha = mix(0.08, 0.58, depth * depth) * edgeFade * waveActive;
         // Water color: muddy yellowish-teal (bridges cool ocean ↔ warm mudflat)
         vec3 muddyTeal = vec3(0.22, 0.58, 0.44);
         float depthAdv = clamp(depth * 1.8, 0.0, 1.0);
@@ -242,7 +246,7 @@ void main() {
 
     // ── 2. Swash zone: thin wet film behind wave tip ───────────────────────────
     float swashDist   = max(distToWave, 0.0);
-    float swashFactor = smoothstep(waveReach * 0.55 + 0.5, 0.0, swashDist) * step(0.0, distToWater);
+    float swashFactor = smoothstep(waveReach * 0.55 + 0.5, 0.0, swashDist) * step(0.0, distToWater) * waveActive;
     swashFactor *= swashFactor;
     if (swashFactor > 0.001) {
         float shimmer  = bN(v_World.xz * 0.55 + vec2(u_Time * 0.07, -u_Time * 0.05)) * 0.40 + 0.60;
@@ -253,7 +257,7 @@ void main() {
 
     // ── 3. Wet sand: dark reflective strip behind swash ───────────────────────
     // Reference shows very dark wet sand with sky reflection — make it prominent.
-    float wetSandFactor = smoothstep(5.0, 0.0, max(distToWave - 1.0, 0.0)) * step(0.0, distToWater);
+    float wetSandFactor = smoothstep(5.0, 0.0, max(distToWave - 1.0, 0.0)) * step(0.0, distToWater) * waveActive;
     if (wetSandFactor > 0.001) {
         baseColor = mix(baseColor, wetSand * 0.72, wetSandFactor * 0.68);
         // Wet sand sky reflection + sun glint through ripple normal
