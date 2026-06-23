@@ -247,12 +247,12 @@ void main() {
 
     // Breaking foam (파도가 부서질 때): tight band at wave tip.
     // [TUNE] 1.3 → breaking foam band width in metres (raise to widen)
-    float tipBand = smoothstep(1.3, 0.0, abs(distToWave)) * (0.35 + 0.65 * waveStrength);
+    float tipBand = smoothstep(1.3, 0.0, abs(distToWave));
 
     // Retreating foam (파도가 되돌아갈 때): trail behind the receding tip.
     // [TUNE] 0.40 → multiplier of waveReach for trail length  0.25 → fixed minimum (m)
     float retreatLen  = waveReach * 0.40 + 0.25;
-    float retreatFoam = smoothstep(retreatLen, 0.0, swashDist) * waveStrength;
+    float retreatFoam = smoothstep(retreatLen, 0.0, swashDist);
 
     // Curl base UV: lateral oscillation + slow shoreward drift gives rolling feel
     float curlT2 = u_Time * 0.65;
@@ -283,7 +283,7 @@ void main() {
 
     // Soft off-white foam — less blinding than pure white
     vec3 foamCol = mix(vec3(0.82, 0.87, 0.90), vec3(0.93, 0.96, 0.98), tipBand);
-    baseColor = mix(baseColor, foamCol, foamTotal * 0.62);
+    baseColor = mix(baseColor, foamCol, foamTotal * 0.82);
 
     // ── Atmospheric fog ────────────────────────────────────────────────────────
     float fogZ    = max(18.0 - v_World.z, 0.0);
