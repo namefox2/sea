@@ -275,9 +275,10 @@ void main() {
     // waterline. Gaussian (±1.5m) creates a natural frothy band at the tip.
     // Edge foam: windS² so it's near-zero at calm and grows quickly with wind.
     // Calm seas barely break → hair-thin faint line; rough seas → wide white band.
-    float edgeFoam = exp(-frontDist * frontDist * 0.45) * foamGrain * (windS * windS * 0.90 + 0.04);
+    // No + 0.04 baseline — purely wind-scaled so calm seas have no constant foam.
+    float edgeFoam = exp(-frontDist * frontDist * 0.45) * foamGrain * windS * windS * 0.90;
 
-    float foam = 0.0; // disabled — reconditioning
+    float foam = clamp(edgeFoam + whitecap, 0.0, 1.0);
 
     // Thin water near the wave tip: blend col toward a pale sandy tint in the last
     // 3m before the wave front. Ultra-shallow water over mudflat shows the bottom
