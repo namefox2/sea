@@ -238,6 +238,8 @@ void main() {
                         wCol * (1.0 + caust * 0.4), depthAdv);
         wRef = mix(wRef, u_Horizon * 0.55, wFres * 0.18);
         baseColor  = mix(baseColor, wRef, waterAlpha);
+        // DEBUG: red where waterAlpha is active (beach shallow water body)
+        baseColor = mix(baseColor, vec3(1.0, 0.05, 0.05), waterAlpha * 0.75);
         // Subtle specular glint on runup water
         baseColor += vec3(0.90, 0.95, 1.00) * wSpec * waterAlpha * 0.32;
     }

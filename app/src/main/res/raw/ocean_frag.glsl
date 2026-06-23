@@ -331,5 +331,10 @@ void main() {
                         * (1.0 - smoothstep(0.0, 2.0, frontDist));
     float finalAlpha = min(shoreAlpha
                           + foamAlpha * foamBoostZone * (0.18 + windS * 0.62), 1.0);
-    gl_FragColor = vec4(col, finalAlpha);
+
+    // DEBUG: green stripe at ocean wave front (frontDist=0)
+    float dbgOcean = exp(-frontDist * frontDist * 3.0);
+    col = mix(col, vec3(0.0, 1.0, 0.1), dbgOcean * 0.85);
+
+    gl_FragColor = vec4(col, max(finalAlpha, dbgOcean * 0.85));
 }
