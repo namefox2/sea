@@ -238,6 +238,8 @@ void main() {
                         wCol * (1.0 + caust * 0.4), depthAdv);
         wRef = mix(wRef, u_Horizon * 0.55, wFres * 0.18);
         baseColor  = mix(baseColor, wRef, waterAlpha);
+        // DEBUG: red where waterAlpha is active
+        baseColor = mix(baseColor, vec3(1.0, 0.05, 0.05), waterAlpha * 0.75);
         // Subtle specular glint on runup water
         baseColor += vec3(0.90, 0.95, 1.00) * wSpec * waterAlpha * 0.32;
     }
@@ -297,6 +299,10 @@ void main() {
     baseColor *= mix(1.0, 0.50, foamTotal);
     vec3 foamCol = mix(vec3(0.82, 0.87, 0.90), vec3(0.93, 0.96, 0.98), tipBand);
     baseColor = mix(baseColor, foamCol, foamTotal * 0.82);
+
+    // DEBUG: magenta stripe at distToWave=0 (beach wave tip)
+    float dbgEdge = smoothstep(0.4, 0.0, abs(distToWave));
+    baseColor = mix(baseColor, vec3(1.0, 0.0, 0.8), dbgEdge * 0.85);
 
     // ── Atmospheric fog ────────────────────────────────────────────────────────
     float fogZ    = max(18.0 - v_World.z, 0.0);
