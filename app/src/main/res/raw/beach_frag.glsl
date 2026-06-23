@@ -176,29 +176,27 @@ void main() {
     float wFres = pow(1.0 - max(dot(waterN, V), 0.0), 3.0);
 
     // ── Wave cycles — phase-locked to Gerstner primary wave in ocean_vert ───
-    // Uses the same L0 / spd values so the beach surge starts exactly when
-    // the ocean wave crest reaches u_WaterlineZ (realistic wave-runup timing).
+    // windS normalises u_WindAmp to [0,1] — beach wave math was designed for
+    // this range; raw values like 12 blew minReach to 9.85 m and waveReach to
+    // 25 m, making the beach look permanently flooded regardless of wave state.
+    float windS = smoothstep(0.0, 1.0, u_WindAmp);
+
     float wx   = v_World.x * 0.13;
-    float L0   = mix(8.0, 16.0, u_WindAmp);     // must match ocean_vert.glsl
-    float spd0 = mix(0.85, 1.65, u_WindAmp);
+    float L0   = mix(8.0, 16.0, windS);     // must match ocean_vert.glsl
+    float spd0 = mix(0.85, 1.65, windS);
     float k0   = 6.28318 / L0;
-    float om0  = spd0 * k0;                      // angular frequency ≈ 0.66 rad/s
-    // Per-column offset: small angle so columns arrive in a natural diagonal
-    // wave-front pattern — much tighter than before (was ±π = random scramble).
-    float ph1  = bN(vec2(wx,            0.5)) * 3.2;  // wider per-column timing spread
+    float om0  = spd0 * k0;
+    float ph1  = bN(vec2(wx,            0.5)) * 3.2;
     float ph2  = bN(vec2(wx * 1.8 + 4.0, 0.5)) * 2.1;
-    // t1 peaks (→1) when the primary Gerstner crest is at waterlineZ
     float t1   = max(sin(k0 * u_WaterlineZ - om0 * u_Time + ph1) * 0.5 + 0.5, 0.0);
     t1 = t1 * t1;
-    // t2: secondary harmonic (wavelength L0*0.58, matches ocean_vert 2nd component)
     float k1   = k0 / 0.58;
     float t2   = max(sin(k1 * u_WaterlineZ - om0 * 1.25 * u_Time + ph2) * 0.5 + 0.5, 0.0);
     t2 = t2 * t2;
-    float minReach  = 0.25 + u_WindAmp * 0.8;
-    // Per-column reach noise breaks up the straight wave front
+    float minReach  = 0.25 + windS * 0.8;
     float reachNoise = bN(vec2(wx * 0.7, u_Time * 0.05)) * 0.55
                      + bN(vec2(wx * 0.25 + 3.0, u_Time * 0.03)) * 0.45;
-    float waveReach = max(t1 * (1.2 + u_WindAmp * 2.0) + t2 * (0.5 + u_WindAmp * 1.0),
+    float waveReach = max(t1 * (1.2 + windS * 2.0) + t2 * (0.5 + windS * 1.0),
                           minReach) * (0.65 + reachNoise * 0.55);
 
     // Wave gate: 0 between waves, 1 when wave actively arrives.
@@ -266,12 +264,10 @@ void main() {
     }
 
     // ── 4. Foam: breaks on arrival, lingers on retreat ───────────────────────
-    // Wind scale: calm=40% min (always some foam when waves arrive), windy=100%.
-    float windS        = smoothstep(0.0, 1.0, u_WindAmp);
     float windFoamMult = 0.40 + windS * 0.60;
 
     // Wave strength: proportional to current wave height — no wave, no foam.
-    float reachNorm   = clamp(waveReach / (4.0 + u_WindAmp * 6.2), 0.0, 1.0);
+    float reachNorm   = clamp(waveReach / (4.0 + windS * 6.2), 0.0, 1.0);
     float waveStrength = reachNorm * reachNorm;
 
     // Breaking foam (파도가 부서질 때): tight band at wave tip.
