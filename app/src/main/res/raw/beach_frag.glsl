@@ -47,8 +47,8 @@ void main() {
     float dCam     = max(length(toFragXZ), 0.01);
 
     // ── Color palette ─────────────────────────────────────────────────────────
-    vec3 drySand        = vec3(0.76, 0.68, 0.52);
-    vec3 wetSand        = vec3(0.42, 0.36, 0.26);
+    vec3 drySand        = vec3(0.62, 0.52, 0.36);
+    vec3 wetSand        = vec3(0.29, 0.22, 0.12);
     vec3 mudflatShallow = vec3(0.28, 0.24, 0.18);
     vec3 mudflatDeep    = vec3(0.18, 0.15, 0.11);
     vec3 tidalPool      = vec3(0.12, 0.16, 0.22);
@@ -230,7 +230,7 @@ void main() {
     // Reference shows very dark wet sand with sky reflection — make it prominent.
     float wetSandFactor = smoothstep(5.0, 0.0, max(distToWave - 1.0, 0.0)) * step(0.0, distToWater);
     if (wetSandFactor > 0.001) {
-        baseColor = mix(baseColor, wetSand * 0.72, wetSandFactor * 0.52);
+        baseColor = mix(baseColor, wetSand * 0.72, wetSandFactor * 0.68);
         // Wet sand sky reflection + sun glint through ripple normal
         vec3 wetRefl = mix(u_Horizon * 0.58, vec3(0.90, 0.95, 1.00), wSpec * 0.35);
         baseColor = mix(baseColor, wetRefl, wetSandFactor * 0.22 * (1.0 - u_TidePercent * 0.3));
@@ -240,8 +240,7 @@ void main() {
     // Reference photo: foam covers a WIDE area (several metres), not just a thin line.
     // Peak at wave tip, then slowly dissolves over ~8 m of beach.
     float reachNorm = waveReach / (4.0 + u_WindAmp * 6.2);  // 0=trough, 1=full crest
-    // Wider tip band (2 m vs 0.9 m): matches the broad white front in reference
-    float tipBand   = smoothstep(2.0, 0.0, abs(distToWave)) * (0.5 + 0.5 * reachNorm);
+    float tipBand   = smoothstep(1.3, 0.0, abs(distToWave)) * (0.5 + 0.5 * reachNorm);
 
     // Trail: foam persists behind wave tip.
     // Guard: trailGrd starts rising at (waveReach×0.5+0.6), which is the approximate
@@ -249,8 +248,8 @@ void main() {
     // staggered and never overlap.  When shorelineMask is still high (dtw small),
     // trailGrd is zero; when trailGrd finally rises, shorelineMask has already fallen.
     // This eliminates the bell-curve product peak seen at dtw≈2.5-3.0m for large waveReach.
-    float trailGrdStart = max(1.0, waveReach * 0.5 + 0.6);
-    float trailFade = smoothstep(waveReach * 0.65 + 0.4, 0.0, swashDist)
+    float trailGrdStart = max(0.7, waveReach * 0.33 + 0.40);
+    float trailFade = smoothstep(waveReach * 0.42 + 0.26, 0.0, swashDist)
                     * smoothstep(trailGrdStart, trailGrdStart + 2.0, distToWater);
 
     // Curl base UV: lateral oscillation + slow shoreward drift gives rolling feel
@@ -278,8 +277,8 @@ void main() {
     // with swell height (waveReach=5m → mask still 0.76 at dtw=3m → too wide).
     // Wave-tip belt (±1.5 m around waveReach): keeps the active foam front visible
     // regardless of how far the wave has travelled up the beach.
-    float shoreMask2   = smoothstep(2.5, 0.0, distToWater);
-    float tipZoneMask  = smoothstep(1.5, 0.0, abs(distToWater - waveReach));
+    float shoreMask2   = smoothstep(1.6, 0.0, distToWater);
+    float tipZoneMask  = smoothstep(1.0, 0.0, abs(distToWater - waveReach));
     float shorelineMask = max(shoreMask2, tipZoneMask * 0.75);
     float beachGuard = smoothstep(-0.5, 0.4, distToWater);
     float foamFront  = tipBand   * laceMask * beachGuard;
@@ -288,7 +287,7 @@ void main() {
 
     // Soft off-white foam — less blinding than pure white
     vec3 foamCol = mix(vec3(0.82, 0.87, 0.90), vec3(0.93, 0.96, 0.98), tipBand);
-    baseColor = mix(baseColor, foamCol, foamTotal * 0.82);
+    baseColor = mix(baseColor, foamCol, foamTotal * 0.62);
 
     // ── Atmospheric fog ────────────────────────────────────────────────────────
     float fogZ    = max(18.0 - v_World.z, 0.0);
