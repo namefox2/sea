@@ -239,7 +239,7 @@ void main() {
     );
 
     // Distance-based bubble scale: large dots near camera, finer texture far away.
-    float bubScale  = mix(3.0, 9.0, clamp(dist / 40.0, 0.0, 1.0));
+    float bubScale  = mix(5.0, 9.0, clamp(dist / 40.0, 0.0, 1.0));
     float bub1 = foamCells(foamUV * bubScale);
     float bub2 = foamCells(foamUV * (bubScale * 1.8) + vec2(2.3, 1.7));
     float bub3 = foamCells(foamUV * (bubScale * 2.9) + vec2(5.1, 3.9));
@@ -333,25 +333,21 @@ void main() {
     float seam = smoothstep(0.90, 1.0, distNorm + horizNoise) * (1.0 - corrMask * 0.6);
     col = mix(col, u_HorizonColor * 0.85, seam * (1.0 - skyReflect * 0.8) * 0.55);
 
-    // Wet zone: seaward side (shallow water showing wet mudflat through it)
-    // + inland side (exposed wet beach after wave retreats).
-    // Seaward: frontDist -8→0 (8m of near-shore shallow ocean tinted muddy)
-    // Inland:  frontDist  0→5 (5m of exposed wet beach after wave)
-    float wetSeaward = smoothstep(-8.0, 0.0, frontDist) * step(frontDist, 0.0);
+    // Wet zone: seaward (shallow water showing wet mudflat) + inland (exposed wet beach).
+    // Seaward range scales with wind: calm=2.5m, windy=8m.
+    float wetRange   = mix(2.5, 8.0, windS);
+    float wetSeaward = smoothstep(-wetRange, 0.0, frontDist) * step(frontDist, 0.0);
     float wetInland  = (1.0 - smoothstep(0.0, 5.0, frontDist))
                      * smoothstep(-0.5, 0.5, frontDist);
     float wetSheen   = max(wetSeaward * 0.85, wetInland);
-
-    // DIAGNOSTIC: full wet zone → bright green.
-    col = mix(col, vec3(0.0, 1.0, 0.4), wetSheen * 0.90);
+    col = mix(col, u_SandWetColor * 0.82, wetSheen * (1.0 - foamAlpha) * 0.65);
 
     // Edge foam visible through thin/transparent water; wet sheen adds faint alpha
     // on the dry beach to show the damp surface where the wave retreated.
     float foamBoostZone = smoothstep(-3.5, 0.0, frontDist)
                         * (1.0 - smoothstep(0.0, 2.0, frontDist));
-    // foamBoostZone multiplier also scales with wind so calm seas show minimal foam.
     float finalAlpha    = min(shoreAlpha
                             + foamAlpha  * foamBoostZone * (0.18 + windS * 0.62)
-                            + wetSheen   * 0.70, 1.0);
+                            + wetSheen   * (0.08 + windS * 0.08), 1.0);
     gl_FragColor = vec4(col, finalAlpha);
 }
