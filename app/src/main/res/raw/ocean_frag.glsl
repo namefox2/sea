@@ -262,9 +262,7 @@ void main() {
                     + vnoise(foamUV * 0.80 - u_Time * vec2(0.03, 0.07)) * 0.40;
     float foamMod   = 0.40 + 0.60 * smoothstep(0.25, 0.72, foamLifeN);
     float shoreDecay = mix(0.40, 0.14, windS);
-    // tipHandoff: suppress ocean foam near the green line so beach foam owns that zone
-    float tipHandoff = smoothstep(0.0, -2.5, frontDist);
-    float nearShore  = exp(min(frontDist, 0.0) * shoreDecay) * step(frontDist, 0.0) * tipHandoff;
+    float nearShore  = exp(min(frontDist, 0.0) * shoreDecay) * step(frontDist, 0.0);
     float shoreFoam = nearShore * swashMod * foamMod * (0.08 + windS * 0.82) * foamGrain;
 
     // Open-ocean whitecaps: v_Foam is high far from shore where waves aren't damped.
