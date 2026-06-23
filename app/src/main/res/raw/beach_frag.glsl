@@ -272,14 +272,14 @@ void main() {
     float reachNorm   = clamp(waveReach / (4.0 + windS * 6.2), 0.0, 1.0);
     float waveStrength = reachNorm * reachNorm;
 
-    // Breaking foam (파도가 부서질 때): tight band at wave tip.
-    // [TUNE] 1.3 → breaking foam band width in metres (raise to widen)
-    float tipBand = smoothstep(2.3, 0.0, abs(distToWave));
+    // Breaking foam (파도가 부서질 때): tight band at wave tip, ocean side only.
+    // [TUNE] 2.3 → breaking foam band width in metres (raise to widen)
+    float tipBand = smoothstep(2.3, 0.0, -distToWave) * step(distToWave, 0.0);
 
     // Retreating foam (파도가 되돌아갈 때): trail behind the receding tip.
     // [TUNE] 0.40 → multiplier of waveReach for trail length  0.25 → fixed minimum (m)
     float retreatLen  = waveReach * 1.40 + 0.25;
-    float retreatFoam = smoothstep(retreatLen, 0.0, swashDist);
+    float retreatFoam = smoothstep(retreatLen, 0.0, -distToWave) * step(distToWave, 0.0);
 
     // Voronoi bubble texture — same approach as ocean shader
     float curlT2 = u_Time * 0.65;
