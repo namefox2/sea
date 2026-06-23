@@ -188,10 +188,10 @@ void main() {
     float waterSurfaceMask = smoothstep(1.5, -1.0, distToWave);
 
     // Turquoise tint: gated on waterSurfaceMask so it only shows when wave is present.
-    // [TUNE] 1.5 = tint reach in metres from waterline (reduced from 5.0 to cut cyan band)
-    // [TUNE] 0.18 = tint strength (reduced from 0.28)
+    // [TUNE] 2.5 = tint reach in metres from waterline (widened from 1.5 to soften edge)
+    // [TUNE] 0.18 = tint strength
     vec3  waterTint  = vec3(0.28, 0.82, 0.76);
-    float shoreBlend = smoothstep(1.5, -0.5, distToWater) * waterSurfaceMask * waveActive;
+    float shoreBlend = smoothstep(2.5, -0.5, distToWater) * waterSurfaceMask * waveActive;
     baseColor = mix(baseColor, waterTint * 0.85, shoreBlend * 0.18);
 
     // ── 1. Shallow water body ─────────────────────────────────────────────────
@@ -244,9 +244,8 @@ void main() {
         baseColor = mix(baseColor, wetRefl, wetSandFactor * 0.22 * (1.0 - u_TidePercent * 0.3));
     }
 
-    // DEBUG: bright blue where waterTint (shoreBlend) is active
-    float dbgWaterTint = smoothstep(0.0, 0.05, shoreBlend);
-    baseColor = mix(baseColor, vec3(0.0, 0.4, 1.0), dbgWaterTint * 0.6);
+    // DEBUG: bright blue where waterTint (shoreBlend) is active — gradient so edge is soft
+    baseColor = mix(baseColor, vec3(0.0, 0.4, 1.0), shoreBlend * 0.6);
 
     // DEBUG: magenta stripe at distToWave=0 (beach wave tip)
     float dbgEdge = smoothstep(0.4, 0.0, abs(distToWave));
@@ -256,8 +255,8 @@ void main() {
     float dbgWsm = smoothstep(0.3, 0.0, abs(distToWave - 1.5));
     baseColor = mix(baseColor, vec3(1.0, 1.0, 0.0), dbgWsm * 0.85);
 
-    // DEBUG: orange stripe at distToWater=5.0 (shoreBlend/waterTint edge)
-    float dbgShore = smoothstep(0.3, 0.0, abs(distToWater - 5.0));
+    // DEBUG: orange stripe at distToWater=2.5 (shoreBlend/waterTint upper edge)
+    float dbgShore = smoothstep(0.3, 0.0, abs(distToWater - 2.5));
     baseColor = mix(baseColor, vec3(1.0, 0.5, 0.0), dbgShore * 0.85);
 
     // ── Atmospheric fog ────────────────────────────────────────────────────────

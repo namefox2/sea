@@ -289,9 +289,10 @@ void main() {
 
     // ── 7. Shore fade — ocean goes transparent near waterline ────────────────
     // sNoiseF (computed above for waveFront) is identical — reuse it
+    // Widened from 4 m (-0.5..+3.5) to 7 m (-1.5..+5.5) for a softer edge.
     float waveEdgeShift = waveH * 1.5;
-    float shoreAlpha = 1.0 - smoothstep(sNoiseF - 0.5 + waveEdgeShift,
-                                         sNoiseF + 3.5 + waveEdgeShift, v_DistToWater);
+    float shoreAlpha = 1.0 - smoothstep(sNoiseF - 1.5 + waveEdgeShift,
+                                         sNoiseF + 5.5 + waveEdgeShift, v_DistToWater);
 
     // ── 8. Sky reflection + noisy horizon seam ───────────────────────────────
     // Grazing-angle Fresnel: far water reflects sky.
