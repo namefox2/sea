@@ -333,13 +333,16 @@ void main() {
     float seam = smoothstep(0.90, 1.0, distNorm + horizNoise) * (1.0 - corrMask * 0.6);
     col = mix(col, u_HorizonColor * 0.85, seam * (1.0 - skyReflect * 0.8) * 0.55);
 
-    // Wet mudflat: where the wave has just passed, the exposed mud is darker and
-    // slightly reflective. frontDist>0 = past the wave tip (dry land). Wet zone
-    // extends 0→3m inland; ramps in over 0.5m so it doesn't start on the foam edge.
-    float wetSheen = (1.0 - smoothstep(0.0, 3.0, frontDist))
-                   * smoothstep(-0.5, 0.5, frontDist);
+    // Wet zone: seaward side (shallow water showing wet mudflat through it)
+    // + inland side (exposed wet beach after wave retreats).
+    // Seaward: frontDist -8→0 (8m of near-shore shallow ocean tinted muddy)
+    // Inland:  frontDist  0→5 (5m of exposed wet beach after wave)
+    float wetSeaward = smoothstep(-8.0, 0.0, frontDist) * step(frontDist, 0.0);
+    float wetInland  = (1.0 - smoothstep(0.0, 5.0, frontDist))
+                     * smoothstep(-0.5, 0.5, frontDist);
+    float wetSheen   = max(wetSeaward * 0.85, wetInland);
 
-    // DIAGNOSTIC: wet zone → bright green so its position/size is visible.
+    // DIAGNOSTIC: full wet zone → bright green.
     col = mix(col, vec3(0.0, 1.0, 0.4), wetSheen * 0.90);
 
     // Edge foam visible through thin/transparent water; wet sheen adds faint alpha
