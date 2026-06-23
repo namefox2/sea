@@ -339,14 +339,15 @@ void main() {
     // 3. Retreated   (frontDist >  0): wet sand exposed on beach where wave pulled back
     float wetInland  = (1.0 - smoothstep(0.0, 5.0, frontDist))
                      * smoothstep(-0.5, 0.5, frontDist);
-    col = mix(col, u_SandWetColor * 0.82, wetInland * (1.0 - foamAlpha) * 0.92);
+    // Full color replacement (1.0) so no ocean blue bleeds through; darker wet sand (0.72)
+    col = mix(col, u_SandWetColor * 0.72, wetInland * (1.0 - foamAlpha));
 
     float foamBoostZone = smoothstep(-3.5, 0.0, frontDist)
                         * (1.0 - smoothstep(0.0, 2.0, frontDist));
-    // Near-camera fadeout: removes foreground ocean right in front of camera
-    float nearFade   = smoothstep(3.0, 15.0, dist);
+    // Wider near-fade (22m) to suppress foreground ocean in A area
+    float nearFade   = smoothstep(3.0, 22.0, dist);
     float finalAlpha = min((shoreAlpha
                            + foamAlpha  * foamBoostZone * (0.18 + windS * 0.62)
-                           + wetInland  * 0.75) * nearFade, 1.0);
+                           + wetInland  * 0.85) * nearFade, 1.0);
     gl_FragColor = vec4(col, finalAlpha);
 }
