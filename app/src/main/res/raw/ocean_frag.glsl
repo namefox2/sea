@@ -277,7 +277,7 @@ void main() {
     // Calm seas barely break → hair-thin faint line; rough seas → wide white band.
     float edgeFoam = exp(-frontDist * frontDist * 0.45) * foamGrain * (windS * windS * 0.90 + 0.04);
 
-    float foam = clamp(shoreFoam + edgeFoam + whitecap, 0.0, 1.0);
+    float foam = 0.0; // disabled — reconditioning
 
     // Thin water near the wave tip: blend col toward a pale sandy tint in the last
     // 3m before the wave front. Ultra-shallow water over mudflat shows the bottom
