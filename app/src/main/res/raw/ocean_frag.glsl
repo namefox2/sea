@@ -294,13 +294,10 @@ void main() {
     col += yunseul * (1.0 - foamAlpha) * deepZone;
 
     // ── 7. Shore fade — ocean goes transparent near waterline ────────────────
-    float distToWater = v_DistToWater;
-    float shoreNoise = sin(v_World.x * 0.25 + u_Time * 0.40) * 1.4
-                     + sin(v_World.x * 0.11 - u_Time * 0.28) * 0.9
-                     + sin(v_World.x * 0.58 + u_Time * 0.62) * 0.5;
+    // sNoiseF (computed above for waveFront) is identical — reuse it
     float waveEdgeShift = waveH * 1.5;
-    float shoreAlpha = 1.0 - smoothstep(shoreNoise - 0.5 + waveEdgeShift,
-                                         shoreNoise + 3.5 + waveEdgeShift, distToWater);
+    float shoreAlpha = 1.0 - smoothstep(sNoiseF - 0.5 + waveEdgeShift,
+                                         sNoiseF + 3.5 + waveEdgeShift, v_DistToWater);
 
     // ── 8. Sky reflection + noisy horizon seam ───────────────────────────────
     // Grazing-angle Fresnel: far water reflects sky.

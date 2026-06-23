@@ -69,9 +69,10 @@ void main() {
     if (mudflatFactor > 0.02) {
         vec2 p = v_World.xz * 0.22;
         vec2 w1 = vec2(bN(p), bN(p + vec2(5.2, 1.3)));
+        vec2 warpBase = p * 1.7 + w1 * 1.6;
         vec2 wp = p + vec2(
-            bN(p * 1.7 + w1 * 1.6 + vec2(3.7, 9.2)),
-            bN(p * 1.7 + w1 * 1.6 + vec2(8.1, 2.8))
+            bN(warpBase + vec2(3.7, 9.2)),
+            bN(warpBase + vec2(8.1, 2.8))
         ) * 2.6;
 
         float ch1 = abs(sin(wp.y * 3.2 + wp.x * 0.5));
@@ -204,8 +205,7 @@ void main() {
     float waterAlpha = 0.0;
     if (shallowZone > 0.5) {
         float depth    = clamp(-distToWave / max(waveReach, 0.1), 0.0, 1.0);
-        float bodyW    = waveReach * 1.3 + 1.5;
-        edgeFade   = smoothstep(bodyW, 0.0, abs(distToWave));
+        edgeFade   = smoothstep(waveReach * 1.3 + 1.5, 0.0, abs(distToWave));
         // Quadratic alpha: very transparent near surface, opaque in deeper water
         waterAlpha = mix(0.08, 0.58, depth * depth) * edgeFade * waveActive;
         // Water color: muddy yellowish-teal (bridges cool ocean ↔ warm mudflat)
