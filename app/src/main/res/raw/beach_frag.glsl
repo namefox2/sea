@@ -153,9 +153,6 @@ void main() {
         baseColor += u_AmbientColor * (1.0 - NdotL) * shadowStr * 0.18 * shadowBlend;
     }
     // Vivid turquoise tint matching reference photo shallow water (#00CED1 area)
-    vec3 waterTint = vec3(0.28, 0.82, 0.76);
-    float shoreBlend = smoothstep(5.0, -0.5, distToWater);
-    baseColor = mix(baseColor, waterTint * 0.85, shoreBlend * 0.28);
 
     // ── Caustics ──────────────────────────────────────────────────────────────
     float caust = sin(v_World.x * 3.8 + u_Time * 1.4) * sin(v_World.z * 4.3 - u_Time * 1.1);
@@ -207,6 +204,13 @@ void main() {
     // distToWave: <0 = wave is here (wet), >0 = wave tip hasn't arrived yet
     float distToWave       = distToWater - waveReach;
     float waterSurfaceMask = smoothstep(1.5, -1.0, distToWave);
+
+    // Turquoise tint: gated on waterSurfaceMask so it only shows when wave is present.
+    // [TUNE] 5.0 = tint reach in metres from waterline (distToWater axis)
+    // [TUNE] 0.28 = tint strength
+    vec3  waterTint  = vec3(0.28, 0.82, 0.76);
+    float shoreBlend = smoothstep(5.0, -0.5, distToWater) * waterSurfaceMask;
+    baseColor = mix(baseColor, waterTint * 0.85, shoreBlend * 0.28);
 
     // ── 1. Shallow water body ─────────────────────────────────────────────────
     vec3 bottomColor = baseColor;  // save terrain color — bleeds through shallow water
