@@ -274,8 +274,14 @@ void main() {
     // Tracks waveFront so it follows the actual rendered water edge, not a fixed
     // waterline. Gaussian (±1.5m) creates a natural frothy band at the tip.
     // Edge foam: windS² so it's near-zero at calm and grows quickly with wind.
-    // Calm seas barely break → hair-thin faint line; rough seas → wide white band.
-    float foam = clamp(whitecap, 0.0, 1.0);
+    // Shore foam: fills the zone between green line (frontDist=0) and magenta
+    // (beach wave tip, frontDist ≈ -2 to -3). Peaks at green, decays inward.
+    // step(frontDist, 0.8): extends just past green to blend with beach tipBand.
+    // windS² so calm seas have zero shore foam.
+    float nearShore = exp(min(frontDist, 0.0) * 0.30) * step(frontDist, 0.8);
+    float shoreFoam = nearShore * windS * windS * 0.85 * foamGrain;
+
+    float foam = clamp(whitecap + shoreFoam, 0.0, 1.0);
 
     // Thin water near the wave tip: blend col toward a pale sandy tint in the last
     // 3m before the wave front. Ultra-shallow water over mudflat shows the bottom
