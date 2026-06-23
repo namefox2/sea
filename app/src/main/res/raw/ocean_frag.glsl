@@ -344,11 +344,11 @@ void main() {
 
     float foamBoostZone = smoothstep(-3.5, 0.0, frontDist)
                         * (1.0 - smoothstep(0.0, 2.0, frontDist));
-    // nearFade only suppresses wetInland/foam overlay near camera — NOT shoreAlpha.
-    // shoreAlpha represents real ocean water; fading it removes the sea at high tide.
+    // nearFade suppresses only foam; wetInland is outside nearFade because these
+    // pixels are geometrically near the camera — nearFade would kill their alpha.
     float nearFade   = smoothstep(3.0, 22.0, dist);
     float finalAlpha = min(shoreAlpha
-                          + (foamAlpha * foamBoostZone * (0.18 + windS * 0.62)
-                          +  wetInland * 0.35) * nearFade, 1.0);
+                          + foamAlpha * foamBoostZone * (0.18 + windS * 0.62) * nearFade
+                          + wetInland * 0.35, 1.0);
     gl_FragColor = vec4(col, finalAlpha);
 }
