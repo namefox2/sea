@@ -26,6 +26,27 @@ float bN(vec2 p) {
     return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
 }
 
+// ── Voronoi cellular foam texture ─────────────────────────────────────────
+vec2 h21v(vec2 p) {
+    p = fract(p * vec2(127.1, 311.7));
+    p += dot(p, p + 43.2);
+    return fract(vec2(p.x * p.y, p.x + p.y));
+}
+float foamCells(vec2 p) {
+    vec2 ip = floor(p); vec2 fp = fract(p);
+    vec2 rp; vec2 d; float md = 8.0;
+    rp=h21v(ip+vec2(-1,-1))*0.80+0.10; d=vec2(-1,-1)+rp-fp; md=min(md,dot(d,d));
+    rp=h21v(ip+vec2( 0,-1))*0.80+0.10; d=vec2( 0,-1)+rp-fp; md=min(md,dot(d,d));
+    rp=h21v(ip+vec2( 1,-1))*0.80+0.10; d=vec2( 1,-1)+rp-fp; md=min(md,dot(d,d));
+    rp=h21v(ip+vec2(-1, 0))*0.80+0.10; d=vec2(-1, 0)+rp-fp; md=min(md,dot(d,d));
+    rp=h21v(ip+vec2( 0, 0))*0.80+0.10; d=vec2( 0, 0)+rp-fp; md=min(md,dot(d,d));
+    rp=h21v(ip+vec2( 1, 0))*0.80+0.10; d=vec2( 1, 0)+rp-fp; md=min(md,dot(d,d));
+    rp=h21v(ip+vec2(-1, 1))*0.80+0.10; d=vec2(-1, 1)+rp-fp; md=min(md,dot(d,d));
+    rp=h21v(ip+vec2( 0, 1))*0.80+0.10; d=vec2( 0, 1)+rp-fp; md=min(md,dot(d,d));
+    rp=h21v(ip+vec2( 1, 1))*0.80+0.10; d=vec2( 1, 1)+rp-fp; md=min(md,dot(d,d));
+    return 1.0 - smoothstep(0.02, 0.30, sqrt(md));
+}
+
 // ── Micro-terrain height field ─────────────────────────────────────────────
 float tidalH(vec2 p) {
     float h  = sin(p.y * 16.0 + p.x * 1.8) * 0.38 + 0.38;
@@ -241,6 +262,41 @@ void main() {
         vec3 wetRefl = mix(u_Horizon * 0.58, vec3(0.90, 0.95, 1.00), wSpec * 0.35);
         baseColor = mix(baseColor, wetRefl, wetSandFactor * 0.22 * (1.0 - u_TidePercent * 0.3));
     }
+
+    // ── 4. Foam ───────────────────────────────────────────────────────────────
+    float windFoamMult = 0.40 + windS * 0.60;
+
+    // Beach foam: ocean side of magenta only (step gate = no camera-side crossing)
+    float tipBand     = smoothstep(2.3, 0.0, -distToWave) * step(distToWave, 0.0);
+    float retreatLen  = waveReach * 1.40 + 0.25;
+    float retreatFoam = smoothstep(retreatLen, 0.0, -distToWave) * step(distToWave, 0.0);
+
+    float curlT2 = u_Time * 0.65;
+    vec2  curlUV = v_World.xz + vec2(
+        sin(curlT2 * 1.1 + v_World.z * 0.55) * 0.35,
+        -curlT2 * 0.16
+    );
+    float densN  = bN(curlUV * 1.8 + u_Time * vec2(0.08, 0.05)) * 0.55
+                 + bN(curlUV * 4.5 - u_Time * vec2(0.04, 0.09)) * 0.45;
+    float density  = smoothstep(0.10, 0.50, densN);
+    float bub1 = foamCells(curlUV * 5.0);
+    float bub2 = foamCells(curlUV * 9.0  + vec2(2.3, 1.7));
+    float bub3 = foamCells(curlUV * 15.0 + vec2(5.1, 3.9));
+    float bubTex   = max(bub3, max(bub2 * 0.88, bub1 * 0.74)) * density;
+    float laceMask = smoothstep(0.08, 0.45, bubTex);
+
+    float shoreMask2    = smoothstep(2.6, 0.0, distToWater);
+    float tipZoneMask   = smoothstep(2.0, 0.0, abs(distToWater - waveReach));
+    float shorelineMask = max(shoreMask2, tipZoneMask * 0.75);
+    float beachGuard    = smoothstep(-0.5, 0.4, distToWater);
+
+    float foamBreak   = tipBand    * laceMask * beachGuard;
+    float foamRetreat = retreatFoam * laceMask * 1.50 * beachGuard;
+    float foamTotal   = clamp(foamBreak + foamRetreat, 0.0, 1.0) * windFoamMult * shorelineMask;
+
+    baseColor *= mix(1.0, 0.50, foamTotal);
+    vec3 foamCol = mix(vec3(0.82, 0.87, 0.90), vec3(0.93, 0.96, 0.98), tipBand);
+    baseColor = mix(baseColor, foamCol, foamTotal * 0.82);
 
     // ── Atmospheric fog ────────────────────────────────────────────────────────
     float fogZ    = max(18.0 - v_World.z, 0.0);
