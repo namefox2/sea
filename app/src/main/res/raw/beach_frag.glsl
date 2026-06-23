@@ -307,6 +307,10 @@ void main() {
     vec3 foamCol = mix(vec3(0.82, 0.87, 0.90), vec3(0.93, 0.96, 0.98), tipBand);
     baseColor = mix(baseColor, foamCol, foamTotal * 0.82);
 
+    // DEBUG: wave edge marker — bright magenta stripe at distToWave=0 (wave tip)
+    float dbgEdge = smoothstep(0.4, 0.0, abs(distToWave));
+    baseColor = mix(baseColor, vec3(1.0, 0.0, 0.8), dbgEdge * 0.85);
+
     // ── Atmospheric fog ────────────────────────────────────────────────────────
     float fogZ    = max(18.0 - v_World.z, 0.0);
     float fogFact = clamp(1.0 - exp(-fogZ * 0.008), 0.0, 0.45);
