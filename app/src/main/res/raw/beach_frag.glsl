@@ -26,6 +26,27 @@ float bN(vec2 p) {
     return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
 }
 
+// ── Voronoi cellular foam texture ─────────────────────────────────────────
+vec2 h21v(vec2 p) {
+    p = fract(p * vec2(127.1, 311.7));
+    p += dot(p, p + 43.2);
+    return fract(vec2(p.x * p.y, p.x + p.y));
+}
+float foamCells(vec2 p) {
+    vec2 ip = floor(p); vec2 fp = fract(p);
+    vec2 rp; vec2 d; float md = 8.0;
+    rp=h21v(ip+vec2(-1,-1))*0.80+0.10; d=vec2(-1,-1)+rp-fp; md=min(md,dot(d,d));
+    rp=h21v(ip+vec2( 0,-1))*0.80+0.10; d=vec2( 0,-1)+rp-fp; md=min(md,dot(d,d));
+    rp=h21v(ip+vec2( 1,-1))*0.80+0.10; d=vec2( 1,-1)+rp-fp; md=min(md,dot(d,d));
+    rp=h21v(ip+vec2(-1, 0))*0.80+0.10; d=vec2(-1, 0)+rp-fp; md=min(md,dot(d,d));
+    rp=h21v(ip+vec2( 0, 0))*0.80+0.10; d=vec2( 0, 0)+rp-fp; md=min(md,dot(d,d));
+    rp=h21v(ip+vec2( 1, 0))*0.80+0.10; d=vec2( 1, 0)+rp-fp; md=min(md,dot(d,d));
+    rp=h21v(ip+vec2(-1, 1))*0.80+0.10; d=vec2(-1, 1)+rp-fp; md=min(md,dot(d,d));
+    rp=h21v(ip+vec2( 0, 1))*0.80+0.10; d=vec2( 0, 1)+rp-fp; md=min(md,dot(d,d));
+    rp=h21v(ip+vec2( 1, 1))*0.80+0.10; d=vec2( 1, 1)+rp-fp; md=min(md,dot(d,d));
+    return 1.0 - smoothstep(0.02, 0.30, sqrt(md));
+}
+
 // ── Micro-terrain height field ─────────────────────────────────────────────
 float tidalH(vec2 p) {
     float h  = sin(p.y * 16.0 + p.x * 1.8) * 0.38 + 0.38;
@@ -254,19 +275,20 @@ void main() {
     float retreatLen  = waveReach * 0.40 + 0.25;
     float retreatFoam = smoothstep(retreatLen, 0.0, swashDist);
 
-    // Curl base UV: lateral oscillation + slow shoreward drift gives rolling feel
+    // Voronoi bubble texture — same approach as ocean shader
     float curlT2 = u_Time * 0.65;
     vec2  curlUV = v_World.xz + vec2(
         sin(curlT2 * 1.1 + v_World.z * 0.55) * 0.35,
         -curlT2 * 0.16
     );
-    // Lacy texture: coarse → cluster structure, fine → bubble holes
-    float fA = bN(curlUV * 0.45 + vec2( u_Time * 0.04, -u_Time * 0.03));
-    float fB = bN(curlUV * 1.50 - vec2( u_Time * 0.09,  u_Time * 0.06));
-    float fC = bN(curlUV * 3.80 + vec2( u_Time * 0.19, -u_Time * 0.12));
-    float foamNoise = fA * 0.45 + fB * 0.35 + fC * 0.20;
-    float thresh    = 0.38 - u_WindAmp * 0.15;    // windier → more foam area
-    float laceMask  = smoothstep(thresh, thresh + 0.22, foamNoise);
+    float densN  = bN(curlUV * 1.8 + u_Time * vec2(0.08, 0.05)) * 0.55
+                 + bN(curlUV * 4.5 - u_Time * vec2(0.04, 0.09)) * 0.45;
+    float density  = smoothstep(0.10, 0.50, densN);
+    float bub1 = foamCells(curlUV * 5.0);
+    float bub2 = foamCells(curlUV * 9.0  + vec2(2.3, 1.7));
+    float bub3 = foamCells(curlUV * 15.0 + vec2(5.1, 3.9));
+    float bubTex   = max(bub3, max(bub2 * 0.88, bub1 * 0.74)) * density;
+    float laceMask = smoothstep(0.08, 0.45, bubTex);
 
     // Foam area envelope
     // [TUNE] 1.6 → near-waterline foam width in metres (distToWater axis)
