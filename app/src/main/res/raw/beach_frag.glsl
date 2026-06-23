@@ -268,11 +268,11 @@ void main() {
 
     // Breaking foam (파도가 부서질 때): tight band at wave tip.
     // [TUNE] 1.3 → breaking foam band width in metres (raise to widen)
-    float tipBand = smoothstep(1.3, 0.0, abs(distToWave));
+    float tipBand = smoothstep(2.3, 0.0, abs(distToWave));
 
     // Retreating foam (파도가 되돌아갈 때): trail behind the receding tip.
     // [TUNE] 0.40 → multiplier of waveReach for trail length  0.25 → fixed minimum (m)
-    float retreatLen  = waveReach * 0.40 + 0.25;
+    float retreatLen  = waveReach * 1.40 + 0.25;
     float retreatFoam = smoothstep(retreatLen, 0.0, swashDist);
 
     // Voronoi bubble texture — same approach as ocean shader
@@ -293,14 +293,14 @@ void main() {
     // Foam area envelope
     // [TUNE] 1.6 → near-waterline foam width in metres (distToWater axis)
     // [TUNE] 1.0 → wave-tip band half-width in metres (around waveReach)
-    float shoreMask2    = smoothstep(1.6, 0.0, distToWater);
-    float tipZoneMask   = smoothstep(1.0, 0.0, abs(distToWater - waveReach));
+    float shoreMask2    = smoothstep(2.6, 0.0, distToWater);
+    float tipZoneMask   = smoothstep(2.0, 0.0, abs(distToWater - waveReach));
     float shorelineMask = max(shoreMask2, tipZoneMask * 0.75);
     float beachGuard    = smoothstep(-0.5, 0.4, distToWater);
 
     float foamBreak   = tipBand    * laceMask * beachGuard;
     // [TUNE] 0.50 → retreat foam intensity relative to breaking foam
-    float foamRetreat = retreatFoam * laceMask * 0.50 * beachGuard;
+    float foamRetreat = retreatFoam * laceMask * 1.50 * beachGuard;
     float foamTotal   = clamp(foamBreak + foamRetreat, 0.0, 1.0) * windFoamMult * shorelineMask;
 
     // Soft off-white foam — less blinding than pure white
