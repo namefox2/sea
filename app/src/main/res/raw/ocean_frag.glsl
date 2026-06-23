@@ -333,11 +333,29 @@ void main() {
     float seam = smoothstep(0.90, 1.0, distNorm + horizNoise) * (1.0 - corrMask * 0.6);
     col = mix(col, u_HorizonColor * 0.85, seam * (1.0 - skyReflect * 0.8) * 0.55);
 
-    // No separate wet sand zone — beach shows through naturally as shoreAlpha fades to 0.
-    // thinZone already makes the wave tip nearly transparent so the transition is smooth.
+    // ── Wet mudflat: dark right after wave retreats, gradually dries ─────────
+    // mudBase: exponential decay with distance past wave tip (0 → dry quickly).
+    // dryAnim: slow outward-propagating phase shift simulates water soaking in then drying.
+    float mudBase    = exp(-frontDist * 0.20) * step(0.0, frontDist);
+    float dryAnim    = sin(u_Time * 0.10 + frontDist * 0.28) * 0.35 + 0.65;
+    float mudWetness = mudBase * dryAnim;
+    col = mix(col, u_SandWetColor * 0.70, mudWetness * (1.0 - foamAlpha));
+
+    // Residual beach foam (거품): thin foam strip left by retreating wave on dry beach
+    float beachFoam = foamGrain * foamMod
+                    * smoothstep(4.0, 0.0, frontDist) * smoothstep(0.0, 0.5, frontDist)
+                    * (0.12 + windS * 0.48);
+
+    // Scene layers (bottom → top):
+    //  갯벌(mudWetness)  ← mudflat darkens when wet, slowly dries
+    //  거품(beachFoam)   ← thin foam on dry beach just past wave tip
+    //  파도(foamBoostZone) ← shore wave foam at water's edge
+    //  바다(shoreAlpha)  ← ocean body
     float foamBoostZone = smoothstep(-3.5, 0.0, frontDist)
                         * (1.0 - smoothstep(0.0, 2.0, frontDist));
     float finalAlpha = min(shoreAlpha
-                          + foamAlpha * foamBoostZone * (0.18 + windS * 0.62), 1.0);
+                          + foamAlpha  * foamBoostZone * (0.18 + windS * 0.62)
+                          + beachFoam  * 0.60
+                          + mudWetness * 0.85, 1.0);
     gl_FragColor = vec4(col, finalAlpha);
 }
