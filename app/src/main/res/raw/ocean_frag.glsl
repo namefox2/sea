@@ -335,5 +335,13 @@ void main() {
     float dbgOcean = exp(-frontDist * frontDist * 3.0);
     col = mix(col, vec3(0.0, 1.0, 0.1), dbgOcean * 0.85);
 
-    gl_FragColor = vec4(col, max(finalAlpha, dbgOcean * 0.85));
+    // DEBUG: white stripe at thinZone edge (frontDist=-3.5)
+    float dbgThin = exp(-(frontDist + 3.5) * (frontDist + 3.5) * 3.0);
+    col = mix(col, vec3(1.0, 1.0, 1.0), dbgThin * 0.85);
+
+    // DEBUG: purple stripe at shoreEdgeBridge start (v_DistToWater=-4.0)
+    float dbgBridge = exp(-(v_DistToWater + 4.0) * (v_DistToWater + 4.0) * 3.0);
+    col = mix(col, vec3(0.6, 0.0, 1.0), dbgBridge * 0.85);
+
+    gl_FragColor = vec4(col, max(finalAlpha, max(dbgOcean, max(dbgThin, dbgBridge)) * 0.85));
 }

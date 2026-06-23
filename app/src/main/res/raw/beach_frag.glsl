@@ -248,6 +248,14 @@ void main() {
     float dbgEdge = smoothstep(0.4, 0.0, abs(distToWave));
     baseColor = mix(baseColor, vec3(1.0, 0.0, 0.8), dbgEdge * 0.85);
 
+    // DEBUG: yellow stripe at distToWave=1.5 (waterSurfaceMask starts)
+    float dbgWsm = smoothstep(0.3, 0.0, abs(distToWave - 1.5));
+    baseColor = mix(baseColor, vec3(1.0, 1.0, 0.0), dbgWsm * 0.85);
+
+    // DEBUG: orange stripe at distToWater=5.0 (shoreBlend/waterTint edge)
+    float dbgShore = smoothstep(0.3, 0.0, abs(distToWater - 5.0));
+    baseColor = mix(baseColor, vec3(1.0, 0.5, 0.0), dbgShore * 0.85);
+
     // ── Atmospheric fog ────────────────────────────────────────────────────────
     float fogZ    = max(18.0 - v_World.z, 0.0);
     float fogFact = clamp(1.0 - exp(-fogZ * 0.008), 0.0, 0.45);
