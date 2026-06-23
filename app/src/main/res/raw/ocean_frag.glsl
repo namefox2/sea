@@ -332,5 +332,5 @@ void main() {
     float dbgBridge = exp(-(v_DistToWater + 4.0) * (v_DistToWater + 4.0) * 3.0);
     col = mix(col, vec3(0.6, 0.0, 1.0), dbgBridge * 0.85);
 
-    gl_FragColor = vec4(col, max(finalAlpha, max(dbgOcean, max(dbgThin, dbgBridge)) * 0.85));
+    gl_FragColor = vec4(col, max(finalAlpha, max(dbgOcean, dbgBridge) * 0.85));
 }
