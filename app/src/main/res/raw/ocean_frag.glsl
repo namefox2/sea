@@ -340,7 +340,9 @@ void main() {
     float wetInland  = (1.0 - smoothstep(0.0, 5.0, frontDist))
                      * smoothstep(-0.5, 0.5, frontDist);
     float wetSheen   = max(wetSeaward * 0.85, wetInland);
-    col = mix(col, u_SandWetColor * 0.82, wetSheen * (1.0 - foamAlpha) * 0.65);
+    // Non-foam wet: suppress ocean blue almost entirely (92% wet sand color).
+    // Foam pixels retain ocean tint naturally via (1 - foamAlpha) gate.
+    col = mix(col, u_SandWetColor * 0.82, wetSheen * (1.0 - foamAlpha) * 0.92);
 
     // Edge foam visible through thin/transparent water; wet sheen adds faint alpha
     // on the dry beach to show the damp surface where the wave retreated.
