@@ -303,8 +303,12 @@ void main() {
     float foamRetreat = retreatFoam * laceMask * 1.50 * beachGuard;
     float foamTotal   = clamp(foamBreak + foamRetreat, 0.0, 1.0) * windFoamMult * shorelineMask;
 
+    // Darken sand under foam for contrast — [TUNE] 0.50 (0.0=black, 1.0=no change)
+    baseColor *= mix(1.0, 0.50, foamTotal);
+
     // Soft off-white foam — less blinding than pure white
     vec3 foamCol = mix(vec3(0.82, 0.87, 0.90), vec3(0.93, 0.96, 0.98), tipBand);
+    // [TUNE] 0.82 = foam opacity (lower → more sand shows through)
     baseColor = mix(baseColor, foamCol, foamTotal * 0.82);
 
     // DEBUG: wave edge marker — bright magenta stripe at distToWave=0 (wave tip)
