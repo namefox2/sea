@@ -190,7 +190,7 @@ void main() {
     // [TUNE] 5.0 = tint reach in metres from waterline (distToWater axis)
     // [TUNE] 0.28 = tint strength
     vec3  waterTint  = vec3(0.28, 0.82, 0.76);
-    float shoreBlend = smoothstep(5.0, -0.5, distToWater) * waterSurfaceMask;
+    float shoreBlend = smoothstep(5.0, -0.5, distToWater) * waterSurfaceMask * waveActive;
     baseColor = mix(baseColor, waterTint * 0.85, shoreBlend * 0.28);
 
     // ── 1. Shallow water body ─────────────────────────────────────────────────
@@ -243,6 +243,10 @@ void main() {
         vec3 wetRefl = mix(u_Horizon * 0.58, vec3(0.90, 0.95, 1.00), wSpec * 0.35);
         baseColor = mix(baseColor, wetRefl, wetSandFactor * 0.22 * (1.0 - u_TidePercent * 0.3));
     }
+
+    // DEBUG: bright blue where waterTint (shoreBlend) is active
+    float dbgWaterTint = smoothstep(0.0, 0.05, shoreBlend);
+    baseColor = mix(baseColor, vec3(0.0, 0.4, 1.0), dbgWaterTint * 0.6);
 
     // DEBUG: magenta stripe at distToWave=0 (beach wave tip)
     float dbgEdge = smoothstep(0.4, 0.0, abs(distToWave));
