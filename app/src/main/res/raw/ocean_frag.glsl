@@ -333,25 +333,20 @@ void main() {
     float seam = smoothstep(0.90, 1.0, distNorm + horizNoise) * (1.0 - corrMask * 0.6);
     col = mix(col, u_HorizonColor * 0.85, seam * (1.0 - skyReflect * 0.8) * 0.55);
 
-    // Wet zone — three wave phases:
-    // 1. Approaching (frontDist << 0): shoreAlpha handles ocean visibility, wetSeaward tints muddy
-    // 2. Wave tip    (frontDist → 0) : thinZone makes water nearly transparent
-    // 3. Retreated   (frontDist > 0) : wetInland shows 100% wet sand over dry beach
-    float wetRange   = mix(2.5, 8.0, windS);
-    float wetSeaward = smoothstep(-wetRange, 0.0, frontDist) * step(frontDist, 0.0);
+    // Wave phases:
+    // 1. Approaching (frontDist << 0): plain shallow ocean — shoreAlpha handles transparency
+    // 2. Wave tip    (frontDist ->  0): thinZone makes water nearly transparent
+    // 3. Retreated   (frontDist >  0): wet sand exposed on beach where wave pulled back
     float wetInland  = (1.0 - smoothstep(0.0, 5.0, frontDist))
                      * smoothstep(-0.5, 0.5, frontDist);
-    float wetSheen   = max(wetSeaward * 0.85, wetInland);
-    // Color: nearly full wet sand color (92%), only foam pixels keep blue ocean tint
-    col = mix(col, u_SandWetColor * 0.82, wetSheen * (1.0 - foamAlpha) * 0.92);
+    col = mix(col, u_SandWetColor * 0.82, wetInland * (1.0 - foamAlpha) * 0.92);
 
     float foamBoostZone = smoothstep(-3.5, 0.0, frontDist)
                         * (1.0 - smoothstep(0.0, 2.0, frontDist));
-    // Alpha: seaward zone uses shoreAlpha (ocean is still present there, minimal extra);
-    //        inland zone needs high alpha so retreated wet sand is clearly visible.
-    float finalAlpha    = min(shoreAlpha
-                            + foamAlpha   * foamBoostZone * (0.18 + windS * 0.62)
-                            + wetSeaward  * (0.05 + windS * 0.05)
-                            + wetInland   * 0.75, 1.0);
+    // Near-camera fadeout: removes foreground ocean right in front of camera
+    float nearFade   = smoothstep(3.0, 15.0, dist);
+    float finalAlpha = min((shoreAlpha
+                           + foamAlpha  * foamBoostZone * (0.18 + windS * 0.62)
+                           + wetInland  * 0.75) * nearFade, 1.0);
     gl_FragColor = vec4(col, finalAlpha);
 }
