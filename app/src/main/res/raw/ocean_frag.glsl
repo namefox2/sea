@@ -333,15 +333,11 @@ void main() {
     float seam = smoothstep(0.90, 1.0, distNorm + horizNoise) * (1.0 - corrMask * 0.6);
     col = mix(col, u_HorizonColor * 0.85, seam * (1.0 - skyReflect * 0.8) * 0.55);
 
-    // No separate wet sand zone — beach shows through naturally as ocean fades near camera.
-    // Ocean (B) simply extends forward and dissolves: shoreAlpha + nearFade together
-    // create a seamless gradient from opaque ocean to transparent beach.
+    // No separate wet sand zone — beach shows through naturally as shoreAlpha fades to 0.
+    // thinZone already makes the wave tip nearly transparent so the transition is smooth.
     float foamBoostZone = smoothstep(-3.5, 0.0, frontDist)
                         * (1.0 - smoothstep(0.0, 2.0, frontDist));
-    // Gentle near-camera fade (2-10m): ocean thins out close to camera so the
-    // beach shows through seamlessly — no hard boundary, ocean just disappears.
-    float nearFade   = smoothstep(2.0, 10.0, dist);
-    float finalAlpha = min((shoreAlpha
-                           + foamAlpha * foamBoostZone * (0.18 + windS * 0.62)) * nearFade, 1.0);
+    float finalAlpha = min(shoreAlpha
+                          + foamAlpha * foamBoostZone * (0.18 + windS * 0.62), 1.0);
     gl_FragColor = vec4(col, finalAlpha);
 }
