@@ -122,16 +122,10 @@ void main() {
     float tidalFade = clamp(-v_DistToWater / 4.0, 0.0, 1.0);
     water = mix(water, vec3(0.20, 0.54, 0.42), tidalZone * tidalFade * (1.0 - depthBlend) * 0.45);
 
-    // ── Shore-edge chroma bridge ──────────────────────────────────────────────
-    // At the waterline the ocean alpha-composites over the sandy beach. The eye
-    // sees flat luminance but a sharp chroma swing (R: 0.00→0.28 teal→sand) that
-    // reads as a seam. Pull the shallow ocean color toward the actual sand color
-    // so BOTH sides of the composite share nearly the same hue at dtw=0, reducing
-    // the per-channel gap to ≤0.02 and making the boundary a gentle gradient.
-    // Smoothstep -4→1m: vivid teal is retained beyond 4m seaward; turbid sandy-teal
-    // only spans the last 4m before the waterline (realistic for tidal flat water).
-    float shoreEdgeBridge = smoothstep(-4.0, 1.0, v_DistToWater);
-    water = mix(water, u_SandDryColor, shoreEdgeBridge * 0.90);
+    // Shore-edge chroma bridge: upper edge moved to 0.0 so ocean is 100% sand colour
+    // exactly at the waterline (v_DistToWater=0), eliminating ShallowColor bleed.
+    float shoreEdgeBridge = smoothstep(-4.0, 0.0, v_DistToWater);
+    water = mix(water, u_SandDryColor, shoreEdgeBridge);
 
     // ── 2. Wave volume shading ────────────────────────────────────────────────
     // crestFac 0.20 (was 0.32): wave-crest colour brightening is now milder because

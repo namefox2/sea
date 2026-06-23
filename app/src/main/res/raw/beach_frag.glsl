@@ -188,11 +188,11 @@ void main() {
     float waterSurfaceMask = smoothstep(1.5, -1.0, distToWave);
 
     // Turquoise tint: gated on waterSurfaceMask so it only shows when wave is present.
-    // [TUNE] 5.0 = tint reach in metres from waterline (distToWater axis)
-    // [TUNE] 0.28 = tint strength
+    // [TUNE] 1.5 = tint reach in metres from waterline (reduced from 5.0 to cut cyan band)
+    // [TUNE] 0.18 = tint strength (reduced from 0.28)
     vec3  waterTint  = vec3(0.28, 0.82, 0.76);
-    float shoreBlend = smoothstep(5.0, -0.5, distToWater) * waterSurfaceMask * waveActive;
-    baseColor = mix(baseColor, waterTint * 0.85, shoreBlend * 0.28);
+    float shoreBlend = smoothstep(1.5, -0.5, distToWater) * waterSurfaceMask * waveActive;
+    baseColor = mix(baseColor, waterTint * 0.85, shoreBlend * 0.18);
 
     // ── 1. Shallow water body ─────────────────────────────────────────────────
     vec3 bottomColor = baseColor;  // save terrain color — bleeds through shallow water
