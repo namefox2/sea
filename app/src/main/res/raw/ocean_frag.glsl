@@ -349,6 +349,6 @@ void main() {
     float nearFade   = smoothstep(3.0, 22.0, dist);
     float finalAlpha = min(shoreAlpha
                           + (foamAlpha * foamBoostZone * (0.18 + windS * 0.62)
-                          +  wetInland * 0.85) * nearFade, 1.0);
+                          +  wetInland * 0.35) * nearFade, 1.0);
     gl_FragColor = vec4(col, finalAlpha);
 }
