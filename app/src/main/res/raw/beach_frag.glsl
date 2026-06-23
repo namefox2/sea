@@ -238,6 +238,7 @@ void main() {
 
     // ── 4. Foam: breaks on arrival, lingers on retreat ───────────────────────
     // Wind scale: calm=40% min (always some foam when waves arrive), windy=100%.
+    float windS        = smoothstep(0.0, 1.0, u_WindAmp);
     float windFoamMult = 0.40 + windS * 0.60;
 
     // Wave strength: proportional to current wave height — no wave, no foam.
