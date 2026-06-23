@@ -236,21 +236,22 @@ void main() {
         baseColor = mix(baseColor, wetRefl, wetSandFactor * 0.22 * (1.0 - u_TidePercent * 0.3));
     }
 
-    // ── 4. Foam: wide turbulent sheet + dissolving bubble trail ───────────────
-    // Reference photo: foam covers a WIDE area (several metres), not just a thin line.
-    // Peak at wave tip, then slowly dissolves over ~8 m of beach.
-    float reachNorm = waveReach / (4.0 + u_WindAmp * 6.2);  // 0=trough, 1=full crest
-    float tipBand   = smoothstep(1.3, 0.0, abs(distToWave)) * (0.5 + 0.5 * reachNorm);
+    // ── 4. Foam: breaks on arrival, lingers on retreat ───────────────────────
+    // Wind scale: calm=40% min (always some foam when waves arrive), windy=100%.
+    float windFoamMult = 0.40 + windS * 0.60;
 
-    // Trail: foam persists behind wave tip.
-    // Guard: trailGrd starts rising at (waveReach×0.5+0.6), which is the approximate
-    // midpoint of shorelineMask's fall-off curve — so the two transition zones are
-    // staggered and never overlap.  When shorelineMask is still high (dtw small),
-    // trailGrd is zero; when trailGrd finally rises, shorelineMask has already fallen.
-    // This eliminates the bell-curve product peak seen at dtw≈2.5-3.0m for large waveReach.
-    float trailGrdStart = max(0.7, waveReach * 0.33 + 0.40);
-    float trailFade = smoothstep(waveReach * 0.42 + 0.26, 0.0, swashDist)
-                    * smoothstep(trailGrdStart, trailGrdStart + 2.0, distToWater);
+    // Wave strength: proportional to current wave height — no wave, no foam.
+    float reachNorm   = clamp(waveReach / (4.0 + u_WindAmp * 6.2), 0.0, 1.0);
+    float waveStrength = reachNorm * reachNorm;
+
+    // Breaking foam (파도가 부서질 때): tight band at wave tip.
+    // [TUNE] 1.3 → breaking foam band width in metres (raise to widen)
+    float tipBand = smoothstep(1.3, 0.0, abs(distToWave)) * (0.35 + 0.65 * waveStrength);
+
+    // Retreating foam (파도가 되돌아갈 때): trail behind the receding tip.
+    // [TUNE] 0.40 → multiplier of waveReach for trail length  0.25 → fixed minimum (m)
+    float retreatLen  = waveReach * 0.40 + 0.25;
+    float retreatFoam = smoothstep(retreatLen, 0.0, swashDist) * waveStrength;
 
     // Curl base UV: lateral oscillation + slow shoreward drift gives rolling feel
     float curlT2 = u_Time * 0.65;
@@ -266,24 +267,18 @@ void main() {
     float thresh    = 0.38 - u_WindAmp * 0.15;    // windier → more foam area
     float laceMask  = smoothstep(thresh, thresh + 0.22, foamNoise);
 
-    // Scattered fine bubbles lingering in the wet zone
-    float bA      = bN(v_World.xz * 2.2 + vec2( u_Time * 0.14,  u_Time * 0.08));
-    float bB      = bN(v_World.xz * 5.8 - vec2( u_Time * 0.10,  u_Time * 0.18));
-    float bubbles = smoothstep(0.60, 0.84, bA * 0.55 + bB * 0.45) * trailFade * 0.60;
-
-    // shorelineMask: two-part envelope.
-    // Near-shore zone (dtw 0 → 2.5 m): fixed-width falloff independent of waveReach.
-    // Previously smoothstep(waveReach+1.2, 0) made the foam zone grow proportionally
-    // with swell height (waveReach=5m → mask still 0.76 at dtw=3m → too wide).
-    // Wave-tip belt (±1.5 m around waveReach): keeps the active foam front visible
-    // regardless of how far the wave has travelled up the beach.
-    float shoreMask2   = smoothstep(1.6, 0.0, distToWater);
-    float tipZoneMask  = smoothstep(1.0, 0.0, abs(distToWater - waveReach));
+    // Foam area envelope
+    // [TUNE] 1.6 → near-waterline foam width in metres (distToWater axis)
+    // [TUNE] 1.0 → wave-tip band half-width in metres (around waveReach)
+    float shoreMask2    = smoothstep(1.6, 0.0, distToWater);
+    float tipZoneMask   = smoothstep(1.0, 0.0, abs(distToWater - waveReach));
     float shorelineMask = max(shoreMask2, tipZoneMask * 0.75);
-    float beachGuard = smoothstep(-0.5, 0.4, distToWater);
-    float foamFront  = tipBand   * laceMask * beachGuard;
-    float foamTrail  = trailFade * laceMask * 0.38 * beachGuard;
-    float foamTotal  = 0.0; // disabled — reconditioning
+    float beachGuard    = smoothstep(-0.5, 0.4, distToWater);
+
+    float foamBreak   = tipBand    * laceMask * beachGuard;
+    // [TUNE] 0.50 → retreat foam intensity relative to breaking foam
+    float foamRetreat = retreatFoam * laceMask * 0.50 * beachGuard;
+    float foamTotal   = clamp(foamBreak + foamRetreat, 0.0, 1.0) * windFoamMult * shorelineMask;
 
     // Soft off-white foam — less blinding than pure white
     vec3 foamCol = mix(vec3(0.82, 0.87, 0.90), vec3(0.93, 0.96, 0.98), tipBand);
