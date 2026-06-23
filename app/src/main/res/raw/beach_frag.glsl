@@ -283,7 +283,7 @@ void main() {
     float beachGuard = smoothstep(-0.5, 0.4, distToWater);
     float foamFront  = tipBand   * laceMask * beachGuard;
     float foamTrail  = trailFade * laceMask * 0.38 * beachGuard;
-    float foamTotal  = clamp(foamFront + foamTrail + bubbles, 0.0, 1.0) * shorelineMask;
+    float foamTotal  = 0.0; // disabled — reconditioning
 
     // Soft off-white foam — less blinding than pure white
     vec3 foamCol = mix(vec3(0.82, 0.87, 0.90), vec3(0.93, 0.96, 0.98), tipBand);
