@@ -250,24 +250,19 @@ void main() {
     float bubShape  = smoothstep(0.08, 0.45, bubbleTex);
     float foamGrain = bubShape;
 
-    // Shore foam: two wave trains at slightly different wavelengths.
-    // Used as a MODULATOR (not a gate): foam is always present near shore
-    // in bubble cells; wave crests boost it, troughs dim it.
-    float swash1 = sin(-v_DistToWater * 1.26 - u_Time * 0.72) * 0.5 + 0.5;
-    float swash2 = sin(-v_DistToWater * 0.94 - u_Time * 0.55) * 0.5 + 0.5;
+    // Shore foam — all relative to frontDist (wave tip), NOT fixed waterline.
+    // This collapses shore foam and edge foam into a single band at the wave front,
+    // preventing the double foam+mudflat pattern caused by using two different origins.
+    float swash1 = sin(-frontDist * 1.26 - u_Time * 0.72) * 0.5 + 0.5;
+    float swash2 = sin(-frontDist * 0.94 - u_Time * 0.55) * 0.5 + 0.5;
     float swashCrest = smoothstep(0.25, 0.65, swash1 * swash2);
-    // Swash base scales with wind: calm = barely any base, windy = 0.40 base.
     float swashBase = mix(0.08, 0.40, windS);
     float swashMod  = swashBase + (1.0 - swashBase) * swashCrest;
-    // Foam lifecycle noise: patches build up then slowly dissolve (~5s period).
     float foamLifeN = vnoise(foamUV * 0.30 + u_Time * vec2(0.06, 0.04)) * 0.60
                     + vnoise(foamUV * 0.80 - u_Time * vec2(0.03, 0.07)) * 0.40;
     float foamMod   = 0.40 + 0.60 * smoothstep(0.25, 0.72, foamLifeN);
-    // Foam band WIDTH scales with wind: calm = tight (decay 0.40), windy = wide (0.14).
-    // Calm sea barely breaks → narrow foam band; rough sea = wide churning zone.
     float shoreDecay = mix(0.40, 0.14, windS);
-    float nearShore  = exp(min(v_DistToWater, 0.0) * shoreDecay) * step(v_DistToWater, 1.5);
-    // Overall intensity nearly zero at calm, bright at full wind.
+    float nearShore  = exp(min(frontDist, 0.0) * shoreDecay) * step(frontDist, 1.5);
     float shoreFoam = nearShore * swashMod * foamMod * (0.08 + windS * 0.82) * foamGrain;
 
     // Open-ocean whitecaps: v_Foam is high far from shore where waves aren't damped.
@@ -334,28 +329,17 @@ void main() {
     col = mix(col, u_HorizonColor * 0.85, seam * (1.0 - skyReflect * 0.8) * 0.55);
 
     // ── Wet mudflat: dark right after wave retreats, gradually dries ─────────
-    // mudBase: exponential decay with distance past wave tip (0 → dry quickly).
-    // dryAnim: slow outward-propagating phase shift simulates water soaking in then drying.
+    // Structure: 파도/거품 (at frontDist≈0) → 갯벌 (frontDist > 0, wet→dry)
     float mudBase    = exp(-frontDist * 0.20) * step(0.0, frontDist);
     float dryAnim    = sin(u_Time * 0.10 + frontDist * 0.28) * 0.35 + 0.65;
     float mudWetness = mudBase * dryAnim;
     col = mix(col, u_SandWetColor * 0.70, mudWetness * (1.0 - foamAlpha));
 
-    // Residual beach foam (거품): thin foam strip left by retreating wave on dry beach
-    float beachFoam = foamGrain * foamMod
-                    * smoothstep(4.0, 0.0, frontDist) * smoothstep(0.0, 0.5, frontDist)
-                    * (0.12 + windS * 0.48);
-
-    // Scene layers (bottom → top):
-    //  갯벌(mudWetness)  ← mudflat darkens when wet, slowly dries
-    //  거품(beachFoam)   ← thin foam on dry beach just past wave tip
-    //  파도(foamBoostZone) ← shore wave foam at water's edge
-    //  바다(shoreAlpha)  ← ocean body
+    // Single foam band at wave front; mudflat starts right behind it
     float foamBoostZone = smoothstep(-3.5, 0.0, frontDist)
                         * (1.0 - smoothstep(0.0, 2.0, frontDist));
     float finalAlpha = min(shoreAlpha
                           + foamAlpha  * foamBoostZone * (0.18 + windS * 0.62)
-                          + beachFoam  * 0.60
                           + mudWetness * 0.85, 1.0);
     gl_FragColor = vec4(col, finalAlpha);
 }
