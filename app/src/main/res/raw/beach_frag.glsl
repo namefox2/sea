@@ -248,8 +248,10 @@ void main() {
     // ── Seaward boundary color-match ────────────────────────────────────────
     // Very subtle tint on the seaward side so the beach colour doesn't contrast
     // too sharply when seen through semi-transparent ocean near waves.
-    float seaTint = smoothstep(0.0, -5.0, distToWater);
-    baseColor = mix(baseColor, vec3(0.20, 0.56, 0.48), seaTint * 0.20);
+    // Extends 4 m landward so the wave-run zone stays slightly lit even
+    // when the wave has receded — prevents the sudden dark-stripe reveal.
+    float seaTint = smoothstep(4.0, -5.0, distToWater);
+    baseColor = mix(baseColor, vec3(0.20, 0.56, 0.48), seaTint * 0.25);
 
     // ── Atmospheric fog ────────────────────────────────────────────────────────
     float fogZ    = max(18.0 - v_World.z, 0.0);
