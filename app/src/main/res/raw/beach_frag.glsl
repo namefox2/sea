@@ -216,9 +216,7 @@ void main() {
                         wCol * (1.0 + caust * 0.4), depthAdv);
         wRef = mix(wRef, u_Horizon * 0.55, wFres * 0.18);
         baseColor  = mix(baseColor, wRef, waterAlpha);
-        // DEBUG: red where waterAlpha is active
-        baseColor = mix(baseColor, vec3(1.0, 0.05, 0.05), waterAlpha * 0.75);
-        // Subtle specular glint on runup water
+            // Subtle specular glint on runup water
         baseColor += vec3(0.90, 0.95, 1.00) * wSpec * waterAlpha * 0.32;
     }
 
@@ -246,8 +244,6 @@ void main() {
         baseColor = mix(baseColor, wetRefl, wetSandFactor * 0.22 * (1.0 - u_TidePercent * 0.3));
     }
 
-    // DEBUG: bright blue where waterTint (shoreBlend) is active — gradient so edge is soft
-    baseColor = mix(baseColor, vec3(0.0, 0.4, 1.0), shoreBlend * 0.6);
 
     // ── Atmospheric fog ────────────────────────────────────────────────────────
     float fogZ    = max(18.0 - v_World.z, 0.0);
