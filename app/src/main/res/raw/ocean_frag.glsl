@@ -101,14 +101,17 @@ void main() {
     // Wide range [0.05 → 0.95]: S-curve spans the full scene without plateauing.
     float depthBlend = smoothstep(0.05, 0.95, shoreBlend + distBias);
 
-    // Three-zone depth gradient with a wide mid plateau:
-    //   depthBlend 0.00→0.35 : bright cyan (shallow) fades gradually into mid-teal
-    //   depthBlend 0.35→0.62 : mid-teal plateau — clearly visible band
-    //   depthBlend 0.62→1.00 : mid-teal fades into deep navy
-    vec3 midWater = mix(u_ShallowColor, u_DeepColor, 0.45);
-    float toMid  = smoothstep(0.0,  0.35, depthBlend);  // gradual shallow→mid
-    float toDeep = smoothstep(2.62, 1.0,  depthBlend);  // mid→deep
-    vec3 water = mix(mix(u_ShallowColor, midWater, toMid), u_DeepColor, toDeep);
+    // Three-zone depth gradient:
+    //   depthBlend 0.00→0.45 : gentle entry from muted-cyan into mid-teal
+    //   depthBlend 0.45→0.65 : mid-teal plateau
+    //   depthBlend 0.65→1.00 : mid-teal into deep navy
+    // shallowWater is pulled 25 % toward mid so the shallowest point is
+    // slightly less vivid than raw ShallowColor — avoids the sudden bright pop.
+    vec3 midWater     = mix(u_ShallowColor, u_DeepColor, 0.45);
+    vec3 shallowWater = mix(u_ShallowColor, midWater, 0.25);
+    float toMid  = smoothstep(0.0,  0.45, depthBlend);
+    float toDeep = smoothstep(0.65, 1.0,  depthBlend);
+    vec3 water = mix(mix(shallowWater, midWater, toMid), u_DeepColor, toDeep);
 
     // Caustics: animated refraction light-patterns visible in the shallow zone.
     // Two overlapping sin×sin patterns give an interference / dappled look.
