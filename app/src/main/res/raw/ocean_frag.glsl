@@ -336,13 +336,6 @@ void main() {
     float finalAlpha = min(shoreAlpha
                           + foamAlpha * foamBoostZone * (0.18 + windS * 0.62), 1.0);
 
-    // DEBUG: white  = ocean v_DistToWater=0  (where ocean thinks waterline is)
-    //        orange = ocean shoreAlpha=0.5  (50% fade boundary)
-    float dbOcZero = smoothstep(0.12, 0.0, abs(v_DistToWater));
-    float dbOcEdge = smoothstep(0.06, 0.0, abs(shoreAlpha - 0.5));
-    col = mix(col, vec3(1.0, 0.5, 0.0), dbOcEdge);
-    col = mix(col, vec3(1.0, 1.0, 1.0), dbOcZero);
-    finalAlpha = max(finalAlpha, max(dbOcEdge, dbOcZero));
 
     gl_FragColor = vec4(col, finalAlpha);
 }
