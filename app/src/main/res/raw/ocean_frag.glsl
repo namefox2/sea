@@ -100,7 +100,16 @@ void main() {
 
     // Wide range [0.05 → 0.95]: S-curve spans the full scene without plateauing.
     float depthBlend = smoothstep(0.05, 0.95, shoreBlend + distBias);
-    vec3 water = mix(u_ShallowColor, u_DeepColor, depthBlend);
+
+    // Three-point gradient: shallow → mid-ocean → deep.
+    // Splits the two-colour mix at the midpoint so a transitional teal sits
+    // between the bright near-shore cyan and the dark far-horizon navy.
+    vec3 midWater = mix(u_ShallowColor, u_DeepColor, 0.42);
+    vec3 water = mix(
+        mix(u_ShallowColor, midWater, clamp(depthBlend * 2.0, 0.0, 1.0)),
+        u_DeepColor,
+        clamp(depthBlend * 2.0 - 1.0, 0.0, 1.0)
+    );
 
     // Caustics: animated refraction light-patterns visible in the shallow zone.
     // Two overlapping sin×sin patterns give an interference / dappled look.
