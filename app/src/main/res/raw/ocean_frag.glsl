@@ -139,8 +139,12 @@ void main() {
     // Matching that color means the transparent composite (ocean + beach below) stays
     // uniform — no bright streak showing through. Using u_SandWetColor brightened
     // (≈ tidal flat + boost) which is close to beach's own shallow-water tint.
-    float shoreEdgeBridge = smoothstep(-6.0, sNoiseF * 0.25, v_DistToWater);
-    water = mix(water, u_SandWetColor * 1.20, shoreEdgeBridge);
+    // At low wind the wide sandy zone was visible as "sea not filling in".
+    // Scale both range and strength with wind so at wind=0 it's just a hint.
+    float bridgeRange = mix(-1.5, -6.0, windS);
+    float bridgeStr   = mix(0.12, 1.00, windS);
+    float shoreEdgeBridge = smoothstep(bridgeRange, sNoiseF * 0.25, v_DistToWater);
+    water = mix(water, u_SandWetColor * 1.20, shoreEdgeBridge * bridgeStr);
 
     // ── 2. Wave volume shading ────────────────────────────────────────────────
     // crestFac 0.20 (was 0.32): wave-crest colour brightening is now milder because
