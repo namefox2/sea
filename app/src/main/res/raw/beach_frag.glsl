@@ -187,11 +187,10 @@ void main() {
     float distToWave       = distToWater - waveReach;
     float waterSurfaceMask = smoothstep(1.5, -1.0, distToWave);
 
-    // Turquoise tint: gated on waterSurfaceMask so it only shows when wave is present.
-    // [TUNE] 2.5 = tint reach in metres from waterline (widened from 1.5 to soften edge)
-    // [TUNE] 0.18 = tint strength
+    // Turquoise tint: restricted to seaward side (distToWater < 0) so it stays
+    // hidden under the opaque ocean — no visible edge on the exposed beach.
     vec3  waterTint  = vec3(0.28, 0.82, 0.76);
-    float shoreBlend = smoothstep(2.5, -0.5, distToWater) * waterSurfaceMask * waveActive;
+    float shoreBlend = smoothstep(0.0, -1.5, distToWater) * waterSurfaceMask * waveActive;
     baseColor = mix(baseColor, waterTint * 0.85, shoreBlend * 0.18);
 
     // ── 1. Shallow water body ─────────────────────────────────────────────────
@@ -255,8 +254,8 @@ void main() {
     float dbgWsm = smoothstep(0.3, 0.0, abs(distToWave - 1.5));
     baseColor = mix(baseColor, vec3(1.0, 1.0, 0.0), dbgWsm * 0.85);
 
-    // DEBUG: orange stripe at distToWater=2.5 (shoreBlend/waterTint upper edge)
-    float dbgShore = smoothstep(0.3, 0.0, abs(distToWater - 2.5));
+    // DEBUG: orange stripe at distToWater=0 (waterline / shoreBlend upper boundary)
+    float dbgShore = smoothstep(0.3, 0.0, abs(distToWater));
     baseColor = mix(baseColor, vec3(1.0, 0.5, 0.0), dbgShore * 0.85);
 
     // ── Atmospheric fog ────────────────────────────────────────────────────────

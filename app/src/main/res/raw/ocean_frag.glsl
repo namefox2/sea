@@ -122,9 +122,10 @@ void main() {
     float tidalFade = clamp(-v_DistToWater / 4.0, 0.0, 1.0);
     water = mix(water, vec3(0.20, 0.54, 0.42), tidalZone * tidalFade * (1.0 - depthBlend) * 0.45);
 
-    // Shore-edge chroma bridge: upper edge moved to 0.0 so ocean is 100% sand colour
-    // exactly at the waterline (v_DistToWater=0), eliminating ShallowColor bleed.
-    float shoreEdgeBridge = smoothstep(-4.0, 0.0, v_DistToWater);
+    // Shore-edge chroma bridge: widened to -6..0 (was -4..0) so ShallowColor/tidal
+    // teal is suppressed further seaward — reduces cyan visible on the camera side
+    // of the waterline reference.
+    float shoreEdgeBridge = smoothstep(-6.0, 0.0, v_DistToWater);
     water = mix(water, u_SandDryColor, shoreEdgeBridge);
 
     // ── 2. Wave volume shading ────────────────────────────────────────────────
@@ -324,8 +325,8 @@ void main() {
     float dbgInner = exp(-(frontDist + 3.5) * (frontDist + 3.5) * 3.0);
     col = mix(col, vec3(1.0, 1.0, 1.0), dbgInner * 0.85);
 
-    // DEBUG: purple stripe at shoreEdgeBridge start (v_DistToWater=-4.0)
-    float dbgBridge = exp(-(v_DistToWater + 4.0) * (v_DistToWater + 4.0) * 3.0);
+    // DEBUG: purple stripe at shoreEdgeBridge start (v_DistToWater=-6.0)
+    float dbgBridge = exp(-(v_DistToWater + 6.0) * (v_DistToWater + 6.0) * 3.0);
     col = mix(col, vec3(0.6, 0.0, 1.0), dbgBridge * 0.85);
 
     float dbgMax = max(dbgOcean, max(dbgInner, dbgBridge));
