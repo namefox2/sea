@@ -127,10 +127,10 @@ void main() {
                   + sin(v_World.x * 0.11 - u_Time * 0.28) * 0.9
                   + sin(v_World.x * 0.58 + u_Time * 0.62) * 0.5;
 
-    // Shore-edge chroma bridge: upper edge perturbed by sNoiseF*0.25 (±0.7 m) so
-    // the 100%-sand completion is a wavy line instead of a constant-Z straight line.
-    float shoreEdgeBridge = smoothstep(-6.0, sNoiseF * 0.25, v_DistToWater);
-    water = mix(water, u_SandDryColor, shoreEdgeBridge);
+    // shoreEdgeBridge removed: blending ocean toward SandDryColor near shore was
+    // creating a brownish-teal band that contrasted with the deep teal farther out,
+    // making the alpha-fade boundary visible. Ocean now stays teal to the waterline;
+    // the beach shader's seaTint provides colour-matching instead.
 
     // ── 2. Wave volume shading ────────────────────────────────────────────────
     // crestFac 0.20 (was 0.32): wave-crest colour brightening is now milder because
@@ -289,11 +289,13 @@ void main() {
     col += yunseul * (1.0 - foamAlpha) * deepZone;
 
     // ── 7. Shore fade — ocean goes transparent near waterline ────────────────
-    // 7 m range (-1.5..+5.5): reverted from -3.5 (too transparent). The hard
-    // straight line was caused by beach step() snapping at distToWater=0, not
-    // by shoreAlpha width — fixed in beach_frag instead.
+    // Lower bound fixed at -8 m (beach discard boundary) so the ocean is always
+    // fully opaque where the beach mesh doesn't exist — no background bleed.
+    // Upper bound wave-reactive (sNoiseF+5.5+waveEdgeShift) as before.
+    // Total fade ≈ 13–18 m, vs the old 7 m; the slower fade eliminates the
+    // sharp colour-contrast edge that appeared when waves receded.
     float waveEdgeShift = waveH * 1.5;
-    float shoreAlpha = 1.0 - smoothstep(sNoiseF - 1.5 + waveEdgeShift,
+    float shoreAlpha = 1.0 - smoothstep(-8.0,
                                          sNoiseF + 5.5 + waveEdgeShift, v_DistToWater);
 
     // ── 8. Sky reflection + noisy horizon seam ───────────────────────────────
