@@ -236,7 +236,9 @@ void main() {
 
     // ── 3. Wet sand: dark reflective strip behind swash ───────────────────────
     // Reference shows very dark wet sand with sky reflection — make it prominent.
-    float wetSandFactor = smoothstep(5.0, 0.0, max(distToWave - 1.0, 0.0)) * smoothstep(-0.5, 0.0, distToWater) * waveActive;
+    // Only darken AFTER the wave front has passed (distToWave < 0); the old
+    // smoothstep(5,0,max(distToWave-1,0)) was firing 6 m before the wave arrived.
+    float wetSandFactor = smoothstep(0.5, -4.0, distToWave) * smoothstep(-0.5, 0.0, distToWater) * waveActive;
     if (wetSandFactor > 0.001) {
         baseColor = mix(baseColor, wetSand * 0.72, wetSandFactor * 0.68);
         // Wet sand sky reflection + sun glint through ripple normal
