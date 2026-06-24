@@ -246,12 +246,10 @@ void main() {
 
 
     // ── Seaward boundary color-match ────────────────────────────────────────
-    // Ocean shoreAlpha now fades from -8 m to shore; beach must match that teal
-    // across the whole -8..0 range so the composite colour stays uniform as
-    // transparency builds.  Brighter teal (0.17, 0.65, 0.58) matches the ocean's
-    // ShallowColor more closely than the previous muted green.
-    float seaTint = smoothstep(0.0, -8.0, distToWater);
-    baseColor = mix(baseColor, vec3(0.17, 0.65, 0.58), seaTint * 0.80);
+    // Very subtle tint on the seaward side so the beach colour doesn't contrast
+    // too sharply when seen through semi-transparent ocean near waves.
+    float seaTint = smoothstep(0.0, -5.0, distToWater);
+    baseColor = mix(baseColor, vec3(0.20, 0.56, 0.48), seaTint * 0.20);
 
     // ── Atmospheric fog ────────────────────────────────────────────────────────
     float fogZ    = max(18.0 - v_World.z, 0.0);
