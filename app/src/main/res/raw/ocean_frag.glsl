@@ -107,7 +107,7 @@ void main() {
     //   depthBlend 0.62→1.00 : mid-teal fades into deep navy
     vec3 midWater = mix(u_ShallowColor, u_DeepColor, 0.45);
     float toMid  = smoothstep(0.0,  0.35, depthBlend);  // gradual shallow→mid
-    float toDeep = smoothstep(0.62, 1.0,  depthBlend);  // mid→deep
+    float toDeep = smoothstep(2.62, 1.0,  depthBlend);  // mid→deep
     vec3 water = mix(mix(u_ShallowColor, midWater, toMid), u_DeepColor, toDeep);
 
     // Caustics: animated refraction light-patterns visible in the shallow zone.
