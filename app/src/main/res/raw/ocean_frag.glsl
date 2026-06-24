@@ -23,6 +23,7 @@ uniform vec3      u_HorizonColor;
 uniform float     u_WindSurge;
 uniform vec3      u_SandDryColor;
 uniform vec3      u_SandWetColor;
+uniform float     u_WaterlineZ;
 
 
 float h21(vec2 p) {
@@ -309,9 +310,17 @@ void main() {
     float waveEdgeShift = waveH * 1.5;
     float windLerp  = clamp(windS * 5.0, 0.0, 1.0);
     float fadeWidth = mix(0.2, 2.5, windLerp);
-    // Clamp wind=0 edge so ocean never pulls back past the waterline (sNoiseF
-    // can be negative, which was making transEdge < 0 → alpha=0 at distToWater=0).
-    float transEdge = mix(max(sNoiseF * 0.25, 0.1), sNoiseF + 4.5 + waveEdgeShift, windLerp);
+    // Perspective correction: ocean surface sits at Y=tideY above beach (Y=0). Camera
+    // at (0, 1.8, 18) looking down means the ocean fragment at the same screen pixel as
+    // the beach waterline has v_DistToWater ≈ (18−waterlineZ)×tideY/1.8 rather than 0.
+    // Adding perspCorr shifts the fade edge so the ocean stays opaque exactly up to
+    // the beach waterline in screen space, closing the gap between the two meshes.
+    float perspCorr = max((18.0 - u_WaterlineZ) * tideY / 1.8, 0.0);
+    float transEdge = mix(
+        max(sNoiseF * 0.25, 0.0) + perspCorr,
+        sNoiseF + 4.5 + waveEdgeShift + perspCorr,
+        windLerp
+    );
     float shoreAlpha = 1.0 - smoothstep(transEdge - fadeWidth, transEdge, v_DistToWater);
 
     // ── 8. Sky reflection + noisy horizon seam ───────────────────────────────
