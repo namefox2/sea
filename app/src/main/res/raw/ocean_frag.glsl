@@ -85,11 +85,10 @@ void main() {
 
     // ── 1. Depth-based water colour — smooth, wave-linked, noise-perturbed ────
     //
-    // tide-linked normalisation distance: tide=0(간조)→60m, tide=1(만조)→25m.
-    // Scaling the range (not just offsetting) means the ENTIRE depth gradient
-    // compresses toward shore at high tide — deep colour reaches closer AND
-    // shallow zone narrows, matching real physics (high tide = deeper everywhere).
-    float normDist = mix(42.0, 17.0, u_Tide);
+    // tide-linked normalisation distance: tide=0(간조)→25m, tide=1(만조)→12m.
+    // Reduced from (42,17) so the bright-cyan shallow zone is narrower and the
+    // mid-depth colour band becomes wider / more prominent in the mid-field.
+    float normDist = mix(25.0, 12.0, u_Tide);
     float shoreZ   = clamp((-v_DistToWater) / normDist, 0.0, 1.0);
 
     float waveDepthMod = waveH * 0.10;
@@ -292,11 +291,12 @@ void main() {
     col += yunseul * (1.0 - foamAlpha) * deepZone;
 
     // ── 7. Shore fade — ocean goes transparent near waterline ────────────────
-    // Narrow 2.5 m transition (was 7 m) so the semi-transparent band is thin
-    // enough to be mostly hidden under wave foam. Both bounds wave-reactive.
+    // At wind=0 no waves reach shore → ocean stays fully opaque (no boundary).
+    // With wind the transparency grows proportionally up to full effect at windS≥0.2.
     float waveEdgeShift = waveH * 1.5;
-    float shoreAlpha = 1.0 - smoothstep(sNoiseF + 2.0 + waveEdgeShift,
-                                         sNoiseF + 4.5 + waveEdgeShift, v_DistToWater);
+    float shoreTransp = 1.0 - smoothstep(sNoiseF + 2.0 + waveEdgeShift,
+                                          sNoiseF + 4.5 + waveEdgeShift, v_DistToWater);
+    float shoreAlpha = 1.0 - shoreTransp * clamp(windS * 5.0, 0.0, 1.0);
 
     // ── 8. Sky reflection + noisy horizon seam ───────────────────────────────
     // Grazing-angle Fresnel: far water reflects sky.
