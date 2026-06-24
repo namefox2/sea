@@ -127,10 +127,14 @@ void main() {
                   + sin(v_World.x * 0.11 - u_Time * 0.28) * 0.9
                   + sin(v_World.x * 0.58 + u_Time * 0.62) * 0.5;
 
-    // Shore-edge chroma bridge: blend water toward SandDryColor as we approach
-    // the waterline. Upper edge noisy so the sandy transition is a wavy line.
+    // Shore-edge chroma bridge: blend water toward the dark wet-mudflat color as
+    // we approach the waterline so that where shoreAlpha makes the ocean semi-
+    // transparent, the composited color (alpha*ocean + (1-alpha)*beach) stays
+    // uniform — the beach underneath is the same dark mudflat, so no contrast line.
+    // u_SandDryColor was wrong here (too bright → increased contrast), use wet/dark.
+    vec3 mudflatEdge = mix(u_SandWetColor, u_SandDryColor, 0.12);
     float shoreEdgeBridge = smoothstep(-6.0, sNoiseF * 0.25, v_DistToWater);
-    water = mix(water, u_SandDryColor, shoreEdgeBridge);
+    water = mix(water, mudflatEdge, shoreEdgeBridge);
 
     // ── 2. Wave volume shading ────────────────────────────────────────────────
     // crestFac 0.20 (was 0.32): wave-crest colour brightening is now milder because
