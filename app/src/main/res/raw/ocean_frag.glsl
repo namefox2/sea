@@ -318,34 +318,26 @@ void main() {
     float finalAlpha = min(shoreAlpha
                           + foamAlpha * foamBoostZone * (0.18 + windS * 0.62), 1.0);
 
-    // DEBUG: green stripe at ocean wave front (frontDist=0)
-    float dbgOcean = exp(-frontDist * frontDist * 3.0);
-    col = mix(col, vec3(0.0, 1.0, 0.1), dbgOcean * 0.85);
-
     // DEBUG: white stripe at frontDist=-3.5 (inner ocean reference)
     float dbgInner = exp(-(frontDist + 3.5) * (frontDist + 3.5) * 3.0);
     col = mix(col, vec3(1.0, 1.0, 1.0), dbgInner * 0.85);
 
-    // DEBUG: purple stripe at shoreEdgeBridge start (v_DistToWater=-6.0)
-    float dbgBridge = exp(-(v_DistToWater + 6.0) * (v_DistToWater + 6.0) * 3.0);
-    col = mix(col, vec3(0.6, 0.0, 1.0), dbgBridge * 0.85);
-
-    // DEBUG: hot-pink stripe at v_DistToWater=0 (waterline / shoreEdgeBridge=1.0)
-    // Hypothesis: straight boundary = this constant-Z plane
+    // DEBUG: hot-pink stripe at v_DistToWater=0 (waterline)
     float dbgWLine = exp(-v_DistToWater * v_DistToWater * 3.0);
     col = mix(col, vec3(1.0, 0.15, 0.6), dbgWLine * 0.85);
 
-    // DEBUG: cyan stripe at frontDist=-5.0 (shoreAlpha lower bound — ocean starts fading)
-    // Hypothesis: straight boundary = lower edge of transparency zone
+    // DEBUG: dark-gold stripe at v_DistToWater=-1.0
+    float dbgD1 = exp(-(v_DistToWater + 1.0) * (v_DistToWater + 1.0) * 3.0);
+    col = mix(col, vec3(0.9, 0.6, 0.0), dbgD1 * 0.85);
+
+    // DEBUG: sky-blue stripe at v_DistToWater=-2.0
+    float dbgD2 = exp(-(v_DistToWater + 2.0) * (v_DistToWater + 2.0) * 3.0);
+    col = mix(col, vec3(0.3, 0.7, 1.0), dbgD2 * 0.85);
+
+    // DEBUG: cyan stripe at frontDist=-5.0 (shoreAlpha lower bound)
     float dbgAlphaLo = exp(-(frontDist + 5.0) * (frontDist + 5.0) * 3.0);
     col = mix(col, vec3(0.0, 1.0, 1.0), dbgAlphaLo * 0.85);
 
-    // DEBUG: lime stripe at frontDist=+2.0 (shoreAlpha upper bound + foamBoostZone end)
-    // Hypothesis: straight boundary = where ocean completely disappears
-    float dbgAlphaHi = exp(-(frontDist - 2.0) * (frontDist - 2.0) * 3.0);
-    col = mix(col, vec3(0.7, 1.0, 0.0), dbgAlphaHi * 0.85);
-
-    float dbgMax = max(max(dbgOcean, dbgInner),
-                       max(max(dbgBridge, dbgWLine), max(dbgAlphaLo, dbgAlphaHi)));
+    float dbgMax = max(max(dbgInner, dbgWLine), max(dbgAlphaLo, max(dbgD1, dbgD2)));
     gl_FragColor = vec4(col, max(finalAlpha, dbgMax * 0.85));
 }
