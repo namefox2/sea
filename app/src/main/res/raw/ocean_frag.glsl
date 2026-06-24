@@ -122,10 +122,9 @@ void main() {
     float tidalFade = clamp(-v_DistToWater / 4.0, 0.0, 1.0);
     water = mix(water, vec3(0.20, 0.54, 0.42), tidalZone * tidalFade * (1.0 - depthBlend) * 0.45);
 
-    // Shore-edge chroma bridge: widened to -6..0 (was -4..0) so ShallowColor/tidal
-    // teal is suppressed further seaward — reduces cyan visible on the camera side
-    // of the waterline reference.
-    float shoreEdgeBridge = smoothstep(-6.0, 0.0, v_DistToWater);
+    // Shore-edge chroma bridge: upper edge perturbed by sNoiseF*0.25 (±0.7 m) so
+    // the 100%-sand completion is a wavy line instead of a constant-Z straight line.
+    float shoreEdgeBridge = smoothstep(-6.0, sNoiseF * 0.25, v_DistToWater);
     water = mix(water, u_SandDryColor, shoreEdgeBridge);
 
     // ── 2. Wave volume shading ────────────────────────────────────────────────
@@ -289,10 +288,10 @@ void main() {
     col += yunseul * (1.0 - foamAlpha) * deepZone;
 
     // ── 7. Shore fade — ocean goes transparent near waterline ────────────────
-    // sNoiseF (computed above for waveFront) is identical — reuse it
-    // Widened from 4 m (-0.5..+3.5) to 7 m (-1.5..+5.5) for a softer edge.
+    // Lower bound shifted -1.5→-3.5 (9 m range, was 7 m): ocean is now ~66% opaque
+    // at the waterline (was 90%), so beach bleeds through gradually — no sharp line.
     float waveEdgeShift = waveH * 1.5;
-    float shoreAlpha = 1.0 - smoothstep(sNoiseF - 1.5 + waveEdgeShift,
+    float shoreAlpha = 1.0 - smoothstep(sNoiseF - 3.5 + waveEdgeShift,
                                          sNoiseF + 5.5 + waveEdgeShift, v_DistToWater);
 
     // ── 8. Sky reflection + noisy horizon seam ───────────────────────────────
