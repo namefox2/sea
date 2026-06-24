@@ -127,14 +127,13 @@ void main() {
                   + sin(v_World.x * 0.11 - u_Time * 0.28) * 0.9
                   + sin(v_World.x * 0.58 + u_Time * 0.62) * 0.5;
 
-    // Shore-edge chroma bridge: blend water toward the dark wet-mudflat color as
-    // we approach the waterline so that where shoreAlpha makes the ocean semi-
-    // transparent, the composited color (alpha*ocean + (1-alpha)*beach) stays
-    // uniform — the beach underneath is the same dark mudflat, so no contrast line.
-    // u_SandDryColor was wrong here (too bright → increased contrast), use wet/dark.
-    vec3 mudflatEdge = mix(u_SandWetColor, u_SandDryColor, 0.12);
+    // Shore-edge chroma bridge: blend water toward the bright shallow-teal that
+    // the beach renders at the waterline (waterTint ≈ 0.28,0.82,0.76 in beach_frag).
+    // Matching that color means the transparent composite (ocean + beach below) stays
+    // uniform — no bright streak showing through. Using u_SandWetColor brightened
+    // (≈ tidal flat + boost) which is close to beach's own shallow-water tint.
     float shoreEdgeBridge = smoothstep(-6.0, sNoiseF * 0.25, v_DistToWater);
-    water = mix(water, mudflatEdge, shoreEdgeBridge);
+    water = mix(water, u_SandWetColor * 1.20, shoreEdgeBridge);
 
     // ── 2. Wave volume shading ────────────────────────────────────────────────
     // crestFac 0.20 (was 0.32): wave-crest colour brightening is now milder because
@@ -293,11 +292,11 @@ void main() {
     col += yunseul * (1.0 - foamAlpha) * deepZone;
 
     // ── 7. Shore fade — ocean goes transparent near waterline ────────────────
-    // Both bounds wave-reactive: fade range tracks the actual wave front so the
-    // ocean is only transparent close to where waves are reaching, not permanently.
+    // Narrow 2.5 m transition (was 7 m) so the semi-transparent band is thin
+    // enough to be mostly hidden under wave foam. Both bounds wave-reactive.
     float waveEdgeShift = waveH * 1.5;
-    float shoreAlpha = 1.0 - smoothstep(sNoiseF - 1.5 + waveEdgeShift,
-                                         sNoiseF + 5.5 + waveEdgeShift, v_DistToWater);
+    float shoreAlpha = 1.0 - smoothstep(sNoiseF + 2.0 + waveEdgeShift,
+                                         sNoiseF + 4.5 + waveEdgeShift, v_DistToWater);
 
     // ── 8. Sky reflection + noisy horizon seam ───────────────────────────────
     // Grazing-angle Fresnel: far water reflects sky.
