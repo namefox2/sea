@@ -272,7 +272,9 @@ void main() {
                     + vnoise(foamUV * 0.80 - u_Time * vec2(0.03, 0.07)) * 0.40;
     float foamMod   = 0.40 + 0.60 * smoothstep(0.25, 0.72, foamLifeN);
     float shoreDecay = mix(0.40, 0.14, windS);
-    float nearShore  = exp(min(frontDist, 0.0) * shoreDecay) * step(frontDist, 0.0);
+    // Extend foam 1.2 m past the wave front so the swash tip (yellow debug line
+    // at frontDist=+0.5) gets visible foam rather than a hard step-off at 0.
+    float nearShore  = exp(min(frontDist, 0.0) * shoreDecay) * smoothstep(1.2, 0.0, frontDist);
     float shoreFoam = nearShore * swashMod * foamMod * (0.08 + windS * 0.82) * foamGrain;
 
     // Open-ocean whitecaps: v_Foam is high far from shore where waves aren't damped.
