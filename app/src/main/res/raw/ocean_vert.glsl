@@ -98,7 +98,8 @@ void main() {
     // the swash advance/retreat is always in phase with the approaching swell.
     float k0    = 6.28318 / L0;
     float phRef = k0 * (cos(wd) * a_Pos.x + sin(wd) * u_WaterlineZ) - spd * u_Time;
-    float runup = sin(phRef) * (1.5 + wind * 2.0);
+    // windS gates the runup so at wind=0 the shore is static (no gap exposed).
+    float runup = sin(phRef) * wind * (1.5 + wind * 2.0);
 
     p.z += shoreZone * runup;
 
