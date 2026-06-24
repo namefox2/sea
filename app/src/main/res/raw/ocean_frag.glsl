@@ -107,10 +107,10 @@ void main() {
     //   depthBlend 0.65→1.00 : mid-teal into deep navy
     // shallowWater is pulled 25 % toward mid so the shallowest point is
     // slightly less vivid than raw ShallowColor — avoids the sudden bright pop.
-    vec3 midWater     = mix(u_ShallowColor, u_DeepColor, 0.65);
-    vec3 shallowWater = mix(u_ShallowColor, midWater, 0.25);
-    float toMid  = smoothstep(0.0,  0.05, depthBlend);
-    float toDeep = smoothstep(2.65, 1.0,  depthBlend);
+    vec3 midWater     = mix(u_ShallowColor, u_DeepColor, 0.45);
+    vec3 shallowWater = mix(u_ShallowColor, midWater, 0.25) * 0.82;
+    float toMid  = smoothstep(0.0,  0.45, depthBlend);
+    float toDeep = smoothstep(0.65, 1.0,  depthBlend);
     vec3 water = mix(mix(shallowWater, midWater, toMid), u_DeepColor, toDeep);
 
     // Caustics: animated refraction light-patterns visible in the shallow zone.
