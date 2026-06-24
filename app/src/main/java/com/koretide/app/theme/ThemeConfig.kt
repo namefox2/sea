@@ -74,7 +74,7 @@ object ThemeColors {
     val SUMMER_LIGHT_SKY_TOP = Color.parseColor("#1E90E8")  // vivid deep sky blue
     val SUMMER_LIGHT_SKY_BOT = Color.parseColor("#90D8F5")  // light horizon blue
     val SUMMER_LIGHT_SEA_TOP = Color.parseColor("#0075A8")  // deep horizon blue (uSeaTop)
-    val SUMMER_LIGHT_SEA_BOT = Color.parseColor("#00C8D4")  // bright turquoise near-viewer (uSeaBot)
+    val SUMMER_LIGHT_SEA_BOT = Color.parseColor("#00A8B8")  // muted turquoise near-viewer (uSeaBot)
     val SUMMER_LIGHT_WAVE   = Color.parseColor("#00B4C8")   // keep similar
     val SUMMER_LIGHT_SUN    = Color.parseColor("#FFFEF2")   // near-white for bright sun
     val SUMMER_LIGHT_MTN    = Color.parseColor("#1565C0")   // keep

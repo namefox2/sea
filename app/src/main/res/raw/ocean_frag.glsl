@@ -108,7 +108,7 @@ void main() {
     // shallowWater is pulled 25 % toward mid so the shallowest point is
     // slightly less vivid than raw ShallowColor — avoids the sudden bright pop.
     vec3 midWater     = mix(u_ShallowColor, u_DeepColor, 0.45);
-    vec3 shallowWater = mix(u_ShallowColor, midWater, 0.25) * 0.82;
+    vec3 shallowWater = mix(u_ShallowColor, midWater, 0.25);
     float toMid  = smoothstep(0.0,  0.45, depthBlend);
     float toDeep = smoothstep(0.65, 1.0,  depthBlend);
     vec3 water = mix(mix(shallowWater, midWater, toMid), u_DeepColor, toDeep);
