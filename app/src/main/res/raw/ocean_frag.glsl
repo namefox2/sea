@@ -309,7 +309,9 @@ void main() {
     float waveEdgeShift = waveH * 1.5;
     float windLerp  = clamp(windS * 5.0, 0.0, 1.0);
     float fadeWidth = mix(0.2, 2.5, windLerp);
-    float transEdge = mix(sNoiseF * 0.25, sNoiseF + 4.5 + waveEdgeShift, windLerp);
+    // Clamp wind=0 edge so ocean never pulls back past the waterline (sNoiseF
+    // can be negative, which was making transEdge < 0 → alpha=0 at distToWater=0).
+    float transEdge = mix(max(sNoiseF * 0.25, 0.1), sNoiseF + 4.5 + waveEdgeShift, windLerp);
     float shoreAlpha = 1.0 - smoothstep(transEdge - fadeWidth, transEdge, v_DistToWater);
 
     // ── 8. Sky reflection + noisy horizon seam ───────────────────────────────

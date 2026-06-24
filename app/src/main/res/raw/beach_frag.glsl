@@ -260,5 +260,16 @@ void main() {
     float fogFact = clamp(1.0 - exp(-fogZ * 0.008), 0.0, 0.45);
     baseColor = mix(baseColor, u_Horizon * 0.82, fogFact);
 
+    // ── DEBUG: key distance thresholds ───────────────────────────────────────
+    float dw = 0.18;
+    float dbRed  = smoothstep(dw, 0.0, abs(distToWater));        // waterline
+    float dbBlue = smoothstep(dw, 0.0, abs(distToWave));         // wave front
+    float dbGrn  = smoothstep(dw, 0.0, abs(distToWater - 4.0)); // seaTint boundary
+    float dbYel  = smoothstep(dw, 0.0, abs(distToWave - 0.5));  // wetSand gate
+    baseColor = mix(baseColor, vec3(1.0, 0.0, 0.0), dbRed  * 0.9);
+    baseColor = mix(baseColor, vec3(0.0, 0.2, 1.0), dbBlue * 0.9);
+    baseColor = mix(baseColor, vec3(0.0, 1.0, 0.0), dbGrn  * 0.9);
+    baseColor = mix(baseColor, vec3(1.0, 1.0, 0.0), dbYel  * 0.9);
+
     gl_FragColor = vec4(baseColor, 1.0);
 }
