@@ -245,6 +245,14 @@ void main() {
     }
 
 
+    // ── Seaward boundary color-match ────────────────────────────────────────
+    // distToWater < 0: beach is under the semi-transparent ocean. Dark wet-sand /
+    // mudflat contrasts sharply against the teal ocean, making the alpha fade look
+    // like a hard edge. Blend beach toward shallow-water teal so ocean and beach
+    // share a similar hue at the boundary → contrast disappears, edge softens.
+    float seaTint = smoothstep(0.0, -5.0, distToWater);
+    baseColor = mix(baseColor, vec3(0.20, 0.56, 0.48), seaTint * 0.62);
+
     // ── Atmospheric fog ────────────────────────────────────────────────────────
     float fogZ    = max(18.0 - v_World.z, 0.0);
     float fogFact = clamp(1.0 - exp(-fogZ * 0.008), 0.0, 0.45);
