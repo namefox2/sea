@@ -41,7 +41,7 @@ void main() {
     // The vertex shader drapes the beach floor below the ocean surface for
     // distToWater < 0, so those fragments lose the depth test and the ocean
     // renders there. We still discard very far fragments to skip fragment work.
-    if (distToWater < -8.0) discard;
+    if (distToWater < -20.0) discard;
 
     vec2  toFragXZ = v_World.xz - u_CamPos.xz;
     float dCam     = max(length(toFragXZ), 0.01);
