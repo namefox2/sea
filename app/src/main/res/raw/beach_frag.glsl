@@ -224,7 +224,10 @@ void main() {
 
     // ── 2. Swash zone: thin wet film behind wave tip ───────────────────────────
     float swashDist   = max(distToWave, 0.0);
-    float swashFactor = smoothstep(waveReach * 0.55 + 0.5, 0.0, swashDist) * step(0.0, distToWater) * waveActive;
+    // smoothstep instead of step: fades in over 0.5 m so beach colour doesn't
+    // snap on at exactly distToWater=0 (that hard snap showed as a straight line
+    // through the ocean's ~10% transparency at the waterline).
+    float swashFactor = smoothstep(waveReach * 0.55 + 0.5, 0.0, swashDist) * smoothstep(-0.5, 0.0, distToWater) * waveActive;
     swashFactor *= swashFactor;
     if (swashFactor > 0.001) {
         float shimmer  = bN(v_World.xz * 0.55 + vec2(u_Time * 0.07, -u_Time * 0.05)) * 0.40 + 0.60;
@@ -235,7 +238,7 @@ void main() {
 
     // ── 3. Wet sand: dark reflective strip behind swash ───────────────────────
     // Reference shows very dark wet sand with sky reflection — make it prominent.
-    float wetSandFactor = smoothstep(5.0, 0.0, max(distToWave - 1.0, 0.0)) * step(0.0, distToWater) * waveActive;
+    float wetSandFactor = smoothstep(5.0, 0.0, max(distToWave - 1.0, 0.0)) * smoothstep(-0.5, 0.0, distToWater) * waveActive;
     if (wetSandFactor > 0.001) {
         baseColor = mix(baseColor, wetSand * 0.72, wetSandFactor * 0.68);
         // Wet sand sky reflection + sun glint through ripple normal

@@ -289,10 +289,11 @@ void main() {
     col += yunseul * (1.0 - foamAlpha) * deepZone;
 
     // ── 7. Shore fade — ocean goes transparent near waterline ────────────────
-    // Lower bound shifted -1.5→-3.5 (9 m range, was 7 m): ocean is now ~66% opaque
-    // at the waterline (was 90%), so beach bleeds through gradually — no sharp line.
+    // 7 m range (-1.5..+5.5): reverted from -3.5 (too transparent). The hard
+    // straight line was caused by beach step() snapping at distToWater=0, not
+    // by shoreAlpha width — fixed in beach_frag instead.
     float waveEdgeShift = waveH * 1.5;
-    float shoreAlpha = 1.0 - smoothstep(sNoiseF - 3.5 + waveEdgeShift,
+    float shoreAlpha = 1.0 - smoothstep(sNoiseF - 1.5 + waveEdgeShift,
                                          sNoiseF + 5.5 + waveEdgeShift, v_DistToWater);
 
     // ── 8. Sky reflection + noisy horizon seam ───────────────────────────────
