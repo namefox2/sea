@@ -291,13 +291,14 @@ void main() {
     col += yunseul * (1.0 - foamAlpha) * deepZone;
 
     // ── 7. Shore fade — ocean goes transparent near waterline ────────────────
-    // shoreAlphaBase: 1 = opaque (seaward), 0 = transparent (landward of wave).
-    // Gated by windS so at wind=0 the ocean stays fully opaque — no boundary line
-    // on calm water. Full effect at windS ≥ 0.2.
+    // Wind=0: cutoff right at the noisy waterline (sNoiseF*0.25), 0.2 m step —
+    //         ocean opaque in water, transparent on beach, no visible band.
+    // Full wind: cutoff moves to wave front (sNoiseF+4.5+waveEdgeShift), 2.5 m fade.
     float waveEdgeShift = waveH * 1.5;
-    float shoreAlphaBase = 1.0 - smoothstep(sNoiseF + 2.0 + waveEdgeShift,
-                                              sNoiseF + 4.5 + waveEdgeShift, v_DistToWater);
-    float shoreAlpha = mix(1.0, shoreAlphaBase, clamp(windS * 5.0, 0.0, 1.0));
+    float windLerp  = clamp(windS * 5.0, 0.0, 1.0);
+    float fadeWidth = mix(0.2, 2.5, windLerp);
+    float transEdge = mix(sNoiseF * 0.25, sNoiseF + 4.5 + waveEdgeShift, windLerp);
+    float shoreAlpha = 1.0 - smoothstep(transEdge - fadeWidth, transEdge, v_DistToWater);
 
     // ── 8. Sky reflection + noisy horizon seam ───────────────────────────────
     // Grazing-angle Fresnel: far water reflects sky.
