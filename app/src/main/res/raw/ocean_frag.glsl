@@ -122,6 +122,11 @@ void main() {
     float tidalFade = clamp(-v_DistToWater / 4.0, 0.0, 1.0);
     water = mix(water, vec3(0.20, 0.54, 0.42), tidalZone * tidalFade * (1.0 - depthBlend) * 0.45);
 
+    // sNoiseF: wave-position noise used here (bridge) and reused in sections 6 & 7.
+    float sNoiseF = sin(v_World.x * 0.25 + u_Time * 0.40) * 1.4
+                  + sin(v_World.x * 0.11 - u_Time * 0.28) * 0.9
+                  + sin(v_World.x * 0.58 + u_Time * 0.62) * 0.5;
+
     // Shore-edge chroma bridge: upper edge perturbed by sNoiseF*0.25 (±0.7 m) so
     // the 100%-sand completion is a wavy line instead of a constant-Z straight line.
     float shoreEdgeBridge = smoothstep(-6.0, sNoiseF * 0.25, v_DistToWater);
@@ -218,11 +223,7 @@ void main() {
     vec3  yunseul   = u_LightColor * u_YunseulStr * sparkle * corrBoost;
 
     // ── 6. Wave-crest foam ────────────────────────────────────────────────────
-    // Wave front: the actual inland tip of the current wave, computed the same
-    // way as section 7's shoreAlpha upper bound so foam tracks the real boundary.
-    float sNoiseF   = sin(v_World.x * 0.25 + u_Time * 0.40) * 1.4
-                    + sin(v_World.x * 0.11 - u_Time * 0.28) * 0.9
-                    + sin(v_World.x * 0.58 + u_Time * 0.62) * 0.5;
+    // sNoiseF already declared above (section 1, shoreEdgeBridge) — reused here.
     float waveFront = sNoiseF + 3.5 + waveH * 1.5; // dtw at wave's inland tip
     float frontDist = v_DistToWater - waveFront;    // +ve = dry land, -ve = in water
 
