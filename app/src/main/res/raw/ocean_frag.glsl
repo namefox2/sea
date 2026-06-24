@@ -329,6 +329,22 @@ void main() {
     float dbgBridge = exp(-(v_DistToWater + 6.0) * (v_DistToWater + 6.0) * 3.0);
     col = mix(col, vec3(0.6, 0.0, 1.0), dbgBridge * 0.85);
 
-    float dbgMax = max(dbgOcean, max(dbgInner, dbgBridge));
+    // DEBUG: hot-pink stripe at v_DistToWater=0 (waterline / shoreEdgeBridge=1.0)
+    // Hypothesis: straight boundary = this constant-Z plane
+    float dbgWLine = exp(-v_DistToWater * v_DistToWater * 3.0);
+    col = mix(col, vec3(1.0, 0.15, 0.6), dbgWLine * 0.85);
+
+    // DEBUG: cyan stripe at frontDist=-5.0 (shoreAlpha lower bound — ocean starts fading)
+    // Hypothesis: straight boundary = lower edge of transparency zone
+    float dbgAlphaLo = exp(-(frontDist + 5.0) * (frontDist + 5.0) * 3.0);
+    col = mix(col, vec3(0.0, 1.0, 1.0), dbgAlphaLo * 0.85);
+
+    // DEBUG: lime stripe at frontDist=+2.0 (shoreAlpha upper bound + foamBoostZone end)
+    // Hypothesis: straight boundary = where ocean completely disappears
+    float dbgAlphaHi = exp(-(frontDist - 2.0) * (frontDist - 2.0) * 3.0);
+    col = mix(col, vec3(0.7, 1.0, 0.0), dbgAlphaHi * 0.85);
+
+    float dbgMax = max(max(dbgOcean, dbgInner),
+                       max(max(dbgBridge, dbgWLine), max(dbgAlphaLo, dbgAlphaHi)));
     gl_FragColor = vec4(col, max(finalAlpha, dbgMax * 0.85));
 }
