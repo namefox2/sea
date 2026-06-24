@@ -337,5 +337,12 @@ void main() {
                           + foamAlpha * foamBoostZone * (0.18 + windS * 0.62), 1.0);
 
 
+    // ── DEBUG ──────────────────────────────────────────────────────────────────
+    float _dbWh = smoothstep(0.12, 0.0, abs(v_DistToWater));          // WHITE  ocean distToWater=0
+    float _dbOr = smoothstep(0.06, 0.0, abs(shoreAlpha - 0.5));       // ORANGE ocean shoreAlpha=0.5
+    col = mix(col, vec3(1.0, 0.5, 0.0), _dbOr);
+    col = mix(col, vec3(1.0, 1.0, 1.0), _dbWh);
+    finalAlpha = max(finalAlpha, max(_dbOr, _dbWh));
+
     gl_FragColor = vec4(col, finalAlpha);
 }
