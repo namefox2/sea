@@ -67,7 +67,7 @@ void main() {
     float wind  = windS * windS;                       // squared for wave perturbation
     float dist     = length(v_World.xz - u_CamPos.xz);
     float distNorm = clamp(dist / 68.0, 0.0, 1.0);
-    float nearFactor = 1.0 - clamp(dist / 20.0, 0.0, 1.0);
+    float nearFactor = exp(-dist / 15.0);
 
     // ── Volume fix: wave undersides (back-faces) are WATER, never black ───────
     // Filled with a lit deep-water colour so a tall wave's underside reads as a
@@ -301,7 +301,7 @@ void main() {
     // Widened smoothstep 0.58→0.92 (width 0.34) → 0.35→0.95 (width 0.60) for a
     // gradual tint instead of a snapping band.  Mix ratio cut 0.28→0.14 to keep
     // Δlum_sky ≤ 0.07 (was +0.131 at dNorm=0.97).
-    float skyReflect = smoothstep(0.35, 0.95, distNorm);
+    float skyReflect = smoothstep(0.0, 0.95, distNorm);
     col = mix(col, u_HorizonColor, skyReflect * (1.0 - foamAlpha) * 0.14);
 
     // Sinusoidal wobble breaks the perfectly-straight horizon line.
