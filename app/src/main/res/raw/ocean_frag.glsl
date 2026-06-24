@@ -110,7 +110,7 @@ void main() {
     vec3 midWater     = mix(u_ShallowColor, u_DeepColor, 0.45);
     vec3 shallowWater = mix(u_ShallowColor, midWater, 0.25);
     float toMid  = smoothstep(0.0,  0.45, depthBlend);
-    float toDeep = smoothstep(0.65, 1.0,  depthBlend);
+    float toDeep = smoothstep(0.45, 1.0,  depthBlend);
     vec3 water = mix(mix(shallowWater, midWater, toMid), u_DeepColor, toDeep);
 
     // Caustics: animated refraction light-patterns visible in the shallow zone.
