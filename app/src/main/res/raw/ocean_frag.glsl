@@ -315,12 +315,12 @@ void main() {
     // Perspective correction: ocean surface sits at Y=tideY above beach (Y=0). Camera
     // at (0, 1.8, 18) looking down means the ocean fragment at the same screen pixel as
     // the beach waterline has v_DistToWater ≈ (18−waterlineZ)×tideY/1.8 rather than 0.
-    // Adding perspCorr shifts the fade edge so the ocean stays opaque exactly up to
-    // the beach waterline in screen space, closing the gap between the two meshes.
+    // Only in the low-wind branch: at high wind, waves and foam already cover the gap,
+    // and adding perspCorr to both branches was pushing water too far toward camera.
     float perspCorr = max((18.0 - u_WaterlineZ) * tideY / 1.8, 0.0);
     float transEdge = mix(
         max(sNoiseF * 0.25, 0.0) + perspCorr,
-        sNoiseF + 4.5 + waveEdgeShift + perspCorr,
+        sNoiseF + 4.5 + waveEdgeShift,
         windLerp
     );
     float shoreAlpha = 1.0 - smoothstep(transEdge - fadeWidth, transEdge, v_DistToWater);
