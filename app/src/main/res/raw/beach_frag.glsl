@@ -217,20 +217,21 @@ void main() {
     float waterAlpha = 0.0;
     if (shallowZone > 0.5) {
         float depth    = clamp(-distToWave / max(waveReach, 0.1), 0.0, 1.0);
-        edgeFade   = smoothstep(waveReach * 1.3 + 1.5, 0.0, abs(distToWave));
-        // Quadratic alpha: very transparent near surface, opaque in deeper water
-        waterAlpha = mix(0.08, 0.58, depth * depth) * edgeFade * waveActive;
-        // Water color: muddy yellowish-teal (bridges cool ocean ↔ warm mudflat)
-        vec3 muddyTeal = vec3(0.22, 0.58, 0.44);
+        // Gradual fade over a longer ramp so the edge doesn't pop
+        edgeFade   = smoothstep(waveReach * 1.5 + 2.5, 0.0, abs(distToWave));
+        // Keep alpha low so the water reads as a transparent glaze, not a solid body.
+        // Max ~0.28 so the mudflat texture shows through everywhere.
+        waterAlpha = mix(0.03, 0.28, depth * depth) * edgeFade * waveActive;
+        // Color: lean toward the ocean teal above rather than muddy brown so the
+        // water reads as a thin continuation of the sea, fading naturally inland.
+        vec3 seaTeal = mix(waterTint * 0.80, u_Horizon * 0.70, 0.35);
         float depthAdv = clamp(depth * 1.8, 0.0, 1.0);
-        vec3 wCol = mix(muddyTeal, waterTint, depthAdv);
-        // Shallow: mudflat bottom shines through; deeper: full water tint + caustics
-        vec3 wRef = mix(bottomColor * 0.75 + wCol * 0.25,
-                        wCol * (1.0 + caust * 0.4), depthAdv);
-        wRef = mix(wRef, u_Horizon * 0.55, wFres * 0.18);
+        // Near wave tip: bottom shines through (mudflat visible); deeper: sea teal + caustics
+        vec3 wRef = mix(bottomColor * 0.82 + seaTeal * 0.18,
+                        seaTeal * (1.0 + caust * 0.3), depthAdv * 0.7);
+        wRef = mix(wRef, u_Horizon * 0.60, wFres * 0.14);
         baseColor  = mix(baseColor, wRef, waterAlpha);
-            // Subtle specular glint on runup water
-        baseColor += vec3(0.90, 0.95, 1.00) * wSpec * waterAlpha * 0.32;
+        baseColor += vec3(0.90, 0.95, 1.00) * wSpec * waterAlpha * 0.20;
     }
 
     // ── 2. Swash zone: thin wet film behind wave tip ───────────────────────────
@@ -242,8 +243,8 @@ void main() {
     swashFactor *= swashFactor;
     if (swashFactor > 0.001) {
         float shimmer  = bN(v_World.xz * 0.55 + vec2(u_Time * 0.07, -u_Time * 0.05)) * 0.40 + 0.60;
-        vec3  swashRef = mix(mix(waterTint, wetSand, 0.42), u_Horizon * 0.50, wFres * 0.16);
-        baseColor = mix(baseColor, swashRef * shimmer, swashFactor * 0.68);
+        vec3  swashRef = mix(mix(waterTint, wetSand, 0.52), u_Horizon * 0.50, wFres * 0.16);
+        baseColor = mix(baseColor, swashRef * shimmer, swashFactor * 0.48);
         baseColor += vec3(0.90, 0.95, 1.00) * pow(max(dot(waterN, H), 0.0), 50.0) * swashFactor * 0.15;
         // Fine foam: two high-frequency noise layers produce tiny white bubble specks
         // in the incoming swash. LOD fades the detail at distance to avoid aliasing.
