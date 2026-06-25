@@ -6,6 +6,7 @@ import com.koretide.app.data.remote.dto.KhoaIndexItem
 import com.koretide.app.domain.model.IndexGrade
 import com.koretide.app.domain.model.IndexType
 import com.koretide.app.domain.model.OceanIndex
+import com.koretide.app.domain.model.StationRegion
 import com.koretide.app.domain.model.TideData
 import com.koretide.app.domain.repository.OceanIndexRepository
 import kotlinx.coroutines.async
@@ -67,6 +68,47 @@ class OceanIndexRepositoryImpl @Inject constructor(
         }
         return fetch(date, stationCode, IndexType.TIDAL_FLAT) { api.getTidalFlatForecast(key, it, date) }
     }
+
+    // 지역 대표 관측소 (지수별 지역 조회용)
+    private val regionStations = mapOf(
+        StationRegion.WEST  to "DT_0001",  // 인천
+        StationRegion.SOUTH to "DT_0013",  // 여수
+        StationRegion.EAST  to "DT_0026",  // 강릉
+        StationRegion.JEJU  to "DT_0035"   // 제주
+    )
+
+    override suspend fun getRegionGrades(
+        date: String,
+        type: IndexType
+    ): List<Pair<StationRegion, OceanIndex>> {
+        if (key.isBlank()) {
+            return StationRegion.values().map { region ->
+                val seed = region.ordinal.toLong()
+                val grade = IndexGrade.values()[((seed + type.ordinal) % 5).toInt()]
+                region to OceanIndex(type, grade, null, emptyList(), null,
+                    SimpleDateFormat("M월 d일", Locale.KOREA).format(Date()), false)
+            }
+        }
+        return coroutineScope {
+            StationRegion.values().map { region ->
+                async {
+                    val code = regionStations[region]
+                    region to fetchForType(date, code, type)
+                }
+            }.map { it.await() }
+        }
+    }
+
+    private suspend fun fetchForType(date: String, stationCode: String?, type: IndexType): OceanIndex =
+        when (type) {
+            IndexType.BEACH_SWIM   -> fetch(date, stationCode, type) { api.getBeachForecast(key, it, date) }
+            IndexType.SEA_FISHING  -> fetch(date, stationCode, type) { api.getFishingForecast(key, it, date) }
+            IndexType.SEASICKNESS  -> fetch(date, stationCode, type) { api.getSeasicknessForecast(key, it, date) }
+            IndexType.SCUBA_DIVING -> fetch(date, stationCode, type) { api.getScubaForecast(key, it, date) }
+            IndexType.TIDAL_FLAT   -> fetch(date, stationCode, type) { api.getTidalFlatForecast(key, it, date) }
+            IndexType.SURFING      -> fetch(date, stationCode, type) { api.getSurfingForecast(key, it, date) }
+            IndexType.SEA_TRAVEL   -> fetch(date, stationCode, type) { api.getSeaTravelForecast(key, it, date) }
+        }
 
     private suspend fun fetch(
         date: String,

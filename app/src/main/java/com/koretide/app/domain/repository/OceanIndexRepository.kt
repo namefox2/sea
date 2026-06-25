@@ -1,6 +1,8 @@
 package com.koretide.app.domain.repository
 
+import com.koretide.app.domain.model.IndexType
 import com.koretide.app.domain.model.OceanIndex
+import com.koretide.app.domain.model.StationRegion
 import com.koretide.app.domain.model.TideData
 
 interface OceanIndexRepository {
@@ -10,4 +12,9 @@ interface OceanIndexRepository {
         stationCode: String? = null,
         tideData: TideData? = null
     ): List<OceanIndex>
+
+    suspend fun getRegionGrades(
+        date: String,
+        type: IndexType
+    ): List<Pair<StationRegion, OceanIndex>>
 }

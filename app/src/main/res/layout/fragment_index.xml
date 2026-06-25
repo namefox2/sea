@@ -1,118 +1,228 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.core.widget.NestedScrollView
+<FrameLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="?android:attr/windowBackground">
 
-    <LinearLayout
+    <!-- ── Screen 1: Index Type List ─────────────────────────────── -->
+    <androidx.core.widget.NestedScrollView
+        android:id="@+id/screenTypeList"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="@dimen/spacing_md">
-
-        <!-- Header row: title + info button -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:layout_marginBottom="@dimen/spacing_xs">
-
-            <TextView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="해양 활동 지수"
-                android:textSize="20sp"
-                android:textStyle="bold"
-                android:textColor="?android:textColorPrimary" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnIndexInfo"
-                style="@style/Widget.MaterialComponents.Button.TextButton"
-                android:layout_width="36dp"
-                android:layout_height="36dp"
-                android:text="ℹ"
-                android:textSize="18sp"
-                android:padding="0dp"
-                app:iconPadding="0dp" />
-        </LinearLayout>
-
-        <TextView
-            android:id="@+id/tvStationHint"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textSize="13sp"
-            android:textColor="?android:textColorSecondary"
-            android:layout_marginBottom="@dimen/spacing_md" />
-
-        <!-- 7-day forecast horizontal scroll -->
-        <TextView
-            android:id="@+id/tvForecastTitle"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="7일 예보"
-            android:textSize="15sp"
-            android:textStyle="bold"
-            android:textColor="?android:textColorPrimary"
-            android:layout_marginBottom="@dimen/spacing_sm"
-            android:visibility="gone" />
-
-        <HorizontalScrollView
-            android:id="@+id/scrollForecast"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:scrollbars="none"
-            android:layout_marginBottom="@dimen/spacing_md"
-            android:visibility="gone">
-
-            <LinearLayout
-                android:id="@+id/containerForecast"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:paddingEnd="@dimen/spacing_sm" />
-
-        </HorizontalScrollView>
-
-        <!-- 물멍하러가기 button -->
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnGoWatch"
-            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="🌊 물멍하러가기"
-            android:textSize="15sp"
-            android:layout_marginBottom="@dimen/spacing_md"
-            android:visibility="gone"
-            app:strokeColor="@color/ocean_blue"
-            app:strokeWidth="1.5dp" />
-
-        <ProgressBar
-            android:id="@+id/progressBar"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center_horizontal"
-            android:visibility="gone" />
-
-        <TextView
-            android:id="@+id/tvError"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textColor="@android:color/holo_red_dark"
-            android:textSize="14sp"
-            android:gravity="center"
-            android:padding="@dimen/spacing_lg"
-            android:visibility="gone" />
+        android:layout_height="match_parent"
+        android:visibility="visible">
 
         <LinearLayout
-            android:id="@+id/containerCards"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:visibility="gone" />
+            android:padding="@dimen/spacing_md">
 
-    </LinearLayout>
-</androidx.core.widget.NestedScrollView>
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="@dimen/spacing_xs">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="해양 활동 지수"
+                    android:textSize="20sp"
+                    android:textStyle="bold"
+                    android:textColor="?android:textColorPrimary" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnIndexInfo"
+                    style="@style/Widget.MaterialComponents.Button.TextButton"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:text="ℹ"
+                    android:textSize="18sp"
+                    android:padding="0dp"
+                    app:iconPadding="0dp" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/tvStationHint"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="13sp"
+                android:textColor="?android:textColorSecondary"
+                android:layout_marginBottom="@dimen/spacing_md" />
+
+            <ProgressBar
+                android:id="@+id/progressTypeList"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_horizontal"
+                android:visibility="gone" />
+
+            <LinearLayout
+                android:id="@+id/containerTypeList"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
+
+    <!-- ── Screen 2: Region Grade List ──────────────────────────── -->
+    <androidx.core.widget.NestedScrollView
+        android:id="@+id/screenRegionList"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="@dimen/spacing_md">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="@dimen/spacing_md">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnBackFromRegion"
+                    style="@style/Widget.MaterialComponents.Button.TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="‹"
+                    android:textSize="22sp"
+                    android:minWidth="0dp"
+                    android:paddingStart="0dp"
+                    android:paddingEnd="8dp"
+                    app:iconPadding="0dp" />
+
+                <TextView
+                    android:id="@+id/tvRegionListTitle"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    android:textColor="?android:textColorPrimary" />
+            </LinearLayout>
+
+            <ProgressBar
+                android:id="@+id/progressRegionList"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_horizontal"
+                android:visibility="gone" />
+
+            <LinearLayout
+                android:id="@+id/containerRegionList"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
+
+    <!-- ── Screen 3: 7-day Forecast ──────────────────────────────── -->
+    <androidx.core.widget.NestedScrollView
+        android:id="@+id/screenForecast"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="@dimen/spacing_md">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="@dimen/spacing_md">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnBackFromForecast"
+                    style="@style/Widget.MaterialComponents.Button.TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="‹"
+                    android:textSize="22sp"
+                    android:minWidth="0dp"
+                    android:paddingStart="0dp"
+                    android:paddingEnd="8dp"
+                    app:iconPadding="0dp" />
+
+                <TextView
+                    android:id="@+id/tvForecastHeaderTitle"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    android:textColor="?android:textColorPrimary" />
+            </LinearLayout>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnGoWatch"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="🌊 물멍하러가기"
+                android:textSize="15sp"
+                android:layout_marginBottom="@dimen/spacing_md"
+                app:strokeColor="@color/ocean_blue"
+                app:strokeWidth="1.5dp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="7일 예보"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                android:textColor="?android:textColorPrimary"
+                android:layout_marginBottom="@dimen/spacing_sm" />
+
+            <HorizontalScrollView
+                android:id="@+id/scrollForecast"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:scrollbars="none"
+                android:layout_marginBottom="@dimen/spacing_md">
+
+                <LinearLayout
+                    android:id="@+id/containerForecast"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:paddingEnd="@dimen/spacing_sm" />
+            </HorizontalScrollView>
+
+            <ProgressBar
+                android:id="@+id/progressBar"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_horizontal"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/tvError"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="@android:color/holo_red_dark"
+                android:textSize="14sp"
+                android:gravity="center"
+                android:padding="@dimen/spacing_lg"
+                android:visibility="gone" />
+
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
+
+</FrameLayout>

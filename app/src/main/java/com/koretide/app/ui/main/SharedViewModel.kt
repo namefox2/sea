@@ -1,6 +1,7 @@
 package com.koretide.app.ui.main
 
 import androidx.lifecycle.ViewModel
+import com.koretide.app.R
 import com.koretide.app.domain.model.Station
 import com.koretide.app.domain.model.TideData
 import com.koretide.app.domain.model.WindData
@@ -57,5 +58,10 @@ class SharedViewModel @Inject constructor() : ViewModel() {
 
     fun setSelectedTheme(themeId: String) {
         _selectedThemeId.value = themeId
+    }
+
+    fun openIndexForStation(station: Station) {
+        _selectedStation.value = station
+        requestTabNavigation(R.id.navigation_index)
     }
 }
