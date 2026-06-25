@@ -20,39 +20,64 @@ class WeatherRepositoryImpl @Inject constructor(
     private val khoaDataApi: KhoaDataApiService
 ) : WeatherRepository {
 
-    private val apiKey get() = BuildConfig.KMA_API_KEY
+    private val apiKey get() = BuildConfig.KHOA_API_KEY
 
     override suspend fun getWindData(lat: Double, lng: Double, stationCode: String): WindData {
         if (apiKey.isBlank()) return MockDataSource.mockWindData(stationCode)
 
-        return try {
-            val date = SimpleDateFormat("yyyyMMdd", Locale.KOREA).format(Date())
-            val time = "0600"
-            // KMA 위경도 → 격자 변환
-            val nx = ((lng - 124.0) * 4).toInt() + 1
-            val ny = ((lat - 33.0) * 4).toInt() + 1
-            val response = kmaApi.getVillageForecast(apiKey, baseDate = date, baseTime = time, nx = nx, ny = ny)
-            val items = response.response?.body?.items?.item ?: emptyList()
-            val wsdItem = items.firstOrNull { it.category == "WSD" }
-            val vecItem = items.firstOrNull { it.category == "VEC" }
-            val speedMs = wsdItem?.fcstValue?.toFloatOrNull() ?: 5.5f
-            val dirDeg  = vecItem?.fcstValue?.toFloatOrNull()  ?: 225f
-            val bft     = BeaufortConverter.toBft(speedMs)
+        val date = SimpleDateFormat("yyyyMMdd", Locale.KOREA).format(Date())
 
-            // noonWave: 실측파랑으로 windAmp 보정 — 조위관측소 코드와 다를 수 있어 실패 시 무시
-            val waveHeightM: Float? = try {
-                val waveResponse = khoaDataApi.getWave(BuildConfig.KHOA_API_KEY, stationCode, date)
-                waveResponse.result?.data?.lastOrNull()?.waveHeight
-            } catch (e: Exception) {
-                Log.d(TAG, "noonWave [$stationCode] skipped: ${e.message}")
+        // 1차: surveyWind (KHOA 관측) — 조위관측소에 풍속 센서가 있을 때 우선 사용
+        val surveyResult = runCatching {
+            val resp = khoaDataApi.getWind(apiKey, stationCode, date)
+            val item = resp.result?.data?.lastOrNull()
+            if (item?.windSpeed != null) {
+                Log.d(TAG, "surveyWind [$stationCode] ok: ${item.windSpeed}m/s ${item.windDir}°")
+                item
+            } else {
+                Log.d(TAG, "surveyWind [$stationCode] empty data")
                 null
             }
+        }.onFailure { Log.d(TAG, "surveyWind [$stationCode] failed: ${it.message}") }
+         .getOrNull()
 
-            WindData(stationCode, speedMs, bft, dirDeg, BeaufortConverter.name(bft), waveHeightM)
-        } catch (e: Exception) {
-            Log.w(TAG, "getWindData [$stationCode] KMA failed → mock", e)
-            MockDataSource.mockWindData(stationCode)
+        val speedMs: Float
+        val dirDeg: Float
+
+        if (surveyResult != null) {
+            speedMs = surveyResult.windSpeed!!
+            dirDeg  = surveyResult.windDir ?: 225f
+        } else {
+            // 2차: KMA 단기예보 (위경도 그리드) — 모든 위치에서 동작
+            val kmaResult = runCatching {
+                val kmaDate = date
+                val time = "0600"
+                val nx = ((lng - 124.0) * 4).toInt() + 1
+                val ny = ((lat - 33.0) * 4).toInt() + 1
+                val resp = kmaApi.getVillageForecast(apiKey, baseDate = kmaDate, baseTime = time, nx = nx, ny = ny)
+                val items = resp.response?.body?.items?.item ?: emptyList()
+                Log.d(TAG, "KMA [$stationCode] items=${items.size}")
+                val ws = items.firstOrNull { it.category == "WSD" }?.fcstValue?.toFloatOrNull()
+                val wd = items.firstOrNull { it.category == "VEC" }?.fcstValue?.toFloatOrNull()
+                Pair(ws, wd)
+            }.onFailure { Log.w(TAG, "KMA [$stationCode] failed → mock", it) }
+             .getOrNull()
+
+            speedMs = kmaResult?.first  ?: return MockDataSource.mockWindData(stationCode)
+            dirDeg  = kmaResult.second ?: 225f
         }
+
+        val bft = BeaufortConverter.toBft(speedMs)
+
+        // 파랑 보정: noonWave — 실패해도 무시
+        val waveHeightM: Float? = runCatching {
+            val wr = khoaDataApi.getWave(apiKey, stationCode, date)
+            wr.result?.data?.lastOrNull()?.waveHeight
+                .also { Log.d(TAG, "noonWave [$stationCode] height=$it") }
+        }.onFailure { Log.d(TAG, "noonWave [$stationCode] skipped: ${it.message}") }
+         .getOrNull()
+
+        return WindData(stationCode, speedMs, bft, dirDeg, BeaufortConverter.name(bft), waveHeightM)
     }
 
     companion object {

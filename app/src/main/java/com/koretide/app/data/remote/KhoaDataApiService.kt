@@ -8,9 +8,10 @@ import retrofit2.http.GET
 import retrofit2.http.Query
 
 // All endpoints at https://apis.data.go.kr/1192136/
+// Each operation follows the pattern: {service}/Get{Service}ApiService
 interface KhoaDataApiService {
 
-    @GET("dtRecent")
+    @GET("dtRecent/GetDtRecentApiService")
     suspend fun getTideRecent(
         @Query("serviceKey") serviceKey: String,
         @Query("ObsCode")    obsCode: String,
@@ -18,7 +19,7 @@ interface KhoaDataApiService {
         @Query("_type")      type: String = "json"
     ): KhoaTideRecentResponse
 
-    @GET("tideFcstHghLw")
+    @GET("tideFcstHghLw/GetTideFcstHghLwApiService")
     suspend fun getTideForecast(
         @Query("serviceKey") serviceKey: String,
         @Query("ObsCode")    obsCode: String,
@@ -26,7 +27,7 @@ interface KhoaDataApiService {
         @Query("_type")      type: String = "json"
     ): KhoaTideFcstResponse
 
-    @GET("surveyWind")
+    @GET("surveyWind/GetSurveyWindApiService")
     suspend fun getWind(
         @Query("serviceKey") serviceKey: String,
         @Query("ObsCode")    obsCode: String,
@@ -34,7 +35,7 @@ interface KhoaDataApiService {
         @Query("_type")      type: String = "json"
     ): KhoaWindResponse
 
-    @GET("noonWave")
+    @GET("noonWave/GetNoonWaveApiService")
     suspend fun getWave(
         @Query("serviceKey") serviceKey: String,
         @Query("ObsCode")    obsCode: String,
