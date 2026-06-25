@@ -162,8 +162,8 @@ void main() {
     float windS = sqrt(u_WindAmp);
 
     float wx   = v_World.x * 0.13;
-    float L0   = mix(8.0, 16.0, windS);     // must match ocean_vert.glsl
-    float spd0 = mix(0.85, 1.65, windS);
+    float L0   = mix(8.0, 16.0, u_WindAmp);   // must match ocean_vert.glsl — raw u_WindAmp, not sqrt
+    float spd0 = mix(0.85, 1.65, u_WindAmp);
     float k0   = 6.28318 / L0;
     float om0  = spd0 * k0;
     float ph1  = bN(vec2(wx,            0.5)) * 3.2;
@@ -173,6 +173,10 @@ void main() {
     float k1   = k0 / 0.58;
     float t2   = max(sin(k1 * u_WaterlineZ - om0 * 1.25 * u_Time + ph2) * 0.5 + 0.5, 0.0);
     t2 = t2 * t2;
+    // Backwash: counter-wave moving seaward at 75% of incoming angular speed.
+    // Phase sign is positive (seaward), offset by ph2 for spatial variation.
+    float t1_back = max(sin(k0 * u_WaterlineZ + om0 * 0.75 * u_Time + ph2) * 0.5 + 0.5, 0.0);
+    t1_back = t1_back * t1_back * 0.65;
     float minReach  = 0.25 + windS * 0.8;
     float reachNoise = bN(vec2(wx * 0.7, u_Time * 0.05)) * 0.55
                      + bN(vec2(wx * 0.25 + 3.0, u_Time * 0.03)) * 0.45;
@@ -248,6 +252,18 @@ void main() {
         float lodFade = clamp(dCam / 14.0, 0.0, 1.0);
         baseColor = mix(baseColor, vec3(0.96, 0.98, 1.00),
                         fineBubbles * swashFactor * 0.50 * (1.0 - lodFade * 0.6));
+    }
+
+    // ── Backwash collision foam ───────────────────────────────────────────────
+    // Frothy foam where the seaward backwash (t1_back) meets the next incoming
+    // wave (t1) — product is high only when both are simultaneously strong.
+    float backCollide = t1 * t1_back * smoothstep(-0.5, 0.5, distToWater) * waveActive;
+    if (backCollide > 0.015) {
+        float fb_b    = bN(v_World.xz * 10.0 + u_Time * vec2(0.07, 0.05));
+        float backFoam = smoothstep(0.60, 0.80, fb_b) * backCollide;
+        float lodFade2 = clamp(dCam / 14.0, 0.0, 1.0);
+        baseColor = mix(baseColor, vec3(0.95, 0.97, 1.00),
+                        backFoam * 0.42 * (1.0 - lodFade2 * 0.5));
     }
 
     // ── 3. Wet sand: dark reflective strip behind swash ───────────────────────
