@@ -27,6 +27,10 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
     @Volatile var defaultHour    = 12.0f  // hour used when useDefaultSun=true (set by theme)
     // 0..1 pre-computed in TideWatchFragment: tidePosition × rangeFactor × regionCap
     @Volatile var mudflatExposure = 0.40f
+    // Tidal range in metres for the selected station — drives how far the waterline
+    // moves between low and high tide. Default = 서해 typical (~4.5 m).
+    // 동해 ~0.3 m → waterline barely shifts; 서해 ~4.5 m → full visual swing.
+    @Volatile var tidalRangeM = 4.5f
     // Ocean colors — theme-driven
     @Volatile var deepColor    = floatArrayOf(0.02f, 0.16f, 0.36f)  // deep navy (#0a3d6b area)
     @Volatile var shallowColor = floatArrayOf(0.10f, 0.68f, 0.72f) // bright turquoise (reference: #00CED1 area)
@@ -268,12 +272,14 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         val yunseulStr = (1f - wAmp * 0.9f).coerceIn(0f, 1f)
 
         // Waterline Z: where ocean meets beach/tidal-flat.
-        // West-Sea tidal range: at low tide the ocean retreats ~36m to the horizon;
-        // at high tide it fills nearly the whole foreground.
-        //   tide=0.0 (간조) → waterlineZ=-18 → vast 갯벌 visible, ocean at far horizon
-        //   tide=0.5 (중간) → waterlineZ= -1 → moderate beach strip
-        //   tide=1.0 (만조) → waterlineZ=+16 → ocean fills view, thin beach near camera
-        val waterlineBase = -18.0f + tide * 34.0f
+        // Visual range is scaled by the station's tidal range relative to the 서해
+        // reference (4.5 m). This ensures 동해 (0.3 m) barely moves the waterline
+        // while 서해 (4.5 m) gets the full ±17 m visual swing.
+        //   서해 (4.5 m) tide=0 → -18, tide=0.5 → -1, tide=1 → +16
+        //   동해 (0.3 m) tide=0 → -2.1, tide=0.5 → -1, tide=1 → -0.0  (barely moves)
+        val tidalScale    = (tidalRangeM / 4.5f).coerceIn(0.02f, 1.0f)
+        val visualRange   = 34.0f * tidalScale
+        val waterlineBase = -1.0f + (tide - 0.5f) * visualRange
         // Multi-frequency wave advance: two oscillations so no two waves are identical.
         // Primary ~5 s period, secondary ~8.6 s; amplitude ±1.5 m calm → ±3.5 m max wind.
         // Uses rawT (not wrapped t) so waterlineZ never jumps at the 1000-s boundary.

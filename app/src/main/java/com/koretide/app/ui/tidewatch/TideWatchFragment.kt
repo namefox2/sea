@@ -16,6 +16,7 @@ import androidx.fragment.app.viewModels
 import com.koretide.app.databinding.FragmentTideWatchBinding
 import com.koretide.app.domain.model.StationRegion
 import com.koretide.app.domain.model.TideData
+import com.koretide.app.domain.model.TidalConfig
 import com.koretide.app.theme.SeasonThemeManager
 import com.koretide.app.ui.main.SharedViewModel
 import com.koretide.app.util.collectFlow
@@ -49,6 +50,8 @@ class TideWatchFragment : Fragment() {
     private var cachedRegion: StationRegion? = null
     private var cachedMaxLevel: Int = DEFAULT_MAX_LEVEL
     private var cachedMinLevel: Int = DEFAULT_MIN_LEVEL
+    // Tidal range in metres — set from API data; falls back to regional TidalConfig default.
+    private var cachedTidalRangeM: Float = TidalConfig.forRegion(StationRegion.WEST).tidalRangeM
 
     private val oceanSound = OceanSoundPlayer()
     private var soundEnabled = false
@@ -213,6 +216,12 @@ class TideWatchFragment : Fragment() {
         collectFlow(sharedViewModel.selectedStation) { station ->
             val b = _binding ?: return@collectFlow
             cachedRegion = station?.region
+            // Apply regional TidalConfig default immediately so the scene reflects the
+            // correct coast type while waiting for the first API response.
+            cachedTidalRangeM = station?.region
+                ?.let { TidalConfig.forRegion(it).tidalRangeM }
+                ?: TidalConfig.forRegion(StationRegion.WEST).tidalRangeM
+            b.tideWatchView.setTidalRange(cachedTidalRangeM)
             b.tideWatchView.setHasStation(station != null)
             if (station != null) {
                 b.tvStationName.text = station.name
@@ -242,13 +251,15 @@ class TideWatchFragment : Fragment() {
     }
 
     private fun applyTideData(b: FragmentTideWatchBinding, data: TideData) {
-        cachedMaxLevel = data.maxLevel
-        cachedMinLevel = data.minLevel
+        cachedMaxLevel     = data.maxLevel
+        cachedMinLevel     = data.minLevel
+        cachedTidalRangeM  = data.tidalRangeM   // override regional default with actual API range
 
         val exposure = computeMudflatExposure(data.currentLevel, data.maxLevel, data.minLevel, cachedRegion)
         val pct = (data.tidePercent * 100).toInt().coerceIn(0, 100)
 
         b.seekTide.progress = pct
+        b.tideWatchView.setTidalRange(data.tidalRangeM)  // scales waterline movement to actual조차
         b.tideWatchView.setMudflatExposure(exposure)
         b.tvTideInfo.text = "${data.tideStatus.displayName} $pct%"
     }

@@ -70,13 +70,16 @@ class TideWatchView @JvmOverloads constructor(
     fun setWind(bft: Int)        { queueEvent { renderer.windAmp = (bft.coerceIn(0, 12) / 12f) } }
     fun setHasStation(has: Boolean) { queueEvent { renderer.useDefaultSun = !has } }
     fun setMudflatExposure(exposure: Float) { queueEvent { renderer.mudflatExposure = exposure.coerceIn(0f, 1f) } }
+    /** Tidal range in metres — scales how far the waterline moves per tide cycle. */
+    fun setTidalRange(rangeM: Float) { queueEvent { renderer.tidalRangeM = rangeM.coerceAtLeast(0.05f) } }
 
     // Immersive preset: noon sun, moderate tidal flat, theme already applied.
     fun applyImmersivePreset() {
         queueEvent {
-            renderer.useDefaultSun = true
-            renderer.defaultHour   = 12.0f
-            renderer.tidePercent   = 0.50f
+            renderer.useDefaultSun   = true
+            renderer.defaultHour     = 12.0f
+            renderer.tidePercent     = 0.50f
+            renderer.tidalRangeM     = 4.5f   // 서해 reference for demo preset
             renderer.mudflatExposure = 0.40f
         }
     }
