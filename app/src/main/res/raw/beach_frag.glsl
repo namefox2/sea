@@ -260,12 +260,5 @@ void main() {
     float fogFact = clamp(1.0 - exp(-fogZ * 0.008), 0.0, 0.45);
     baseColor = mix(baseColor, u_Horizon * 0.82, fogFact);
 
-    // ── DEBUG ──────────────────────────────────────────────────────────────────
-    float _dw = 0.18;
-    baseColor = mix(baseColor, vec3(1.0, 0.0, 0.0), smoothstep(_dw, 0.0, abs(distToWater))       * 0.9); // RED   distToWater=0
-    baseColor = mix(baseColor, vec3(0.0, 0.2, 1.0), smoothstep(_dw, 0.0, abs(distToWave))         * 0.9); // BLUE  distToWave=0
-    baseColor = mix(baseColor, vec3(1.0, 1.0, 0.0), smoothstep(_dw, 0.0, abs(distToWave - 0.5))  * 0.9); // YEL   distToWave=0.5
-    baseColor = mix(baseColor, vec3(0.0, 1.0, 0.0), smoothstep(_dw, 0.0, abs(distToWater - 4.0)) * 0.9); // GRN   distToWater=4
-
     gl_FragColor = vec4(baseColor, 1.0);
 }
