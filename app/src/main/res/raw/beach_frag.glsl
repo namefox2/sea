@@ -178,9 +178,12 @@ void main() {
                      + bN(vec2(wx * 0.25 + 3.0, u_Time * 0.03)) * 0.45;
     float waveReach = max(t1 * (1.2 + windS * 3.5) + t2 * (0.5 + windS * 1.8),
                           minReach) * (0.65 + reachNoise * 0.55);
-    // Perspective damping: camera is at Z≈18, waterline at u_WaterlineZ.
-    // Near the camera the same world-space reach looks much larger in screen-space,
-    // so scale it down proportionally — full reach at the waterline, ~40% near camera.
+    // Slow recede: lagged copy at 45% angular speed holds waveReach up while the
+    // fast wave retreats, so the water withdraws more slowly than it advances.
+    float t1_lag = max(sin(k0 * u_WaterlineZ - om0 * 0.45 * u_Time + ph1) * 0.5 + 0.5, 0.0);
+    t1_lag = t1_lag * t1_lag * 0.55;
+    waveReach = max(waveReach, t1_lag * (1.2 + windS * 3.5) * (0.65 + reachNoise * 0.55));
+    // Perspective damping: near camera same world-space reach looks much wider → scale down.
     float dtwNorm   = clamp(distToWater / max(18.0 - u_WaterlineZ, 2.0), 0.0, 1.0);
     waveReach *= 1.0 - smoothstep(0.3, 1.0, dtwNorm) * 0.60;
 
@@ -237,6 +240,14 @@ void main() {
         vec3  swashRef = mix(mix(waterTint, wetSand, 0.42), u_Horizon * 0.50, wFres * 0.16);
         baseColor = mix(baseColor, swashRef * shimmer, swashFactor * 0.68);
         baseColor += vec3(0.90, 0.95, 1.00) * pow(max(dot(waterN, H), 0.0), 50.0) * swashFactor * 0.15;
+        // Fine foam: two high-frequency noise layers produce tiny white bubble specks
+        // in the incoming swash. LOD fades the detail at distance to avoid aliasing.
+        float fb1 = bN(v_World.xz * 9.0  + u_Time * vec2( 0.12, -0.04));
+        float fb2 = bN(v_World.xz * 15.0 - u_Time * vec2(-0.07,  0.09));
+        float fineBubbles = smoothstep(0.68, 0.86, fb1 * 0.55 + fb2 * 0.45);
+        float lodFade = clamp(dCam / 14.0, 0.0, 1.0);
+        baseColor = mix(baseColor, vec3(0.96, 0.98, 1.00),
+                        fineBubbles * swashFactor * 0.50 * (1.0 - lodFade * 0.6));
     }
 
     // ── 3. Wet sand: dark reflective strip behind swash ───────────────────────
