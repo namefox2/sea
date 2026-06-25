@@ -159,7 +159,7 @@ void main() {
     // windS normalises u_WindAmp to [0,1] — beach wave math was designed for
     // this range; raw values like 12 blew minReach to 9.85 m and waveReach to
     // 25 m, making the beach look permanently flooded regardless of wave state.
-    float windS = smoothstep(0.0, 0.4, u_WindAmp);
+    float windS = sqrt(u_WindAmp);
 
     float wx   = v_World.x * 0.13;
     float L0   = mix(8.0, 16.0, windS);     // must match ocean_vert.glsl

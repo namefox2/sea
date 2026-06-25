@@ -38,9 +38,9 @@ vec3 gerstner(vec2 xz0, vec2 dir, float amp, float L, float speed, float t,
 void main() {
     float w = u_WindAmp;
 
-    // Saturates at bft≈5 (w=0.4); no squaring so light wind (bft 2-3) produces
-    // visible waves instead of being crushed near zero.
-    float wind = smoothstep(0.0, 0.4, w);
+    // sqrt curve: large jump at low wind so bft-2 waves are visible,
+    // while still reaching 1.0 only at bft-12 to preserve full progression.
+    float wind = sqrt(w);
 
     float amp = mix(0.05, 0.50, wind);
     float L0  = mix(8.0, 16.0, w);   // longer wavelength → swell look
