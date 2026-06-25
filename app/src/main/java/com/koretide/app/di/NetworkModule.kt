@@ -9,6 +9,7 @@ import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
+import android.util.Log
 import okhttp3.OkHttpClient
 import okhttp3.ResponseBody.Companion.toResponseBody
 import okhttp3.logging.HttpLoggingInterceptor
@@ -45,7 +46,11 @@ object NetworkModule {
         .addInterceptor { chain ->
             val response = chain.proceed(chain.request())
             val mediaType = response.body?.contentType()
-            val body = response.body?.string()?.trimStart('﻿')?.trim() ?: ""
+            val raw = response.body?.string() ?: ""
+            val body = raw.trimStart('﻿').trim()
+            if (BuildConfig.DEBUG && body.isNotEmpty() && !body.startsWith("{") && !body.startsWith("[")) {
+                Log.w("RawResponse", "${chain.request().url} → ${body.take(400)}")
+            }
             response.newBuilder().body(body.toResponseBody(mediaType)).build()
         }
         .build()

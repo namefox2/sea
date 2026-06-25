@@ -1,6 +1,7 @@
 package com.koretide.app.data.repository
 
 import com.koretide.app.BuildConfig
+import android.util.Log
 import com.koretide.app.data.local.dao.TideRecordDao
 import com.koretide.app.data.local.entity.TideRecordEntity
 import com.koretide.app.data.remote.KhoaDataApiService
@@ -79,6 +80,7 @@ class TideRepositoryImpl @Inject constructor(
                 records      = records.map { it.toDomain() }
             )
         } catch (e: Exception) {
+            Log.w("TideRepo", "getTideData [$stationCode] failed → mock", e)
             MockDataSource.mockTideData(stationCode)
         }
     }
