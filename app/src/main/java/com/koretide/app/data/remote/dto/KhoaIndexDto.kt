@@ -5,13 +5,19 @@ import com.squareup.moshi.JsonClass
 
 @JsonClass(generateAdapter = true)
 data class KhoaIndexResponse(
-    @Json(name = "result") val result: KhoaIndexResult?
+    @Json(name = "header") val header: KhoaHeader?,
+    @Json(name = "body")   val body: KhoaIndexBody?
 )
 
 @JsonClass(generateAdapter = true)
-data class KhoaIndexResult(
-    @Json(name = "meta") val meta: KhoaDataMeta?,
-    @Json(name = "data") val data: List<KhoaIndexItem>?
+data class KhoaIndexBody(
+    @Json(name = "items")      val items: KhoaIndexItems?,
+    @Json(name = "totalCount") val totalCount: Int?
+)
+
+@JsonClass(generateAdapter = true)
+data class KhoaIndexItems(
+    @Json(name = "item") val item: List<KhoaIndexItem>?
 )
 
 @JsonClass(generateAdapter = true)

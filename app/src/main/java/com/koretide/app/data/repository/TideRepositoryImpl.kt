@@ -32,8 +32,8 @@ class TideRepositoryImpl @Inject constructor(
             val current = khoaDataApi.getTideRecent(apiKey, stationCode, date)
             val table   = khoaDataApi.getTideForecast(apiKey, stationCode, date)
 
-            val dataItems  = current.result?.data ?: emptyList()
-            val tableItems = table.result?.data   ?: emptyList()
+            val dataItems  = current.body?.items?.item ?: emptyList()
+            val tableItems = table.body?.items?.item   ?: emptyList()
 
             val currentLevel = dataItems.lastOrNull()?.tideLevel ?: 300
 
@@ -61,7 +61,7 @@ class TideRepositoryImpl @Inject constructor(
             val lowItem  = allLow.firstOrNull  { it.tphTime.orEmpty() >= nowTime } ?: allLow.lastOrNull()
 
             val records = dataItems.map { item ->
-                val ts = parseDateToMillis(item.recordTime ?: date)
+                val ts = parseDateToMillis(item.obsrvnDt ?: date)
                 TideRecordEntity(stationCode = stationCode, timestamp = ts, waterLevel = item.tideLevel ?: 0)
             }
 
@@ -94,11 +94,11 @@ class TideRepositoryImpl @Inject constructor(
     }
 
     private fun parseDateToMillis(dateStr: String): Long {
-        return try {
-            val fmt = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.KOREA)
-            fmt.parse(dateStr)?.time ?: System.currentTimeMillis()
-        } catch (e: Exception) {
-            System.currentTimeMillis()
+        val formats = listOf("yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd HH:mm", "yyyyMMdd HHmm")
+        for (fmt in formats) {
+            runCatching { SimpleDateFormat(fmt, Locale.KOREA).parse(dateStr)?.time }
+                .getOrNull()?.let { return it }
         }
+        return System.currentTimeMillis()
     }
 }

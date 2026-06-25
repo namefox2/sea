@@ -74,7 +74,7 @@ class OceanIndexRepositoryImpl @Inject constructor(
         type: IndexType,
         call: suspend (String?) -> com.koretide.app.data.remote.dto.KhoaIndexResponse
     ): OceanIndex = try {
-        val items = call(stationCode).result?.data ?: emptyList()
+        val items = call(stationCode).body?.items?.item ?: emptyList()
         val item  = items.firstOrNull { it.obsCode == stationCode }
                   ?: items.firstOrNull()
         item?.toDomain(type) ?: mockIndex(type)
