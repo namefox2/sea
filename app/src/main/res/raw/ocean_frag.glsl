@@ -64,8 +64,8 @@ float foamCells(vec2 p) {
 }
 
 void main() {
-    float windS = smoothstep(0.0, 1.0, u_WindAmp);   // [0..1] pre-square; used for foam
-    float wind  = windS * windS;                       // squared for wave perturbation
+    float windS = smoothstep(0.0, 0.4, u_WindAmp);
+    float wind  = windS;
     float dist     = length(v_World.xz - u_CamPos.xz);
     float distNorm = clamp(dist / 68.0, 0.0, 1.0);
     float nearFactor = exp(-dist / 15.0);
