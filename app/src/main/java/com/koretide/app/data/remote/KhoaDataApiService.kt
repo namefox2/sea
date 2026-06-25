@@ -3,6 +3,7 @@ package com.koretide.app.data.remote
 import com.koretide.app.data.remote.dto.KhoaTideRecentResponse
 import com.koretide.app.data.remote.dto.KhoaTideFcstResponse
 import com.koretide.app.data.remote.dto.KhoaWaveResponse
+import com.koretide.app.data.remote.dto.StationResponse
 import retrofit2.http.GET
 import retrofit2.http.Query
 
@@ -16,40 +17,41 @@ interface KhoaDataApiService {
     suspend fun getTideRecent(
         @Query("serviceKey") serviceKey: String,
         @Query("obsCode")    obsCode: String?,
-        @Query("reqDate")       date: String,
+        @Query("reqDate")    date: String,
         @Query("numOfRows")  numOfRows: Int = 100,
         @Query("pageNo")     pageNo: Int = 1,
-        @Query("type")      type: String = "json"
+        @Query("type")       type: String = "json"
     ): KhoaTideRecentResponse
 
     @GET("tideFcstHghLw/GetTideFcstHghLwApiService")
     suspend fun getTideForecast(
         @Query("serviceKey") serviceKey: String,
         @Query("obsCode")    obsCode: String?,
-        @Query("reqDate")       date: String,
+        @Query("reqDate")    date: String,
         @Query("numOfRows")  numOfRows: Int = 20,
         @Query("pageNo")     pageNo: Int = 1,
-        @Query("type")      type: String = "json"
+        @Query("type")       type: String = "json"
     ): KhoaTideFcstResponse
 
     @GET("noonWave/GetNoonWaveApiService")
     suspend fun getWave(
         @Query("serviceKey") serviceKey: String,
         @Query("obsCode")    obsCode: String?,
-        @Query("reqDate")       date: String,
+        @Query("reqDate")    date: String,
         @Query("numOfRows")  numOfRows: Int = 100,
         @Query("pageNo")     pageNo: Int = 1,
-        @Query("type")      type: String = "json"
+        @Query("type")       type: String = "json"
     ): KhoaWaveResponse
 }
 
+// odcloud.kr 조위관측소 목록 API (baseUrl: https://api.odcloud.kr/api/)
 interface OdCloudApi {
 
     @GET("15146602/v1/uddi:81b0665b-4f21-41e8-91f1-d3ecc4a7a3f1")
     suspend fun getStations(
-        @Query("page") page: Int = 1,
-        @Query("perPage") perPage: Int = 100,
-        @Query("returnType") returnType: String = "json",
-        @Query("serviceKey") serviceKey: String
+        @Query("page")        page: Int = 1,
+        @Query("perPage")     perPage: Int = 200,
+        @Query("returnType")  returnType: String = "json",
+        @Query("serviceKey")  serviceKey: String
     ): StationResponse
 }

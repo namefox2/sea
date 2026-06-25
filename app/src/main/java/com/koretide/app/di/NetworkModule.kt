@@ -4,6 +4,7 @@ import android.util.Log
 import com.koretide.app.BuildConfig
 import com.koretide.app.data.remote.KhoaDataApiService
 import com.koretide.app.data.remote.KhoaIndexApiService
+import com.koretide.app.data.remote.OdCloudApi
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import dagger.Module
@@ -24,6 +25,10 @@ import javax.inject.Singleton
 @Qualifier
 @Retention(AnnotationRetention.BINARY)
 annotation class KhoaRetrofit
+
+@Qualifier
+@Retention(AnnotationRetention.BINARY)
+annotation class OdCloudRetrofit
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -71,10 +76,10 @@ object NetworkModule {
             .addConverterFactory(MoshiConverterFactory.create(moshi))
             .build()
 
-    fun provideOdCloudRetrofit(
-        client: OkHttpClient,
-        moshi: Moshi
-    ): Retrofit =
+    @Provides
+    @Singleton
+    @OdCloudRetrofit
+    fun provideOdCloudRetrofit(client: OkHttpClient, moshi: Moshi): Retrofit =
         Retrofit.Builder()
             .baseUrl("https://api.odcloud.kr/api/")
             .client(client)
@@ -90,6 +95,11 @@ object NetworkModule {
     @Singleton
     fun provideKhoaIndexApiService(@KhoaRetrofit retrofit: Retrofit): KhoaIndexApiService =
         retrofit.create(KhoaIndexApiService::class.java)
+
+    @Provides
+    @Singleton
+    fun provideOdCloudApi(@OdCloudRetrofit retrofit: Retrofit): OdCloudApi =
+        retrofit.create(OdCloudApi::class.java)
 
     // KHOA data.go.kr XML 응답 → JSON 변환
     // 구조: <response><header>...</header><body><items><item>...</item></items></body></response>
