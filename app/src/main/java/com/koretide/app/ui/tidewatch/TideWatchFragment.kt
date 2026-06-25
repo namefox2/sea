@@ -28,10 +28,6 @@ private const val KEY_THEME_ID = "selected_theme_id"
 private const val PREFS_WATCH = "watch_prefs"
 private const val KEY_WAVE_SOUND = "wave_sound_enabled"
 
-// Default tidal range used when no station data is available (서해 typical ~600 cm).
-private const val DEFAULT_MAX_LEVEL = 600
-private const val DEFAULT_MIN_LEVEL = 0
-
 @AndroidEntryPoint
 class TideWatchFragment : Fragment() {
 
@@ -46,10 +42,7 @@ class TideWatchFragment : Fragment() {
     private var uiVisible = true
     private var isImmersivePreset = false
 
-    // Cached tidal range data — updated whenever real station data arrives.
     private var cachedRegion: StationRegion? = null
-    private var cachedMaxLevel: Int = DEFAULT_MAX_LEVEL
-    private var cachedMinLevel: Int = DEFAULT_MIN_LEVEL
     // Tidal range in metres — set from API data; falls back to regional TidalConfig default.
     private var cachedTidalRangeM: Float = TidalConfig.forRegion(StationRegion.WEST).tidalRangeM
 
@@ -101,9 +94,12 @@ class TideWatchFragment : Fragment() {
     private fun setupSliders() {
         val initialTidePct = binding.seekTide.progress / 100f
         binding.tideWatchView.setTide(initialTidePct)
+        binding.tideWatchView.setTidalRange(cachedTidalRangeM)
         binding.tideWatchView.setMudflatExposure(
-            computeMudflatExposure(initialTidePct, cachedMaxLevel, cachedMinLevel, cachedRegion)
+            computeMudflatExposure(initialTidePct, cachedTidalRangeM, cachedRegion)
         )
+        binding.seekTidalRange.progress = (cachedTidalRangeM * 10).toInt().coerceIn(0, 100)
+        binding.tvTidalRange.text = "%.1fm".format(cachedTidalRangeM)
         binding.tideWatchView.setWind(binding.seekWind.progress)
 
         binding.seekWind.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
@@ -121,9 +117,23 @@ class TideWatchFragment : Fragment() {
                 binding.tvTidePct.text = "$progress%"
                 val pct = progress / 100f
                 binding.tideWatchView.setTide(pct)
-                // Recompute mudflat exposure whenever the slider changes (user or code).
                 binding.tideWatchView.setMudflatExposure(
-                    computeMudflatExposure(pct, cachedMaxLevel, cachedMinLevel, cachedRegion)
+                    computeMudflatExposure(pct, cachedTidalRangeM, cachedRegion)
+                )
+            }
+            override fun onStartTrackingTouch(sb: SeekBar) {}
+            override fun onStopTrackingTouch(sb: SeekBar) {}
+        })
+
+        binding.seekTidalRange.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(sb: SeekBar, progress: Int, fromUser: Boolean) {
+                val rangeM = (progress / 10f).coerceAtLeast(0.05f)
+                cachedTidalRangeM = rangeM
+                binding.tvTidalRange.text = "%.1fm".format(rangeM)
+                binding.tideWatchView.setTidalRange(rangeM)
+                val pct = binding.seekTide.progress / 100f
+                binding.tideWatchView.setMudflatExposure(
+                    computeMudflatExposure(pct, rangeM, cachedRegion)
                 )
             }
             override fun onStartTrackingTouch(sb: SeekBar) {}
@@ -195,7 +205,7 @@ class TideWatchFragment : Fragment() {
             val pct = binding.seekTide.progress / 100f
             binding.tideWatchView.setTide(pct)
             binding.tideWatchView.setMudflatExposure(
-                computeMudflatExposure(pct, cachedMaxLevel, cachedMinLevel, cachedRegion)
+                computeMudflatExposure(pct, cachedTidalRangeM, cachedRegion)
             )
         }
         viewModel.windData.value?.let { data ->
@@ -251,25 +261,26 @@ class TideWatchFragment : Fragment() {
     }
 
     private fun applyTideData(b: FragmentTideWatchBinding, data: TideData) {
-        cachedMaxLevel     = data.maxLevel
-        cachedMinLevel     = data.minLevel
-        cachedTidalRangeM  = data.tidalRangeM   // override regional default with actual API range
+        cachedTidalRangeM = data.tidalRangeM
 
-        val exposure = computeMudflatExposure(data.currentLevel, data.maxLevel, data.minLevel, cachedRegion)
         val pct = (data.tidePercent * 100).toInt().coerceIn(0, 100)
-
         b.seekTide.progress = pct
-        b.tideWatchView.setTidalRange(data.tidalRangeM)  // scales waterline movement to actual조차
-        b.tideWatchView.setMudflatExposure(exposure)
+        // Sync the 조차 slider to the actual station range
+        b.seekTidalRange.progress = (data.tidalRangeM * 10).toInt().coerceIn(0, 100)
+        b.tvTidalRange.text = "%.1fm".format(data.tidalRangeM)
+
+        b.tideWatchView.setTidalRange(data.tidalRangeM)
+        b.tideWatchView.setMudflatExposure(
+            computeMudflatExposure(data.tidePercent, data.tidalRangeM, cachedRegion)
+        )
         b.tvTideInfo.text = "${data.tideStatus.displayName} $pct%"
     }
 
     private fun updateMudflatGrade(b: FragmentTideWatchBinding, data: TideData) {
         val region = cachedRegion
         val hasTidalFlat = region == StationRegion.WEST || region == StationRegion.SOUTH
-        val tidalRange = data.maxLevel - data.minLevel
-        if (hasTidalFlat && tidalRange > 100) {
-            val exposure = computeMudflatExposure(data.currentLevel, data.maxLevel, data.minLevel, region)
+        if (hasTidalFlat && data.tidalRangeM > 1.0f) {
+            val exposure = computeMudflatExposure(data.tidePercent, data.tidalRangeM, region)
             b.tvMudflatGrade.text = when {
                 exposure >= 0.60f -> "🦀 갯벌 매우 많이 드러남"
                 exposure >= 0.30f -> "🦀 갯벌 보통 드러남"
@@ -314,27 +325,27 @@ class TideWatchFragment : Fragment() {
 }
 
 // ── Tidal flat exposure computation ──────────────────────────────────────────
-// Returns a 0..1 value reflecting how much tidal flat is currently visible,
-// combining: (1) how far the tide is out, (2) the local tidal range magnitude,
-// and (3) a hard cap per coast type (동해 rarely exposes mudflat).
+// Returns 0..1: how much tidal flat is currently visible.
+//   tidePercent  — 0 = 간조 (low tide / exposed), 1 = 만조 (high tide / submerged)
+//   tidalRangeM  — actual조차 in metres (from API or 조차 slider)
+//   region       — per-coast hard cap (동해 almost never shows mudflat)
 private fun computeMudflatExposure(
-    currentLevel: Int, maxLevel: Int, minLevel: Int, region: StationRegion?
+    tidePercent: Float, tidalRangeM: Float, region: StationRegion?
 ): Float {
-    val tidalRange = (maxLevel - minLevel).toFloat()
-    if (tidalRange <= 0f) return 0f
+    if (tidalRangeM <= 0.05f) return 0f
 
-    // 0 = submerged (high tide), 1 = fully exposed (low tide)
-    val tidePosition = ((maxLevel - currentLevel).toFloat() / tidalRange).coerceIn(0f, 1f)
+    // tidePercent=0 (간조) → tidePosition=1 (fully exposed)
+    val tidePosition = (1f - tidePercent).coerceIn(0f, 1f)
 
-    // How much this location's range allows mudflat to form
+    // rangeFactor: small조차 → little mudflat even at low tide (in metres)
     val rangeFactor = when {
-        tidalRange < 100f -> 0.00f                                                    // <1m: no flat
-        tidalRange < 300f -> (tidalRange - 100f) / 200f * 0.30f                      // 1-3m: small
-        tidalRange < 500f -> 0.30f + (tidalRange - 300f) / 200f * 0.50f              // 3-5m: moderate
-        else              -> 0.80f + ((tidalRange - 500f) / 500f).coerceAtMost(1f) * 0.20f // 5m+: large
+        tidalRangeM < 1.0f -> 0.00f
+        tidalRangeM < 3.0f -> (tidalRangeM - 1.0f) / 2.0f * 0.30f
+        tidalRangeM < 5.0f -> 0.30f + (tidalRangeM - 3.0f) / 2.0f * 0.50f
+        else               -> 0.80f + ((tidalRangeM - 5.0f) / 5.0f).coerceAtMost(1f) * 0.20f
     }
 
-    // Per-region hard cap: even at maximum range, 동해/제주 show almost no mudflat
+    // Per-region hard cap: 동해/제주 geography rarely forms exposed mudflat
     val regionCap = when (region) {
         StationRegion.WEST  -> 1.00f
         StationRegion.SOUTH -> 0.60f
@@ -344,14 +355,4 @@ private fun computeMudflatExposure(
     }
 
     return (tidePosition * rangeFactor * regionCap).coerceIn(0f, 1f)
-}
-
-// Overload for the manual slider (no actual level data, only tidePercent).
-private fun computeMudflatExposure(
-    tidePercent: Float, maxLevel: Int, minLevel: Int, region: StationRegion?
-): Float {
-    val tidalRange = (maxLevel - minLevel).toFloat()
-    // tidePercent=0 → lowest tide → currentLevel=minLevel; tidePercent=1 → highest → currentLevel=maxLevel
-    val currentLevel = (minLevel + tidePercent * tidalRange).toInt()
-    return computeMudflatExposure(currentLevel, maxLevel, minLevel, region)
 }
