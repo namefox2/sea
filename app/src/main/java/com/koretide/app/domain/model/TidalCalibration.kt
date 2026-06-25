@@ -20,6 +20,8 @@ package com.koretide.app.domain.model
  *   서해 만조(~870 cm) → waterlineZ ≈ +12  (바다 가득)
  *   동해 간조(~110 cm) → waterlineZ ≈ -1   (해수욕장 반/바다 반)
  *   동해 만조(~170 cm) → waterlineZ ≈ +0.5 (바다 조금 늘어남)
+ *   제주 간조(~50 cm)  → waterlineZ ≈ +6   (바위/해안 조금 드러남)
+ *   제주 만조(~220 cm) → waterlineZ ≈ +10  (바다 가득 — 섬 해안선)
  */
 data class TidalCalibration(
     val histMinCm: Int,
@@ -37,7 +39,7 @@ data class TidalCalibration(
             StationRegion.WEST  -> TidalCalibration( 20, 1000, -18f,  16f)
             StationRegion.SOUTH -> TidalCalibration( 20,  450, -10f,  12f)
             StationRegion.EAST  -> TidalCalibration( 30,  270,  -3f,   3f)
-            StationRegion.JEJU  -> TidalCalibration(  0,  290,  -5f,   5f)
+            StationRegion.JEJU  -> TidalCalibration(  0,  290,   5f,  12f)
         }
     }
 }

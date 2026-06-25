@@ -143,7 +143,8 @@ void main() {
     // At low wind the wide sandy zone was visible as "sea not filling in".
     // Scale both range and strength with wind so at wind=0 it's just a hint.
     float bridgeRange = mix(-1.5, -6.0, windS);
-    float bridgeStr   = mix(0.12, 1.00, windS);
+    // Slightly stronger bridge at calm so the shore edge doesn't snap teal → brown.
+    float bridgeStr   = mix(0.28, 1.00, windS);
     float shoreEdgeBridge = smoothstep(bridgeRange, sNoiseF * 0.25, v_DistToWater);
     water = mix(water, u_SandWetColor * 1.20, shoreEdgeBridge * bridgeStr);
 
@@ -311,7 +312,9 @@ void main() {
     // Full wind: cutoff moves to wave front (sNoiseF+4.5+waveEdgeShift), 2.5 m fade.
     float waveEdgeShift = waveH * 1.5;
     float windLerp  = clamp(windS * 5.0, 0.0, 1.0);
-    float fadeWidth = mix(0.2, 2.5, windLerp);
+    // Wider fade at ALL wind levels: calm water still needs a soft shore transition.
+    // Old min was 0.2 (≈1 pixel) → hard boundary even in flat conditions.
+    float fadeWidth = mix(1.5, 2.5, windLerp);
     // Perspective correction: ocean surface sits at Y=tideY above beach (Y=0). Camera
     // at (0, 1.8, 18) looking down means the ocean fragment at the same screen pixel as
     // the beach waterline has v_DistToWater ≈ (18−waterlineZ)×tideY/1.8 rather than 0.
