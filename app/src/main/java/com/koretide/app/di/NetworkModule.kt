@@ -1,9 +1,8 @@
 package com.koretide.app.di
 
 import com.koretide.app.BuildConfig
-import com.koretide.app.data.remote.KhoaApiService
-import com.koretide.app.data.remote.KmaApiService
-import com.koretide.app.data.remote.KmaBeachApiService
+import com.koretide.app.data.remote.KhoaDataApiService
+import com.koretide.app.data.remote.KhoaIndexApiService
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import dagger.Module
@@ -21,14 +20,6 @@ import javax.inject.Singleton
 @Qualifier
 @Retention(AnnotationRetention.BINARY)
 annotation class KhoaRetrofit
-
-@Qualifier
-@Retention(AnnotationRetention.BINARY)
-annotation class KmaRetrofit
-
-@Qualifier
-@Retention(AnnotationRetention.BINARY)
-annotation class KmaBeachRetrofit
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -57,43 +48,18 @@ object NetworkModule {
     @KhoaRetrofit
     fun provideKhoaRetrofit(client: OkHttpClient, moshi: Moshi): Retrofit =
         Retrofit.Builder()
-            .baseUrl("https://www.khoa.go.kr/api/oceangrid/")
+            .baseUrl("https://apis.data.go.kr/1192136/")
             .client(client)
             .addConverterFactory(MoshiConverterFactory.create(moshi))
             .build()
 
     @Provides
     @Singleton
-    @KmaRetrofit
-    fun provideKmaRetrofit(client: OkHttpClient, moshi: Moshi): Retrofit =
-        Retrofit.Builder()
-            .baseUrl("https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/")
-            .client(client)
-            .addConverterFactory(MoshiConverterFactory.create(moshi))
-            .build()
+    fun provideKhoaDataApiService(@KhoaRetrofit retrofit: Retrofit): KhoaDataApiService =
+        retrofit.create(KhoaDataApiService::class.java)
 
     @Provides
     @Singleton
-    fun provideKhoaApiService(@KhoaRetrofit retrofit: Retrofit): KhoaApiService =
-        retrofit.create(KhoaApiService::class.java)
-
-    @Provides
-    @Singleton
-    fun provideKmaApiService(@KmaRetrofit retrofit: Retrofit): KmaApiService =
-        retrofit.create(KmaApiService::class.java)
-
-    @Provides
-    @Singleton
-    @KmaBeachRetrofit
-    fun provideKmaBeachRetrofit(client: OkHttpClient, moshi: Moshi): Retrofit =
-        Retrofit.Builder()
-            .baseUrl("https://apis.data.go.kr/1360000/")
-            .client(client)
-            .addConverterFactory(MoshiConverterFactory.create(moshi))
-            .build()
-
-    @Provides
-    @Singleton
-    fun provideKmaBeachApiService(@KmaBeachRetrofit retrofit: Retrofit): KmaBeachApiService =
-        retrofit.create(KmaBeachApiService::class.java)
+    fun provideKhoaIndexApiService(@KhoaRetrofit retrofit: Retrofit): KhoaIndexApiService =
+        retrofit.create(KhoaIndexApiService::class.java)
 }

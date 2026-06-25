@@ -1,7 +1,7 @@
 package com.koretide.app.data.repository
 
 import com.koretide.app.BuildConfig
-import com.koretide.app.data.remote.KmaApiService
+import com.koretide.app.data.remote.KhoaDataApiService
 import com.koretide.app.data.remote.MockDataSource
 import com.koretide.app.domain.model.WindData
 import com.koretide.app.domain.repository.WeatherRepository
@@ -14,25 +14,31 @@ import javax.inject.Singleton
 
 @Singleton
 class WeatherRepositoryImpl @Inject constructor(
-    private val kmaApi: KmaApiService
+    private val khoaDataApi: KhoaDataApiService
 ) : WeatherRepository {
 
+    private val apiKey get() = BuildConfig.KHOA_API_KEY
+
     override suspend fun getWindData(lat: Double, lng: Double, stationCode: String): WindData {
-        if (BuildConfig.KMA_API_KEY.isBlank()) return MockDataSource.mockWindData(stationCode)
+        if (apiKey.isBlank()) return MockDataSource.mockWindData(stationCode)
 
         return try {
             val date = SimpleDateFormat("yyyyMMdd", Locale.KOREA).format(Date())
-            val time = "0600"
-            val nx = ((lng - 124.0) * 4).toInt() + 1
-            val ny = ((lat - 33.0) * 4).toInt() + 1
-            val response = kmaApi.getVillageForecast(BuildConfig.KMA_API_KEY, baseDate = date, baseTime = time, nx = nx, ny = ny)
-            val items = response.response?.body?.items?.item ?: emptyList()
-            val wsdItem = items.firstOrNull { it.category == "WSD" }
-            val vecItem = items.firstOrNull { it.category == "VEC" }
-            val speedMs = wsdItem?.fcstValue?.toFloatOrNull() ?: 5.5f
-            val dirDeg = vecItem?.fcstValue?.toFloatOrNull() ?: 225f
-            val bft = BeaufortConverter.toBft(speedMs)
-            WindData(stationCode, speedMs, bft, dirDeg, BeaufortConverter.name(bft))
+
+            val windResponse = khoaDataApi.getWind(apiKey, stationCode, date)
+            val windItem = windResponse.result?.data?.lastOrNull()
+
+            val speedMs  = windItem?.windSpeed ?: 5.5f
+            val dirDeg   = windItem?.windDir   ?: 225f
+            val bft      = BeaufortConverter.toBft(speedMs)
+
+            // fetch observed wave height for windAmp correction; null on failure
+            val waveHeightM: Float? = try {
+                val waveResponse = khoaDataApi.getWave(apiKey, stationCode, date)
+                waveResponse.result?.data?.lastOrNull()?.waveHeight
+            } catch (_: Exception) { null }
+
+            WindData(stationCode, speedMs, bft, dirDeg, BeaufortConverter.name(bft), waveHeightM)
         } catch (e: Exception) {
             MockDataSource.mockWindData(stationCode)
         }

@@ -199,7 +199,9 @@ class TideWatchFragment : Fragment() {
             )
         }
         viewModel.windData.value?.let { data ->
-            binding.tideWatchView.setWind(data.beaufort)
+            val waveBasedBft = data.waveHeightM?.let { h -> (h * 2.0 + 1.0).coerceIn(0.0, 12.0).toInt() }
+            val effectiveBft = if (waveBasedBft != null) maxOf(data.beaufort, waveBasedBft) else data.beaufort
+            binding.tideWatchView.setWind(effectiveBft)
             binding.tideWatchView.windDirectionDeg = data.directionDeg
         }
     }
@@ -241,11 +243,18 @@ class TideWatchFragment : Fragment() {
         collectFlow(viewModel.windData) { data ->
             val b = _binding ?: return@collectFlow
             if (data != null && !isImmersivePreset) {
-                b.seekWind.progress = data.beaufort
+                // Blend forecast Beaufort with wave-based estimate: take the higher value
+                // so that a calm wind forecast doesn't hide rough sea state from wave data.
+                val waveBasedBft = data.waveHeightM?.let { h ->
+                    (h * 2.0 + 1.0).coerceIn(0.0, 12.0).toInt()
+                }
+                val effectiveBft = if (waveBasedBft != null) maxOf(data.beaufort, waveBasedBft) else data.beaufort
+                b.seekWind.progress = effectiveBft
                 b.tideWatchView.windDirectionDeg = data.directionDeg
-                oceanSound.setIntensity(data.beaufort.coerceIn(0, 12) / 12f)
+                oceanSound.setIntensity(effectiveBft.coerceIn(0, 12) / 12f)
                 sharedViewModel.updateWindData(data)
-                b.tvWindInfo.text = "${data.beaufortName} (${data.beaufort}bft, ${data.speedMs}m/s)"
+                val waveStr = data.waveHeightM?.let { " / 파고 %.1fm".format(it) } ?: ""
+                b.tvWindInfo.text = "${data.beaufortName} (${effectiveBft}bft, ${data.speedMs}m/s)$waveStr"
             }
         }
     }

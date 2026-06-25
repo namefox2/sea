@@ -5,5 +5,6 @@ data class WindData(
     val speedMs: Float,
     val beaufort: Int,
     val directionDeg: Float,
-    val beaufortName: String
+    val beaufortName: String,
+    val waveHeightM: Float? = null
 )
