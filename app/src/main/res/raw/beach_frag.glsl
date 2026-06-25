@@ -180,16 +180,17 @@ void main() {
     float minReach  = 0.25 + windS * 0.8;
     float reachNoise = bN(vec2(wx * 0.7, u_Time * 0.05)) * 0.55
                      + bN(vec2(wx * 0.25 + 3.0, u_Time * 0.03)) * 0.45;
-    float waveReach = max(t1 * (1.2 + windS * 3.5) + t2 * (0.5 + windS * 1.8),
+    float waveReach = max(t1 * (1.5 + windS * 4.0) + t2 * (0.6 + windS * 2.0),
                           minReach) * (0.65 + reachNoise * 0.55);
     // Slow recede: lagged copy at 45% angular speed holds waveReach up while the
     // fast wave retreats, so the water withdraws more slowly than it advances.
     float t1_lag = max(sin(k0 * u_WaterlineZ - om0 * 0.45 * u_Time + ph1) * 0.5 + 0.5, 0.0);
     t1_lag = t1_lag * t1_lag * 0.55;
-    waveReach = max(waveReach, t1_lag * (1.2 + windS * 3.5) * (0.65 + reachNoise * 0.55));
-    // Perspective damping: near camera same world-space reach looks much wider → scale down.
+    waveReach = max(waveReach, t1_lag * (1.5 + windS * 4.0) * (0.65 + reachNoise * 0.55));
+    // Perspective: near horizon (far from camera, dtwNorm≈0) boost reach to compensate
+    // visual compression; near camera (dtwNorm≈1) reduce so waves don't leap toward viewer.
     float dtwNorm   = clamp(distToWater / max(18.0 - u_WaterlineZ, 2.0), 0.0, 1.0);
-    waveReach *= 1.0 - smoothstep(0.3, 1.0, dtwNorm) * 0.60;
+    waveReach *= mix(1.3, 0.55, dtwNorm);
 
     // Wave gate: 0 between waves, 1 when wave actively arrives.
     // Prevents shallowZone/swash/wetSand from firing on minReach alone.
@@ -257,7 +258,9 @@ void main() {
     // ── Backwash collision foam ───────────────────────────────────────────────
     // Frothy foam where the seaward backwash (t1_back) meets the next incoming
     // wave (t1) — product is high only when both are simultaneously strong.
-    float backCollide = t1 * t1_back * smoothstep(-0.5, 0.5, distToWater) * waveActive;
+    float backCollide = t1 * t1_back * smoothstep(-0.5, 0.5, distToWater)
+                     * smoothstep(1.0, -0.5, distToWave)
+                     * waveActive;
     if (backCollide > 0.015) {
         float fb_b    = bN(v_World.xz * 10.0 + u_Time * vec2(0.07, 0.05));
         float backFoam = smoothstep(0.60, 0.80, fb_b) * backCollide;
