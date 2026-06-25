@@ -42,3 +42,14 @@ interface KhoaDataApiService {
         @Query("type")      type: String = "json"
     ): KhoaWaveResponse
 }
+
+interface OdCloudApi {
+
+    @GET("15146602/v1/uddi:81b0665b-4f21-41e8-91f1-d3ecc4a7a3f1")
+    suspend fun getStations(
+        @Query("page") page: Int = 1,
+        @Query("perPage") perPage: Int = 100,
+        @Query("returnType") returnType: String = "json",
+        @Query("serviceKey") serviceKey: String
+    ): StationResponse
+}

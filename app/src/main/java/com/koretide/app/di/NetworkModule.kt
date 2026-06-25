@@ -65,6 +65,16 @@ object NetworkModule {
             .addConverterFactory(MoshiConverterFactory.create(moshi))
             .build()
 
+    fun provideOdCloudRetrofit(
+        client: OkHttpClient,
+        moshi: Moshi
+    ): Retrofit =
+        Retrofit.Builder()
+            .baseUrl("https://api.odcloud.kr/api/")
+            .client(client)
+            .addConverterFactory(MoshiConverterFactory.create(moshi))
+            .build()
+
     @Provides
     @Singleton
     fun provideKhoaDataApiService(@KhoaRetrofit retrofit: Retrofit): KhoaDataApiService =
