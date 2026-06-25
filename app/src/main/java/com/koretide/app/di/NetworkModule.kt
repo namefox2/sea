@@ -10,6 +10,7 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import okhttp3.OkHttpClient
+import okhttp3.ResponseBody.Companion.toResponseBody
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
@@ -41,6 +42,12 @@ object NetworkModule {
             level = if (BuildConfig.DEBUG) HttpLoggingInterceptor.Level.BASIC
                     else HttpLoggingInterceptor.Level.NONE
         })
+        .addInterceptor { chain ->
+            val response = chain.proceed(chain.request())
+            val mediaType = response.body?.contentType()
+            val body = response.body?.string()?.trimStart('﻿')?.trim() ?: ""
+            response.newBuilder().body(body.toResponseBody(mediaType)).build()
+        }
         .build()
 
     @Provides
