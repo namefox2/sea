@@ -4,8 +4,8 @@ import android.util.Log
 import com.koretide.app.BuildConfig
 import com.koretide.app.data.remote.KhoaDataApiService
 import com.koretide.app.data.remote.MockDataSource
+import com.koretide.app.data.remote.dto.KhoaTideRecentItem
 import com.koretide.app.data.remote.dto.KhoaWaveItem
-import com.koretide.app.data.remote.dto.KhoaWindItem
 import com.koretide.app.domain.model.WindData
 import com.koretide.app.domain.repository.WeatherRepository
 import com.koretide.app.util.BeaufortConverter
@@ -29,10 +29,10 @@ class WeatherRepositoryImpl @Inject constructor(
         val date = SimpleDateFormat("yyyyMMdd", Locale.KOREA).format(Date())
 
         return try {
-            // surveyWind는 조위코드(DT_xxxx)를 쓰지 않음 → null로 전체 조회 후 최근접 선택
-            val windItems = khoaDataApi.getWind(apiKey, null, date).body?.items?.item.orEmpty()
-            val item = windItems.nearestTo(lat, lng)
-            Log.d(TAG, "surveyWind nearest=${item?.stationName} speed=${item?.windSpeed} dir=${item?.windDir}")
+            // dtRecent에 풍향/풍속도 포함 → obsCode null로 전체 조회 후 최근접 선택
+            val items = khoaDataApi.getTideRecent(apiKey, null, date).body?.items?.item.orEmpty()
+            val item = items.nearestTo(lat, lng)
+            Log.d(TAG, "dtRecent wind nearest=${item?.stationName} wspd=${item?.windSpeed} wndrct=${item?.windDir}")
 
             val speedMs = item?.windSpeed ?: return MockDataSource.mockWindData(stationCode)
             val dirDeg  = item.windDir ?: 225f
@@ -41,7 +41,7 @@ class WeatherRepositoryImpl @Inject constructor(
             val waveHeightM: Float? = runCatching {
                 val waveItems = khoaDataApi.getWave(apiKey, null, date).body?.items?.item.orEmpty()
                 val wave = waveItems.nearestWaveTo(lat, lng)
-                wave?.waveHeight.also { Log.d(TAG, "noonWave nearest=${wave?.stationName} height=$it") }
+                wave?.waveHeight.also { Log.d(TAG, "noonWave nearest=${wave?.stationName} wh=$it") }
             }.onFailure { Log.d(TAG, "noonWave skipped: ${it.message}") }
              .getOrNull()
 
@@ -52,9 +52,11 @@ class WeatherRepositoryImpl @Inject constructor(
         }
     }
 
-    private fun List<KhoaWindItem>.nearestTo(lat: Double, lng: Double): KhoaWindItem? {
+    private fun List<KhoaTideRecentItem>.nearestTo(lat: Double, lng: Double): KhoaTideRecentItem? {
         val latest = groupBy { it.obsrvnDt }.maxByOrNull { it.key.orEmpty() }?.value ?: return firstOrNull()
-        return latest.minByOrNull { abs((it.lat ?: 0.0) - lat) + abs((it.lon ?: 0.0) - lng) }
+        return latest.filter { it.windSpeed != null }
+            .minByOrNull { abs((it.lat ?: 0.0) - lat) + abs((it.lon ?: 0.0) - lng) }
+            ?: latest.minByOrNull { abs((it.lat ?: 0.0) - lat) + abs((it.lon ?: 0.0) - lng) }
     }
 
     private fun List<KhoaWaveItem>.nearestWaveTo(lat: Double, lng: Double): KhoaWaveItem? {

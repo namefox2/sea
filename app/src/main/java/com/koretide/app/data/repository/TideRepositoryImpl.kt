@@ -35,7 +35,8 @@ class TideRepositoryImpl @Inject constructor(
             val dataItems  = current.body?.items?.item ?: emptyList()
             val tableItems = table.body?.items?.item   ?: emptyList()
 
-            val currentLevel = dataItems.lastOrNull()?.tideLevel ?: 300
+            // bscTdlvHgt는 Float(cm) → Int로 반올림
+            val currentLevel = dataItems.lastOrNull()?.tideLevel?.toInt() ?: 300
 
             val allHigh  = tableItems.filter { it.hlCode == "HH" }
             val allLow   = tableItems.filter { it.hlCode == "LL" }
@@ -47,7 +48,7 @@ class TideRepositoryImpl @Inject constructor(
             else 0.5f
 
             val prevLevel = if (dataItems.size >= 2)
-                dataItems[dataItems.size - 2].tideLevel ?: currentLevel
+                dataItems[dataItems.size - 2].tideLevel?.toInt() ?: currentLevel
             else currentLevel
             val tideStatus = when {
                 tidePercent > 0.92f       -> TideStatus.HIGH_TIDE
@@ -62,7 +63,7 @@ class TideRepositoryImpl @Inject constructor(
 
             val records = dataItems.map { item ->
                 val ts = parseDateToMillis(item.obsrvnDt ?: date)
-                TideRecordEntity(stationCode = stationCode, timestamp = ts, waterLevel = item.tideLevel ?: 0)
+                TideRecordEntity(stationCode = stationCode, timestamp = ts, waterLevel = item.tideLevel?.toInt() ?: 0)
             }
 
             tideRecordDao.insertAll(records)
