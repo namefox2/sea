@@ -4,23 +4,16 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.koretide.app.domain.model.StationRegion
 import com.koretide.app.domain.usecase.GetAllStationsUseCase
-import com.koretide.app.domain.usecase.GetTideUseCase
-import com.koretide.app.domain.usecase.GetWindUseCase
 import com.koretide.app.domain.usecase.SearchStationsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.sync.Semaphore
-import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.mapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -28,9 +21,7 @@ import javax.inject.Inject
 @HiltViewModel
 class SearchViewModel @Inject constructor(
     private val searchStationsUseCase: SearchStationsUseCase,
-    private val getAllStationsUseCase: GetAllStationsUseCase,
-    private val getTideUseCase: GetTideUseCase,
-    private val getWindUseCase: GetWindUseCase
+    private val getAllStationsUseCase: GetAllStationsUseCase
 ) : ViewModel() {
 
     private val _query = MutableStateFlow("")
@@ -46,30 +37,18 @@ class SearchViewModel @Inject constructor(
     private val stations = combine(_query, _selectedRegion) { q, r -> Pair(q, r) }
         .flatMapLatest { (q, r) -> searchStationsUseCase(q, r) }
 
-    @OptIn(ExperimentalCoroutinesApi::class)
+    // 즉시 emit — API 호출 없이 DB 데이터만 사용
+    // 조위/바람 실시간 정보는 지역 선택 후 TideWatchFragment에서 로드
     val stationItems: StateFlow<List<StationAdapter.StationItem>> = stations
-        .mapLatest { list ->
-            // 최대 5개 동시 API 호출로 제한 — 한꺼번에 수백 개 요청 방지
-            val semaphore = Semaphore(5)
-            coroutineScope {
-                list.map { station ->
-                    async {
-                        semaphore.withPermit {
-                            val tide = runCatching { getTideUseCase(station.code) }.getOrNull()
-                            val wind = runCatching {
-                                getWindUseCase(station.lat, station.lng, station.code)
-                            }.getOrNull()
-                            StationAdapter.StationItem(
-                                station = station,
-                                tidePercent = tide?.tidePercent
-                                    ?: station.lastTideLevel?.let { (it.toFloat() / 600f).coerceIn(0f, 1f) },
-                                tideStatus = tide?.tideStatus,
-                                windBft = wind?.beaufort,
-                                waterLevelCm = tide?.currentLevel
-                            )
-                        }
-                    }
-                }.awaitAll()
+        .map { list ->
+            list.map { station ->
+                StationAdapter.StationItem(
+                    station = station,
+                    tidePercent = station.lastTideLevel?.let { (it.toFloat() / 600f).coerceIn(0f, 1f) },
+                    tideStatus = null,
+                    windBft = null,
+                    waterLevelCm = station.lastTideLevel
+                )
             }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
