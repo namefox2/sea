@@ -16,29 +16,29 @@ interface KhoaDataApiService {
     suspend fun getTideRecent(
         @Query("serviceKey") serviceKey: String,
         @Query("obsCode")    obsCode: String?,
-        @Query("Date")       date: String,
+        @Query("reqDate")       date: String,
         @Query("numOfRows")  numOfRows: Int = 100,
         @Query("pageNo")     pageNo: Int = 1,
-        @Query("_type")      type: String = "json"
+        @Query("type")      type: String = "json"
     ): KhoaTideRecentResponse
 
     @GET("tideFcstHghLw/GetTideFcstHghLwApiService")
     suspend fun getTideForecast(
         @Query("serviceKey") serviceKey: String,
         @Query("obsCode")    obsCode: String?,
-        @Query("Date")       date: String,
+        @Query("reqDate")       date: String,
         @Query("numOfRows")  numOfRows: Int = 20,
         @Query("pageNo")     pageNo: Int = 1,
-        @Query("_type")      type: String = "json"
+        @Query("type")      type: String = "json"
     ): KhoaTideFcstResponse
 
     @GET("noonWave/GetNoonWaveApiService")
     suspend fun getWave(
         @Query("serviceKey") serviceKey: String,
         @Query("obsCode")    obsCode: String?,
-        @Query("Date")       date: String,
+        @Query("reqDate")       date: String,
         @Query("numOfRows")  numOfRows: Int = 100,
         @Query("pageNo")     pageNo: Int = 1,
-        @Query("_type")      type: String = "json"
+        @Query("type")      type: String = "json"
     ): KhoaWaveResponse
 }
