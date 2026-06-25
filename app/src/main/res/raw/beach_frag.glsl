@@ -176,8 +176,13 @@ void main() {
     float minReach  = 0.25 + windS * 0.8;
     float reachNoise = bN(vec2(wx * 0.7, u_Time * 0.05)) * 0.55
                      + bN(vec2(wx * 0.25 + 3.0, u_Time * 0.03)) * 0.45;
-    float waveReach = max(t1 * (1.2 + windS * 2.0) + t2 * (0.5 + windS * 1.0),
+    float waveReach = max(t1 * (1.2 + windS * 3.5) + t2 * (0.5 + windS * 1.8),
                           minReach) * (0.65 + reachNoise * 0.55);
+    // Perspective damping: camera is at Z≈18, waterline at u_WaterlineZ.
+    // Near the camera the same world-space reach looks much larger in screen-space,
+    // so scale it down proportionally — full reach at the waterline, ~40% near camera.
+    float dtwNorm   = clamp(distToWater / max(18.0 - u_WaterlineZ, 2.0), 0.0, 1.0);
+    waveReach *= 1.0 - smoothstep(0.3, 1.0, dtwNorm) * 0.60;
 
     // Wave gate: 0 between waves, 1 when wave actively arrives.
     // Prevents shallowZone/swash/wetSand from firing on minReach alone.
