@@ -27,10 +27,11 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
     @Volatile var defaultHour    = 12.0f  // hour used when useDefaultSun=true (set by theme)
     // 0..1 pre-computed in TideWatchFragment: tidePosition × rangeFactor × regionCap
     @Volatile var mudflatExposure = 0.40f
-    // Tidal range in metres for the selected station — drives how far the waterline
-    // moves between low and high tide. Default = 서해 typical (~4.5 m).
-    // 동해 ~0.3 m → waterline barely shifts; 서해 ~4.5 m → full visual swing.
-    @Volatile var tidalRangeM = 4.5f
+    // Visual Z bounds from TidalCalibration — waterline maps linearly from
+    // calibVisualMinZ (historical all-time low) to calibVisualMaxZ (all-time high).
+    // Default = 서해 calibration so the demo view looks dramatic.
+    @Volatile var calibVisualMinZ = -18f
+    @Volatile var calibVisualMaxZ =  16f
     // Ocean colors — theme-driven
     @Volatile var deepColor    = floatArrayOf(0.02f, 0.16f, 0.36f)  // deep navy (#0a3d6b area)
     @Volatile var shallowColor = floatArrayOf(0.10f, 0.68f, 0.72f) // bright turquoise (reference: #00CED1 area)
@@ -271,15 +272,16 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         val roughness  = (wAmp * wAmp * 0.40f + 0.04f).coerceAtMost(0.40f)
         val yunseulStr = (1f - wAmp * 0.9f).coerceIn(0f, 1f)
 
-        // Waterline Z: where ocean meets beach/tidal-flat.
-        // Visual range is scaled by the station's tidal range relative to the 서해
-        // reference (4.5 m). This ensures 동해 (0.3 m) barely moves the waterline
-        // while 서해 (4.5 m) gets the full ±17 m visual swing.
-        //   서해 (4.5 m) tide=0 → -18, tide=0.5 → -1, tide=1 → +16
-        //   동해 (0.3 m) tide=0 → -2.1, tide=0.5 → -1, tide=1 → -0.0  (barely moves)
-        val tidalScale    = (tidalRangeM / 4.5f).coerceIn(0.02f, 1.0f)
-        val visualRange   = 34.0f * tidalScale
-        val waterlineBase = -1.0f + (tide - 0.5f) * visualRange
+        // Waterline Z: linear mapping from calibrated tide position to scene Z.
+        // tide = calibratedT in [0,1]: 0 → historical all-time low, 1 → all-time high.
+        // Per-region calibration (서해 default shown here):
+        //   tide=0 → calibVisualMinZ=-18 (갯벌 최대 노출)
+        //   tide=1 → calibVisualMaxZ=+16 (바다 가득)
+        //   강화 간조(80 cm) calibratedT≈0.06 → Z≈-16.9 ✓
+        //   강화 만조(870 cm) calibratedT≈0.87 → Z≈+12   ✓
+        //   삼척 간조(110 cm) calibratedT≈0.33 → Z≈-1.0  ✓
+        //   삼척 만조(170 cm) calibratedT≈0.58 → Z≈+0.5  ✓
+        val waterlineBase = calibVisualMinZ + tide * (calibVisualMaxZ - calibVisualMinZ)
         // Multi-frequency wave advance: two oscillations so no two waves are identical.
         // Primary ~5 s period, secondary ~8.6 s; amplitude ±1.5 m calm → ±3.5 m max wind.
         // Uses rawT (not wrapped t) so waterlineZ never jumps at the 1000-s boundary.

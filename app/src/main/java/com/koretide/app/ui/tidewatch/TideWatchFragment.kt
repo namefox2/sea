@@ -16,7 +16,7 @@ import androidx.fragment.app.viewModels
 import com.koretide.app.databinding.FragmentTideWatchBinding
 import com.koretide.app.domain.model.StationRegion
 import com.koretide.app.domain.model.TideData
-import com.koretide.app.domain.model.TidalConfig
+import com.koretide.app.domain.model.TidalCalibration
 import com.koretide.app.theme.SeasonThemeManager
 import com.koretide.app.ui.main.SharedViewModel
 import com.koretide.app.util.collectFlow
@@ -43,8 +43,10 @@ class TideWatchFragment : Fragment() {
     private var isImmersivePreset = false
 
     private var cachedRegion: StationRegion? = null
-    // Tidal range in metres — set from API data; falls back to regional TidalConfig default.
-    private var cachedTidalRangeM: Float = TidalConfig.forRegion(StationRegion.WEST).tidalRangeM
+    // Per-region historical calibration; drives waterlineZ via absolute cm → visual Z mapping.
+    private var cachedCalibration: TidalCalibration = TidalCalibration.forRegion(StationRegion.WEST)
+    // Today's actual tidal range in metres (from API) — used only for mudflat exposure.
+    private var cachedTidalRangeM: Float = 4.5f
 
     private val oceanSound = OceanSoundPlayer()
     private var soundEnabled = false
@@ -92,14 +94,16 @@ class TideWatchFragment : Fragment() {
     }
 
     private fun setupSliders() {
-        val initialTidePct = binding.seekTide.progress / 100f
-        binding.tideWatchView.setTide(initialTidePct)
-        binding.tideWatchView.setTidalRange(cachedTidalRangeM)
+        // Apply default (서해) calibration visual range on startup
+        binding.tideWatchView.setVisualRange(cachedCalibration.visualMinZ, cachedCalibration.visualMaxZ)
+
+        val initialT = binding.seekTide.progress / 100f
+        binding.tideWatchView.setTide(initialT)
         binding.tideWatchView.setMudflatExposure(
-            computeMudflatExposure(initialTidePct, cachedTidalRangeM, cachedRegion)
+            computeMudflatExposure(initialT, cachedTidalRangeM, cachedRegion)
         )
-        binding.seekTidalRange.progress = (cachedTidalRangeM * 10).toInt().coerceIn(0, 100)
-        binding.tvTidalRange.text = "%.1fm".format(cachedTidalRangeM)
+        // 조차 row: display-only — shows today's actual tidal range from API
+        binding.seekTidalRange.isEnabled = false
         binding.tideWatchView.setWind(binding.seekWind.progress)
 
         binding.seekWind.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
@@ -112,28 +116,14 @@ class TideWatchFragment : Fragment() {
             override fun onStopTrackingTouch(sb: SeekBar) {}
         })
 
+        // 물때 slider: calibratedT in [0,1] — higher = more water (correct direction)
         binding.seekTide.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(sb: SeekBar, progress: Int, fromUser: Boolean) {
                 binding.tvTidePct.text = "$progress%"
-                val pct = progress / 100f
-                binding.tideWatchView.setTide(pct)
+                val t = progress / 100f
+                binding.tideWatchView.setTide(t)
                 binding.tideWatchView.setMudflatExposure(
-                    computeMudflatExposure(pct, cachedTidalRangeM, cachedRegion)
-                )
-            }
-            override fun onStartTrackingTouch(sb: SeekBar) {}
-            override fun onStopTrackingTouch(sb: SeekBar) {}
-        })
-
-        binding.seekTidalRange.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(sb: SeekBar, progress: Int, fromUser: Boolean) {
-                val rangeM = (progress / 10f).coerceAtLeast(0.05f)
-                cachedTidalRangeM = rangeM
-                binding.tvTidalRange.text = "%.1fm".format(rangeM)
-                binding.tideWatchView.setTidalRange(rangeM)
-                val pct = binding.seekTide.progress / 100f
-                binding.tideWatchView.setMudflatExposure(
-                    computeMudflatExposure(pct, rangeM, cachedRegion)
+                    computeMudflatExposure(t, cachedTidalRangeM, cachedRegion)
                 )
             }
             override fun onStartTrackingTouch(sb: SeekBar) {}
@@ -202,10 +192,10 @@ class TideWatchFragment : Fragment() {
         if (tideData != null) {
             applyTideData(binding, tideData)
         } else {
-            val pct = binding.seekTide.progress / 100f
-            binding.tideWatchView.setTide(pct)
+            val t = binding.seekTide.progress / 100f
+            binding.tideWatchView.setTide(t)
             binding.tideWatchView.setMudflatExposure(
-                computeMudflatExposure(pct, cachedTidalRangeM, cachedRegion)
+                computeMudflatExposure(t, cachedTidalRangeM, cachedRegion)
             )
         }
         viewModel.windData.value?.let { data ->
@@ -226,12 +216,12 @@ class TideWatchFragment : Fragment() {
         collectFlow(sharedViewModel.selectedStation) { station ->
             val b = _binding ?: return@collectFlow
             cachedRegion = station?.region
-            // Apply regional TidalConfig default immediately so the scene reflects the
-            // correct coast type while waiting for the first API response.
-            cachedTidalRangeM = station?.region
-                ?.let { TidalConfig.forRegion(it).tidalRangeM }
-                ?: TidalConfig.forRegion(StationRegion.WEST).tidalRangeM
-            b.tideWatchView.setTidalRange(cachedTidalRangeM)
+            // Apply regional calibration immediately so the scene reflects the correct
+            // coast type while waiting for the first API response.
+            cachedCalibration = TidalCalibration.forRegion(
+                station?.region ?: StationRegion.WEST
+            )
+            b.tideWatchView.setVisualRange(cachedCalibration.visualMinZ, cachedCalibration.visualMaxZ)
             b.tideWatchView.setHasStation(station != null)
             if (station != null) {
                 b.tvStationName.text = station.name
@@ -263,24 +253,30 @@ class TideWatchFragment : Fragment() {
     private fun applyTideData(b: FragmentTideWatchBinding, data: TideData) {
         cachedTidalRangeM = data.tidalRangeM
 
-        val pct = (data.tidePercent * 100).toInt().coerceIn(0, 100)
-        b.seekTide.progress = pct
-        // Sync the 조차 slider to the actual station range
+        // Map the actual API water level (cm) to calibrated T using historical regional extremes.
+        // This ensures 강화 간조=80cm→갯벌, 강화 만조=870cm→바다가득, regardless of daily range.
+        val calibratedT = cachedCalibration.calibratedT(data.currentLevel)
+        val sliderPct   = (calibratedT * 100).toInt().coerceIn(0, 100)
+        b.seekTide.progress = sliderPct
+        b.tvTidePct.text    = "$sliderPct%"
+
+        // 조차 slider: display-only — shows today's actual tidal range from API
         b.seekTidalRange.progress = (data.tidalRangeM * 10).toInt().coerceIn(0, 100)
         b.tvTidalRange.text = "%.1fm".format(data.tidalRangeM)
 
-        b.tideWatchView.setTidalRange(data.tidalRangeM)
+        b.tideWatchView.setTide(calibratedT)
         b.tideWatchView.setMudflatExposure(
-            computeMudflatExposure(data.tidePercent, data.tidalRangeM, cachedRegion)
+            computeMudflatExposure(calibratedT, data.tidalRangeM, cachedRegion)
         )
-        b.tvTideInfo.text = "${data.tideStatus.displayName} $pct%"
+        b.tvTideInfo.text = "${data.tideStatus.displayName} ${data.currentLevel}cm"
     }
 
     private fun updateMudflatGrade(b: FragmentTideWatchBinding, data: TideData) {
         val region = cachedRegion
         val hasTidalFlat = region == StationRegion.WEST || region == StationRegion.SOUTH
         if (hasTidalFlat && data.tidalRangeM > 1.0f) {
-            val exposure = computeMudflatExposure(data.tidePercent, data.tidalRangeM, region)
+            val calibratedT = cachedCalibration.calibratedT(data.currentLevel)
+            val exposure = computeMudflatExposure(calibratedT, data.tidalRangeM, region)
             b.tvMudflatGrade.text = when {
                 exposure >= 0.60f -> "🦀 갯벌 매우 많이 드러남"
                 exposure >= 0.30f -> "🦀 갯벌 보통 드러남"

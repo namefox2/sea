@@ -66,20 +66,25 @@ class TideWatchView @JvmOverloads constructor(
             queueEvent { renderer.windDirRad = Math.toRadians(value.toDouble()).toFloat() }
         }
 
-    fun setTide(percent: Float)  { queueEvent { renderer.tidePercent = percent.coerceIn(0f, 1f) } }
-    fun setWind(bft: Int)        { queueEvent { renderer.windAmp = (bft.coerceIn(0, 12) / 12f) } }
+    fun setTide(calibratedT: Float) { queueEvent { renderer.tidePercent = calibratedT.coerceIn(0f, 1f) } }
+    fun setWind(bft: Int)           { queueEvent { renderer.windAmp = (bft.coerceIn(0, 12) / 12f) } }
     fun setHasStation(has: Boolean) { queueEvent { renderer.useDefaultSun = !has } }
     fun setMudflatExposure(exposure: Float) { queueEvent { renderer.mudflatExposure = exposure.coerceIn(0f, 1f) } }
-    /** Tidal range in metres — scales how far the waterline moves per tide cycle. */
-    fun setTidalRange(rangeM: Float) { queueEvent { renderer.tidalRangeM = rangeM.coerceAtLeast(0.05f) } }
+    /** Sets the visual Z bounds from TidalCalibration — call whenever the region changes. */
+    fun setVisualRange(minZ: Float, maxZ: Float) {
+        queueEvent {
+            renderer.calibVisualMinZ = minZ
+            renderer.calibVisualMaxZ = maxZ
+        }
+    }
 
-    // Immersive preset: noon sun, moderate tidal flat, theme already applied.
+    // Immersive preset: noon sun, mid-tide position, theme already applied.
+    // Does NOT override calibVisualMinZ/MaxZ so regional range stays correct.
     fun applyImmersivePreset() {
         queueEvent {
             renderer.useDefaultSun   = true
             renderer.defaultHour     = 12.0f
             renderer.tidePercent     = 0.50f
-            renderer.tidalRangeM     = 4.5f   // 서해 reference for demo preset
             renderer.mudflatExposure = 0.40f
         }
     }
