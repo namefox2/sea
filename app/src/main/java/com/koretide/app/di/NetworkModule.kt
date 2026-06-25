@@ -3,6 +3,7 @@ package com.koretide.app.di
 import com.koretide.app.BuildConfig
 import com.koretide.app.data.remote.KhoaDataApiService
 import com.koretide.app.data.remote.KhoaIndexApiService
+import com.koretide.app.data.remote.KmaApiService
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import dagger.Module
@@ -20,6 +21,10 @@ import javax.inject.Singleton
 @Qualifier
 @Retention(AnnotationRetention.BINARY)
 annotation class KhoaRetrofit
+
+@Qualifier
+@Retention(AnnotationRetention.BINARY)
+annotation class KmaRetrofit
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -55,6 +60,16 @@ object NetworkModule {
 
     @Provides
     @Singleton
+    @KmaRetrofit
+    fun provideKmaRetrofit(client: OkHttpClient, moshi: Moshi): Retrofit =
+        Retrofit.Builder()
+            .baseUrl("https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/")
+            .client(client)
+            .addConverterFactory(MoshiConverterFactory.create(moshi))
+            .build()
+
+    @Provides
+    @Singleton
     fun provideKhoaDataApiService(@KhoaRetrofit retrofit: Retrofit): KhoaDataApiService =
         retrofit.create(KhoaDataApiService::class.java)
 
@@ -62,4 +77,9 @@ object NetworkModule {
     @Singleton
     fun provideKhoaIndexApiService(@KhoaRetrofit retrofit: Retrofit): KhoaIndexApiService =
         retrofit.create(KhoaIndexApiService::class.java)
+
+    @Provides
+    @Singleton
+    fun provideKmaApiService(@KmaRetrofit retrofit: Retrofit): KmaApiService =
+        retrofit.create(KmaApiService::class.java)
 }
