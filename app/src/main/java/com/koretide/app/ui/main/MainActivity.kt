@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.navigation.fragment.NavHostFragment
+import androidx.navigation.ui.NavigationUI
 import androidx.navigation.ui.setupWithNavController
 import com.koretide.app.R
 import com.koretide.app.databinding.ActivityMainBinding
@@ -33,6 +34,17 @@ class MainActivity : AppCompatActivity() {
             .findFragmentById(R.id.nav_host_fragment) as NavHostFragment
         val navController = navHostFragment.navController
         binding.bottomNavigation.setupWithNavController(navController)
+
+        // setupWithNavController 의 기본 동작은 non-tab 화면(Detail 등)에서 Search 탭을 누를 때
+        // popUpTo 를 올바르게 처리 못할 수 있으므로, Search 탭은 항상 루트로 직접 팝
+        binding.bottomNavigation.setOnItemSelectedListener { item ->
+            if (item.itemId == R.id.navigation_search) {
+                navController.popBackStack(R.id.navigation_search, false)
+                true
+            } else {
+                NavigationUI.onNavDestinationSelected(item, navController)
+            }
+        }
     }
 
     private fun observeTabNavigation() {
