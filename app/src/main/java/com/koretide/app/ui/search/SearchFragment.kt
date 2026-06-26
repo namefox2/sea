@@ -172,6 +172,8 @@ class SearchFragment : Fragment() {
         viewModel.setQuery("")
         viewModel.setRegionFilter(null)
         _binding?.chipAll?.isChecked = true
+        // Refresh batch data if 30-min cache in repository is stale; no-op otherwise
+        viewModel.refreshBatch()
     }
 
     override fun onDestroyView() {

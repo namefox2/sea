@@ -74,7 +74,7 @@ class SearchViewModel @Inject constructor(
 
     init {
         refreshStations()
-        loadBatchTideData()
+        refreshBatch()
     }
 
     fun setQuery(query: String) {
@@ -100,10 +100,12 @@ class SearchViewModel @Inject constructor(
         }
     }
 
-    private fun loadBatchTideData() {
+    fun refreshBatch() {
         viewModelScope.launch {
             runCatching { getBatchTideStatusUseCase() }
-                .onSuccess { _batchLevels.value = it }
+                .onSuccess { levels ->
+                    if (levels.isNotEmpty()) _batchLevels.value = levels
+                }
                 .onFailure { Log.w("SearchViewModel", "batch tide fetch failed", it) }
         }
     }
