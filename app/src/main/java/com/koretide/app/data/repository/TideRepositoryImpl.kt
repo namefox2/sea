@@ -11,6 +11,9 @@ import com.koretide.app.domain.model.TideData
 import com.koretide.app.domain.model.TideRecord
 import com.koretide.app.domain.model.TideStatus
 import com.koretide.app.domain.repository.TideRepository
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.text.SimpleDateFormat
@@ -103,8 +106,8 @@ class TideRepositoryImpl @Inject constructor(
         return data.records
     }
 
-    // obsCode=null 단일 호출로 전체 조위 일괄 수집 (include로 필드 제한 → 최소 응답 크기)
-    // 개별 obsCode 병렬 호출은 OkHttp maxRequestsPerHost=5 기본값에 막혀 ~6초 소요
+    // 각 관측소 코드로 dtRecent 개별 병렬 호출 (obsCode=null 벌크 호출은 API가 지원하지 않음)
+    // WeatherRepo.getWindData()와 동일한 방식 — numOfRows=1로 최신 1건만 요청
     override suspend fun getBatchRecentLevels(): List<RecentTideLevel> {
         // Return cache if still fresh
         val now = System.currentTimeMillis()
@@ -114,32 +117,40 @@ class TideRepositoryImpl @Inject constructor(
         }
 
         return batchMutex.withLock {
-            // Double-check after acquiring lock (another coroutine may have just fetched)
             val now2 = System.currentTimeMillis()
             if (batchCache.isNotEmpty() && now2 - batchCacheTime < BATCH_CACHE_TTL) {
                 return@withLock batchCache
             }
 
+            val stations = stationDao.getAllStationsSnapshot()
+            if (stations.isEmpty()) return@withLock emptyList()
+
             val date = SimpleDateFormat("yyyyMMdd", Locale.KOREA).format(Date())
-            Log.d(TAG, "▶ getBatchRecentLevels API 호출 date=$date (numOfRows=1000)")
+            Log.d(TAG, "▶ getBatchRecentLevels 병렬 호출 stations=${stations.size}  date=$date")
             val t0 = System.currentTimeMillis()
 
-            val raw = khoaDataApi.getTideRecent(
-                serviceKey = apiKey,
-                obsCode    = null,
-                date       = date,
-                numOfRows  = 1000
-            ).body?.items?.item.orEmpty()
+            val result = coroutineScope {
+                stations.map { station ->
+                    async {
+                        try {
+                            val item = khoaDataApi.getTideRecent(
+                                serviceKey = apiKey,
+                                obsCode    = station.code,
+                                date       = date,
+                                numOfRows  = 1
+                            ).body?.items?.item?.lastOrNull()
+                            if (item != null && (item.tideLevel != null || item.windSpeed != null)) {
+                                RecentTideLevel(station.lat, station.lng, item.tideLevel?.toInt(), item.windSpeed)
+                            } else null
+                        } catch (e: Exception) {
+                            Log.w(TAG, "dtRecent[${station.code}] 실패: ${e.message}")
+                            null
+                        }
+                    }
+                }.awaitAll().filterNotNull()
+            }
 
-            // API returns time-series rows per station — keep only the latest row per station
-            val result = raw
-                .filter { it.lat != null && it.lon != null && (it.tideLevel != null || it.windSpeed != null) }
-                .groupBy { it.stationName ?: "${it.lat}_${it.lon}" }
-                .values
-                .map { group -> group.maxByOrNull { it.obsrvnDt ?: "" }!! }
-                .map { RecentTideLevel(it.lat!!, it.lon!!, it.tideLevel?.toInt(), it.windSpeed) }
-
-            Log.d(TAG, "  완료 ${System.currentTimeMillis() - t0}ms  raw=${raw.size}  valid=${result.size}")
+            Log.d(TAG, "  완료 ${System.currentTimeMillis() - t0}ms  valid=${result.size}/${stations.size}")
 
             if (result.isNotEmpty()) {
                 batchCache = result
