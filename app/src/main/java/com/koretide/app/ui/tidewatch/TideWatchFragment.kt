@@ -150,6 +150,12 @@ class TideWatchFragment : Fragment() {
             // Note: isImmersivePreset intentionally NOT set here — keeps double-tap from
             // calling restoreStationView() and changing slider values unexpectedly.
             cachedTidalRangeM = 5.5f
+            // 지역정보 삭제 → visual Z 범위도 기본(서해)값으로 복원해 첫 실행과 동일하게 동작.
+            // (좁은 지역 범위가 남아 있으면 물때를 올릴 때 수면선이 거의 안 올라가
+            //  beach 셰이더의 underwater 어둡게 처리만 커져 "바다 아래가 까매지는" 문제 발생)
+            cachedRegion = null
+            cachedCalibration = TidalCalibration.forRegion(StationRegion.WEST)
+            binding.tideWatchView.setVisualRange(cachedCalibration.visualMinZ, cachedCalibration.visualMaxZ)
             // Set sliders first; their listeners may queue a mudflatExposure GL event
             binding.seekWind.progress       = 2
             binding.seekTide.progress       = 35
