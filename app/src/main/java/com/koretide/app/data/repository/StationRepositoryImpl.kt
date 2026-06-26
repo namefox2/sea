@@ -4,7 +4,6 @@ import android.util.Log
 import com.koretide.app.BuildConfig
 import com.koretide.app.data.local.dao.StationDao
 import com.koretide.app.data.local.entity.StationEntity
-import com.koretide.app.data.remote.MockDataSource
 import com.koretide.app.data.remote.OdCloudApi
 import com.koretide.app.domain.model.Station
 import com.koretide.app.domain.model.StationRegion
@@ -30,43 +29,28 @@ class StationRepositoryImpl @Inject constructor(
 
     override suspend fun refreshStations() {
         if (stationDao.count() > 0) return
-        if (apiKey.isBlank()) {
-            seedMockStations()
-            return
+        if (apiKey.isBlank()) throw IllegalStateException("API 키가 설정되지 않았습니다")
+        val items = odCloudApi.getStations(serviceKey = apiKey).data.orEmpty()
+        Log.d("StationRepo", "API returned ${items.size} stations")
+        if (items.isEmpty()) throw Exception("관측소 데이터가 없습니다")
+        val entities = items.mapNotNull { item ->
+            val code = item.code ?: return@mapNotNull null
+            val name = item.name ?: return@mapNotNull null
+            val lat  = item.lat?.toDoubleOrNull() ?: return@mapNotNull null
+            val lon  = item.lon?.toDoubleOrNull() ?: return@mapNotNull null
+            StationEntity(
+                code   = code,
+                name   = name,
+                region = regionFromCoords(lat, lon).name,
+                lat    = lat,
+                lng    = lon
+            )
         }
-        try {
-            val items = odCloudApi.getStations(serviceKey = apiKey).data.orEmpty()
-            Log.d("StationRepo", "API returned ${items.size} stations")
-            val entities = items.mapNotNull { item ->
-                val code = item.code ?: return@mapNotNull null
-                val name = item.name ?: return@mapNotNull null
-                val lat  = item.lat?.toDoubleOrNull() ?: return@mapNotNull null
-                val lon  = item.lon?.toDoubleOrNull() ?: return@mapNotNull null
-                StationEntity(
-                    code   = code,
-                    name   = name,
-                    region = regionFromCoords(lat, lon).name,
-                    lat    = lat,
-                    lng    = lon
-                )
-            }
-            if (entities.isNotEmpty()) {
-                stationDao.upsertAll(entities)
-            } else {
-                seedMockStations()
-            }
-        } catch (e: Exception) {
-            Log.w("StationRepo", "API fetch failed → seeding mock stations", e)
-            seedMockStations()
-        }
+        stationDao.upsertAll(entities)
     }
 
     override suspend fun getStation(code: String): Station? =
         stationDao.getStation(code)?.toDomain()
-
-    private suspend fun seedMockStations() {
-        stationDao.upsertAll(MockDataSource.stations.map { StationEntity.fromDomain(it) })
-    }
 
     // 좌표 기반 지역 판별
     private fun regionFromCoords(lat: Double, lon: Double): StationRegion = when {

@@ -1,5 +1,6 @@
 package com.koretide.app.ui.search
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.koretide.app.domain.model.StationRegion
@@ -32,6 +33,9 @@ class SearchViewModel @Inject constructor(
 
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+
+    private val _loadError = MutableStateFlow<String?>(null)
+    val loadError: StateFlow<String?> = _loadError.asStateFlow()
 
     @OptIn(ExperimentalCoroutinesApi::class)
     private val stations = combine(_query, _selectedRegion) { q, r -> Pair(q, r) }
@@ -68,8 +72,12 @@ class SearchViewModel @Inject constructor(
     private fun refreshStations() {
         viewModelScope.launch {
             _isLoading.value = true
+            _loadError.value = null
             try {
                 getAllStationsUseCase.refresh()
+            } catch (e: Exception) {
+                Log.w("SearchViewModel", "station refresh failed", e)
+                _loadError.value = "자료를 가져오는데 실패했습니다"
             } finally {
                 _isLoading.value = false
             }

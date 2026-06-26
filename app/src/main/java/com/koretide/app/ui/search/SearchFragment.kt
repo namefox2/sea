@@ -116,8 +116,10 @@ class SearchFragment : Fragment() {
 
     private fun observeState() {
         collectFlow(viewModel.stationItems) { items ->
+            if (viewModel.loadError.value != null) return@collectFlow
             adapter.submitList(items)
             if (items.isEmpty()) {
+                binding.tvEmpty.setText(R.string.no_stations)
                 binding.tvEmpty.visible()
                 binding.recyclerStations.gone()
             } else {
@@ -127,6 +129,13 @@ class SearchFragment : Fragment() {
         }
         collectFlow(viewModel.isLoading) { loading ->
             binding.progressBar.visibility = if (loading) View.VISIBLE else View.GONE
+        }
+        collectFlow(viewModel.loadError) { error ->
+            if (error != null) {
+                binding.tvEmpty.text = error
+                binding.tvEmpty.visible()
+                binding.recyclerStations.gone()
+            }
         }
     }
 
