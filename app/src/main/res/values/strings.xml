@@ -55,11 +55,9 @@
     <string name="btn_go_watch">물멍하러가기</string>
 
     <!-- ====================================================================
-         AdMob — 배너 단위 ID는 실제 프로덕션 ID로 교체됨.
-         ⚠ admob_app_id는 아직 Google 테스트 앱 ID입니다.
-         AdMob 콘솔의 "앱 ID"(ca-app-pub-9392221797396472~XXXXXXXXXX)로 교체하세요.
+         AdMob — 실제 프로덕션 ID 적용됨 (앱 ID + 배너 단위 ID).
          ===================================================================== -->
-    <string name="admob_app_id" translatable="false">ca-app-pub-3940256099942544~3347511713</string>
+    <string name="admob_app_id" translatable="false">ca-app-pub-9392221797396472~6888037626</string>
     <string name="admob_banner_map_unit_id" translatable="false">ca-app-pub-9392221797396472/2539361985</string>
     <string name="admob_banner_search_unit_id" translatable="false">ca-app-pub-9392221797396472/2539361985</string>
 
