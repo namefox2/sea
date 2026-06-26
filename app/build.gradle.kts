@@ -29,6 +29,7 @@ android {
         buildConfigField("String", "KHOA_API_KEY",  "\"${localProps.getProperty("KHOA_API_KEY",  "")}\"")
         buildConfigField("String", "KMA_API_KEY",   "\"${localProps.getProperty("KMA_API_KEY",   "")}\"")
         buildConfigField("String", "BEACH_API_KEY", "\"${localProps.getProperty("BEACH_API_KEY", "")}\"")
+        buildConfigField("String", "KASI_API_KEY",  "\"${localProps.getProperty("KASI_API_KEY",  "")}\"")
 
         manifestPlaceholders["naverClientId"] = localProps.getProperty("NAVER_CLIENT_ID", "j5uq4i1va5")
     }

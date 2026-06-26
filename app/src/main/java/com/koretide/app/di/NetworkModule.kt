@@ -2,6 +2,7 @@ package com.koretide.app.di
 
 import android.util.Log
 import com.koretide.app.BuildConfig
+import com.koretide.app.data.remote.KasiApiService
 import com.koretide.app.data.remote.KhoaDataApiService
 import com.koretide.app.data.remote.KhoaIndexApiService
 import com.koretide.app.data.remote.OdCloudApi
@@ -29,6 +30,10 @@ annotation class KhoaRetrofit
 @Qualifier
 @Retention(AnnotationRetention.BINARY)
 annotation class OdCloudRetrofit
+
+@Qualifier
+@Retention(AnnotationRetention.BINARY)
+annotation class KasiRetrofit
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -100,6 +105,21 @@ object NetworkModule {
     @Singleton
     fun provideOdCloudApi(@OdCloudRetrofit retrofit: Retrofit): OdCloudApi =
         retrofit.create(OdCloudApi::class.java)
+
+    @Provides
+    @Singleton
+    @KasiRetrofit
+    fun provideKasiRetrofit(client: OkHttpClient, moshi: Moshi): Retrofit =
+        Retrofit.Builder()
+            .baseUrl("https://apis.data.go.kr/B090041/openapi/service/RiseSetInfoService/")
+            .client(client)
+            .addConverterFactory(MoshiConverterFactory.create(moshi))
+            .build()
+
+    @Provides
+    @Singleton
+    fun provideKasiApiService(@KasiRetrofit retrofit: Retrofit): KasiApiService =
+        retrofit.create(KasiApiService::class.java)
 
     // KHOA data.go.kr XML 응답 → JSON 변환
     // 구조: <response><header>...</header><body><items><item>...</item></items></body></response>
