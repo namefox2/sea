@@ -65,7 +65,7 @@ class SearchViewModel @Inject constructor(
                     station      = station,
                     tidePercent  = tidePercent,
                     tideStatus   = tideStatus,
-                    windBft      = null,
+                    windBft      = match?.windSpeedMs?.let { speedToBeaufort(it) },
                     waterLevelCm = currentLevel
                 )
             }
@@ -110,4 +110,20 @@ class SearchViewModel @Inject constructor(
 
     private fun List<RecentTideLevel>.nearestTo(lat: Double, lng: Double): RecentTideLevel? =
         minByOrNull { (it.lat - lat) * (it.lat - lat) + (it.lon - lng) * (it.lon - lng) }
+
+    private fun speedToBeaufort(ms: Float): Int = when {
+        ms < 0.3f  -> 0
+        ms < 1.5f  -> 1
+        ms < 3.3f  -> 2
+        ms < 5.5f  -> 3
+        ms < 7.9f  -> 4
+        ms < 10.7f -> 5
+        ms < 13.8f -> 6
+        ms < 17.1f -> 7
+        ms < 20.7f -> 8
+        ms < 24.4f -> 9
+        ms < 28.4f -> 10
+        ms < 32.6f -> 11
+        else       -> 12
+    }
 }

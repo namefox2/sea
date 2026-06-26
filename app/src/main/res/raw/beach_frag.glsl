@@ -293,12 +293,12 @@ void main() {
     // ── Underwater suppression near camera ─────────────────────────────────────
     // At high tide the ocean mesh becomes transparent in front of the waterline
     // (shore-fade zone), revealing the sandy beach below the water surface.
-    // Blend toward a dark ocean-floor color wherever beach Y < water surface Y
-    // and the fragment is in the camera-side transparent zone.
-    float tideY_b    = u_TidePercent * 1.4 - 0.7;
-    float belowSurf  = clamp((tideY_b - v_World.y) / 0.20, 0.0, 1.0);
-    float nearCamFade = smoothstep(-2.0, 5.0, distToWater);
-    baseColor = mix(baseColor, vec3(0.05, 0.13, 0.22), belowSurf * nearCamFade);
+    // Only apply on the seaward side (distToWater < 0) so exposed mudflat
+    // (distToWater > 0) does not darken as tide rises.
+    float tideY_b       = u_TidePercent * 1.4 - 0.7;
+    float belowSurf     = clamp((tideY_b - v_World.y) / 0.20, 0.0, 1.0);
+    float underwaterMask = smoothstep(0.5, -1.5, distToWater);
+    baseColor = mix(baseColor, vec3(0.05, 0.13, 0.22), belowSurf * underwaterMask);
 
     gl_FragColor = vec4(baseColor, 1.0);
 }

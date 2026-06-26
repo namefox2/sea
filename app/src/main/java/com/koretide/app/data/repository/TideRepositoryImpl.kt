@@ -110,8 +110,8 @@ class TideRepositoryImpl @Inject constructor(
         ).body?.items?.item.orEmpty()
 
         val result = raw
-            .filter { it.lat != null && it.lon != null && it.tideLevel != null }
-            .map { RecentTideLevel(it.lat!!, it.lon!!, it.tideLevel!!.toInt()) }
+            .filter { it.lat != null && it.lon != null && (it.tideLevel != null || it.windSpeed != null) }
+            .map { RecentTideLevel(it.lat!!, it.lon!!, it.tideLevel?.toInt(), it.windSpeed) }
 
         Log.d(TAG, "  완료 ${System.currentTimeMillis() - t0}ms  raw=${raw.size}  valid=${result.size}")
         return result

@@ -174,7 +174,8 @@ class OceanIndexRepositoryImpl @Inject constructor(
         stats       = statsFor(type),
         beachName   = bbchNm,
         date        = predcYmd?.let { formatDate(it) },
-        isAvailable = true
+        isAvailable = true,
+        opnStat     = opnStat
     )
 
     private fun KhoaIndexItem.statsFor(type: IndexType): List<Pair<String, String>> = buildList {

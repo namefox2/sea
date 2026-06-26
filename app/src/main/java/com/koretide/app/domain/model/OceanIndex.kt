@@ -7,7 +7,8 @@ data class OceanIndex(
     val stats: List<Pair<String, String>>,
     val beachName: String?,
     val date: String?,
-    val isAvailable: Boolean
+    val isAvailable: Boolean,
+    val opnStat: String? = null  // 개장상태 (개장/폐장/비개장)
 )
 
 enum class IndexType(val displayName: String, val emoji: String) {

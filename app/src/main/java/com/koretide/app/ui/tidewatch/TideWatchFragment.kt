@@ -148,18 +148,17 @@ class TideWatchFragment : Fragment() {
     private fun setupImmersiveButton() {
         binding.btnImmersive.setOnClickListener {
             isImmersivePreset = true
-            // Set cached range before slider so mudflat computation uses preset value
             cachedTidalRangeM = 5.5f
             binding.tideWatchView.applyImmersivePreset()
-            // Reset sliders to preset defaults (listeners also propagate to renderer)
-            binding.seekWind.progress      = 2
-            binding.seekTide.progress      = 35
+            binding.seekWind.progress       = 2
+            binding.seekTide.progress       = 35
             binding.seekTidalRange.progress = 55
             binding.tvTidalRange.text       = "5.5m"
-            uiVisible = false
-            binding.overlayCard.visibility = View.GONE
-            binding.sliderPanel.visibility = View.GONE
-            sharedViewModel.setWatchImmersive(true)
+            // Clear station info overlay so UI shows the neutral preset state
+            binding.tvStationName.text      = ""
+            binding.tvTideInfo.text         = ""
+            binding.tvWindInfo.text         = ""
+            binding.tvMudflatGrade.visibility = View.GONE
         }
     }
 
@@ -211,6 +210,7 @@ class TideWatchFragment : Fragment() {
 
         collectFlow(sharedViewModel.selectedStation) { station ->
             val b = _binding ?: return@collectFlow
+            isImmersivePreset = false
             cachedRegion = station?.region
             cachedCalibration = TidalCalibration.forRegion(
                 station?.region ?: StationRegion.WEST
@@ -298,9 +298,9 @@ class TideWatchFragment : Fragment() {
         _binding?.tideWatchView?.onPause()
         oceanSound.stop()
         viewModel.stopPolling()
+        isImmersivePreset = false
         if (!uiVisible) {
             uiVisible = true
-            isImmersivePreset = false
             sharedViewModel.setWatchImmersive(false)
         }
     }

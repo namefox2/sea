@@ -160,11 +160,18 @@ class IndexFragment : Fragment() {
             row.findViewById<TextView>(R.id.tvRegionName).text = item.name
 
             val grade = item.index.grade
+            val opnStat = item.index.opnStat
             val tvGrade = row.findViewById<TextView>(R.id.tvRegionGrade)
             if (grade != null && item.index.isAvailable) {
-                tvGrade.text = "${grade.emoji} Lv.${grade.level} ${grade.label}"
+                val statusSuffix = opnStat?.let { " · $it" } ?: ""
+                tvGrade.text = "${grade.emoji} Lv.${grade.level} ${grade.label}$statusSuffix"
                 tvGrade.setTextColor(ContextCompat.getColor(requireContext(), gradeTextColor(grade)))
                 tvGrade.setBackgroundResource(gradeBg(grade))
+            } else if (opnStat != null) {
+                tvGrade.text = opnStat
+                val color = if (opnStat == "개장") R.color.status_rising else R.color.status_falling
+                tvGrade.setTextColor(ContextCompat.getColor(requireContext(), color))
+                tvGrade.background = null
             } else {
                 tvGrade.text = "정보 없음"
                 tvGrade.setTextColor(ContextCompat.getColor(requireContext(), android.R.color.darker_gray))
@@ -187,7 +194,8 @@ class IndexFragment : Fragment() {
         } else {
             "${state.region.displayName} · ${state.type.emoji} 7일 예보"
         }
-        binding.tvForecastHeaderTitle.text = title
+        val statusSuffix = state.opnStat?.let { "  [$it]" } ?: ""
+        binding.tvForecastHeaderTitle.text = "$title$statusSuffix"
 
         binding.containerForecast.removeAllViews()
         val inflater = LayoutInflater.from(requireContext())

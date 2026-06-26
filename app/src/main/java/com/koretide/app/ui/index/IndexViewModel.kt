@@ -36,7 +36,8 @@ sealed class IndexUiState {
         val type: IndexType,
         val region: StationRegion,
         val beachName: String?,
-        val forecast: List<DayForecast>
+        val forecast: List<DayForecast>,
+        val opnStat: String? = null
     ) : IndexUiState()
     data class Error(val message: String) : IndexUiState()
 }
@@ -91,7 +92,7 @@ class IndexViewModel @Inject constructor(
     fun selectBeach(beach: BeachIndexItem, type: IndexType, region: StationRegion) {
         navStack.add(IndexNav.Forecast(type, region))
         currentBeach = beach
-        loadForecast(type, region, beach.name)
+        loadForecast(type, region, beach.name, beach.index.opnStat)
     }
 
     private fun loadBeachList(type: IndexType, region: StationRegion) {
@@ -109,11 +110,11 @@ class IndexViewModel @Inject constructor(
         }
     }
 
-    private fun loadForecast(type: IndexType, region: StationRegion, beachName: String?) {
+    private fun loadForecast(type: IndexType, region: StationRegion, beachName: String?, opnStat: String? = null) {
         viewModelScope.launch {
             _uiState.value = IndexUiState.Loading
             val forecast = getSevenDayForecast(beachName ?: region.displayName, region.displayName)
-            _uiState.value = IndexUiState.Forecast(type, region, beachName, forecast)
+            _uiState.value = IndexUiState.Forecast(type, region, beachName, forecast, opnStat)
         }
     }
 
