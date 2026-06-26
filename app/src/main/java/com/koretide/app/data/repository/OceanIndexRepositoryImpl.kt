@@ -2,6 +2,10 @@ package com.koretide.app.data.repository
 
 import com.koretide.app.BuildConfig
 import com.koretide.app.data.BeachPlaceData
+import com.koretide.app.data.ScubaPlaceData
+import com.koretide.app.data.SeaTravelPlaceData
+import com.koretide.app.data.SurfingPlaceData
+import com.koretide.app.data.TidalFlatPlaceData
 import com.koretide.app.data.remote.KhoaIndexApiService
 import com.koretide.app.data.remote.dto.KhoaIndexItem
 import com.koretide.app.domain.model.IndexGrade
@@ -35,20 +39,21 @@ class OceanIndexRepositoryImpl @Inject constructor(
     ): List<OceanIndex> {
         if (key.isBlank()) throw IllegalStateException("API 키가 설정되지 않았습니다")
 
-        // 위도/경도로 가장 가까운 해수욕장 placeCode 결정
-        val placeCode = when {
-            lat != null && lon != null -> BeachPlaceData.nearest(lat, lon)?.code
-            else -> null
-        }
+        // 지수 유형별 가장 가까운 placeCode 결정
+        val hsCode = if (lat != null && lon != null) BeachPlaceData.nearest(lat, lon)?.code else null
+        val baCode = if (lat != null && lon != null) SeaTravelPlaceData.nearest(lat, lon)?.code else null
+        val ssCode = if (lat != null && lon != null) ScubaPlaceData.nearest(lat, lon)?.code else null
+        val srCode = if (lat != null && lon != null) SurfingPlaceData.nearest(lat, lon)?.code else null
+        val tlCode = if (lat != null && lon != null) TidalFlatPlaceData.nearest(lat, lon)?.code else null
 
         return coroutineScope {
-            val beach   = async { fetch(date, placeCode, IndexType.BEACH_SWIM)   { api.getBeachForecast(key, it, date) } }
-            val fishing = async { fetch(date, placeCode, IndexType.SEA_FISHING)  { api.getFishingForecast(key, it, date) } }
-            val sick    = async { fetch(date, placeCode, IndexType.SEASICKNESS)  { api.getSeasicknessForecast(key, it, date) } }
-            val scuba   = async { fetch(date, placeCode, IndexType.SCUBA_DIVING) { api.getScubaForecast(key, it, date) } }
-            val tidal   = async { tidalFlatIndex(date, placeCode, tideData) }
-            val surf    = async { fetch(date, placeCode, IndexType.SURFING)      { api.getSurfingForecast(key, it, date) } }
-            val travel  = async { fetch(date, placeCode, IndexType.SEA_TRAVEL)   { api.getSeaTravelForecast(key, it, date) } }
+            val beach   = async { fetch(date, hsCode, IndexType.BEACH_SWIM)   { api.getBeachForecast(key, it, date) } }
+            val fishing = async { fetch(date, hsCode, IndexType.SEA_FISHING)  { api.getFishingForecast(key, it, date) } }
+            val sick    = async { fetch(date, hsCode, IndexType.SEASICKNESS)  { api.getSeasicknessForecast(key, it, date) } }
+            val scuba   = async { fetch(date, ssCode, IndexType.SCUBA_DIVING) { api.getScubaForecast(key, it, date) } }
+            val tidal   = async { tidalFlatIndex(date, tlCode, tideData) }
+            val surf    = async { fetch(date, srCode, IndexType.SURFING)      { api.getSurfingForecast(key, it, date) } }
+            val travel  = async { fetch(date, baCode, IndexType.SEA_TRAVEL)   { api.getSeaTravelForecast(key, it, date) } }
             listOf(beach, fishing, sick, scuba, tidal, surf, travel).map { it.await() }
         }
     }
