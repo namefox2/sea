@@ -11,9 +11,6 @@ import com.koretide.app.domain.model.TideData
 import com.koretide.app.domain.model.TideRecord
 import com.koretide.app.domain.model.TideStatus
 import com.koretide.app.domain.repository.TideRepository
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -98,44 +95,27 @@ class TideRepositoryImpl @Inject constructor(
         return data.records
     }
 
-    // 조위관측소 목록 기준으로 obsCode별 병렬 호출 → 전체 현재 조위 일괄 수집
+    // obsCode=null 단일 호출로 전체 조위 일괄 수집 (include로 필드 제한 → 최소 응답 크기)
+    // 개별 obsCode 병렬 호출은 OkHttp maxRequestsPerHost=5 기본값에 막혀 ~6초 소요
     override suspend fun getBatchRecentLevels(): List<RecentTideLevel> {
         val date = SimpleDateFormat("yyyyMMdd", Locale.KOREA).format(Date())
-        val stations = stationDao.getAllStationsSnapshot()
-        Log.d(TAG, "▶ getBatchRecentLevels: 조위관측소 ${stations.size}개, date=$date")
+        Log.d(TAG, "▶ getBatchRecentLevels date=$date (단일 호출, numOfRows=200)")
+        val t0 = System.currentTimeMillis()
 
-        if (stations.isEmpty()) {
-            Log.w(TAG, "  DB에 관측소 없음 — 빈 리스트 반환")
-            return emptyList()
-        }
+        val raw = khoaDataApi.getTideRecent(
+            serviceKey = apiKey,
+            obsCode    = null,
+            date       = date,
+            numOfRows  = 200,
+            include    = "lat,lot,bscTdlvHgt,obsrvnDt"
+        ).body?.items?.item.orEmpty()
 
-        return coroutineScope {
-            stations.map { station ->
-                async {
-                    runCatching {
-                        khoaDataApi.getTideRecent(
-                            serviceKey = apiKey,
-                            obsCode    = station.code,
-                            date       = date,
-                            numOfRows  = 1,
-                            include    = "lat,lot,bscTdlvHgt,obsrvnDt"
-                        ).body?.items?.item?.lastOrNull()?.let { item ->
-                            if (item.lat != null && item.lon != null && item.tideLevel != null) {
-                                Log.d(TAG, "  ${station.name}(${station.code}) → ${item.tideLevel.toInt()}cm")
-                                RecentTideLevel(item.lat, item.lon, item.tideLevel.toInt())
-                            } else {
-                                Log.d(TAG, "  ${station.name}(${station.code}) → 조위 데이터 없음")
-                                null
-                            }
-                        }
-                    }.onFailure {
-                        Log.w(TAG, "  ${station.code} 호출 실패: ${it.message}")
-                    }.getOrNull()
-                }
-            }.awaitAll().filterNotNull()
-        }.also { result ->
-            Log.d(TAG, "  배치 완료: ${result.size}/${stations.size}개 수신")
-        }
+        val result = raw
+            .filter { it.lat != null && it.lon != null && it.tideLevel != null }
+            .map { RecentTideLevel(it.lat!!, it.lon!!, it.tideLevel!!.toInt()) }
+
+        Log.d(TAG, "  완료 ${System.currentTimeMillis() - t0}ms  raw=${raw.size}  valid=${result.size}")
+        return result
     }
 
     private fun parseDateToMillis(dateStr: String): Long {
