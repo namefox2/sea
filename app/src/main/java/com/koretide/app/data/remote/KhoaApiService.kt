@@ -10,7 +10,7 @@ interface KhoaApiService {
     @GET("tideObsStationList")
     suspend fun getStationList(
         @Query("ServiceKey") serviceKey: String,
-        @Query("_type") type: String = "json"
+        @Query("type") type: String = "json"
     ): KhoaStationListResponse
 
     @GET("tideCurPre")
@@ -18,7 +18,7 @@ interface KhoaApiService {
         @Query("ServiceKey") serviceKey: String,
         @Query("ObsCode") obsCode: String,
         @Query("Date") date: String,
-        @Query("_type") type: String = "json"
+        @Query("type") type: String = "json"
     ): KhoaTideCurrentResponse
 
     @GET("tideObsPreTab")
@@ -26,6 +26,6 @@ interface KhoaApiService {
         @Query("ServiceKey") serviceKey: String,
         @Query("ObsCode") obsCode: String,
         @Query("Date") date: String,
-        @Query("_type") type: String = "json"
+        @Query("type") type: String = "json"
     ): KhoaTideTableResponse
 }

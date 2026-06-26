@@ -31,21 +31,29 @@ class StationRepositoryImpl @Inject constructor(
         if (stationDao.count() > 0) return
         if (apiKey.isBlank()) throw IllegalStateException("API 키가 설정되지 않았습니다")
         val items = odCloudApi.getStations(serviceKey = apiKey).data.orEmpty()
-        Log.d("StationRepo", "API returned ${items.size} stations")
+        Log.d(TAG, "▶ refreshStations: API 응답 ${items.size}개")
+
+        val typeBreakdown = items.groupBy { it.type ?: "null" }.mapValues { it.value.size }
+        Log.d(TAG, "  관측소 유형별: $typeBreakdown")
+
         if (items.isEmpty()) throw Exception("관측소 데이터가 없습니다")
-        val entities = items.mapNotNull { item ->
-            val code = item.code ?: return@mapNotNull null
-            val name = item.name ?: return@mapNotNull null
-            val lat  = item.lat?.toDoubleOrNull() ?: return@mapNotNull null
-            val lon  = item.lon?.toDoubleOrNull() ?: return@mapNotNull null
-            StationEntity(
-                code   = code,
-                name   = name,
-                region = regionFromCoords(lat, lon).name,
-                lat    = lat,
-                lng    = lon
-            )
-        }
+
+        val entities = items
+            .filter { it.type == "조위관측소" }
+            .mapNotNull { item ->
+                val code = item.code ?: return@mapNotNull null
+                val name = item.name ?: return@mapNotNull null
+                val lat  = item.lat?.toDoubleOrNull() ?: return@mapNotNull null
+                val lon  = item.lon?.toDoubleOrNull() ?: return@mapNotNull null
+                StationEntity(
+                    code   = code,
+                    name   = name,
+                    region = regionFromCoords(lat, lon).name,
+                    lat    = lat,
+                    lng    = lon
+                )
+            }
+        Log.d(TAG, "  조위관측소 필터 후: ${entities.size}개 저장")
         stationDao.upsertAll(entities)
     }
 
@@ -56,6 +64,8 @@ class StationRepositoryImpl @Inject constructor(
         stationDao.getAllStationsSnapshot()
             .minByOrNull { (it.lat - lat) * (it.lat - lat) + (it.lng - lon) * (it.lng - lon) }
             ?.toDomain()
+
+    companion object { private const val TAG = "StationRepo" }
 
     // 좌표 기반 지역 판별
     private fun regionFromCoords(lat: Double, lon: Double): StationRegion = when {

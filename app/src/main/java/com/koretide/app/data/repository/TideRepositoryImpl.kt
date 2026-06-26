@@ -2,6 +2,7 @@ package com.koretide.app.data.repository
 
 import com.koretide.app.BuildConfig
 import android.util.Log
+import com.koretide.app.data.local.dao.StationDao
 import com.koretide.app.data.local.dao.TideRecordDao
 import com.koretide.app.data.local.entity.TideRecordEntity
 import com.koretide.app.data.remote.KhoaDataApiService
@@ -10,6 +11,9 @@ import com.koretide.app.domain.model.TideData
 import com.koretide.app.domain.model.TideRecord
 import com.koretide.app.domain.model.TideStatus
 import com.koretide.app.domain.repository.TideRepository
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -18,6 +22,7 @@ import javax.inject.Singleton
 
 @Singleton
 class TideRepositoryImpl @Inject constructor(
+    private val stationDao: StationDao,
     private val tideRecordDao: TideRecordDao,
     private val khoaDataApi: KhoaDataApiService
 ) : TideRepository {
@@ -28,8 +33,8 @@ class TideRepositoryImpl @Inject constructor(
         val date = SimpleDateFormat("yyyyMMdd", Locale.KOREA).format(Date())
         Log.d(TAG, "▶ getTideData station=$stationCode date=$date")
 
-        val current = khoaDataApi.getTideRecent(apiKey, stationCode, date)
-        val table   = khoaDataApi.getTideForecast(apiKey, stationCode, date)
+        val current = khoaDataApi.getTideRecent(apiKey, stationCode, date, include = "obsrvnDt,bscTdlvHgt")
+        val table   = khoaDataApi.getTideForecast(apiKey, stationCode, date, include = "tphTime,tphLevel,hlCode")
 
         val dataItems  = current.body?.items?.item ?: emptyList()
         val tableItems = table.body?.items?.item   ?: emptyList()
@@ -93,15 +98,44 @@ class TideRepositoryImpl @Inject constructor(
         return data.records
     }
 
+    // 조위관측소 목록 기준으로 obsCode별 병렬 호출 → 전체 현재 조위 일괄 수집
     override suspend fun getBatchRecentLevels(): List<RecentTideLevel> {
         val date = SimpleDateFormat("yyyyMMdd", Locale.KOREA).format(Date())
-        Log.d(TAG, "▶ getBatchRecentLevels date=$date numOfRows=200")
-        val raw = khoaDataApi.getTideRecent(apiKey, null, date, 200).body?.items?.item.orEmpty()
-        val result = raw
-            .filter { it.lat != null && it.lon != null && it.tideLevel != null }
-            .map { RecentTideLevel(it.lat!!, it.lon!!, it.tideLevel!!.toInt()) }
-        Log.d(TAG, "  raw=${raw.size}  valid(lat+lon+level)=${result.size}")
-        return result
+        val stations = stationDao.getAllStationsSnapshot()
+        Log.d(TAG, "▶ getBatchRecentLevels: 조위관측소 ${stations.size}개, date=$date")
+
+        if (stations.isEmpty()) {
+            Log.w(TAG, "  DB에 관측소 없음 — 빈 리스트 반환")
+            return emptyList()
+        }
+
+        return coroutineScope {
+            stations.map { station ->
+                async {
+                    runCatching {
+                        khoaDataApi.getTideRecent(
+                            serviceKey = apiKey,
+                            obsCode    = station.code,
+                            date       = date,
+                            numOfRows  = 1,
+                            include    = "lat,lot,bscTdlvHgt,obsrvnDt"
+                        ).body?.items?.item?.lastOrNull()?.let { item ->
+                            if (item.lat != null && item.lon != null && item.tideLevel != null) {
+                                Log.d(TAG, "  ${station.name}(${station.code}) → ${item.tideLevel.toInt()}cm")
+                                RecentTideLevel(item.lat, item.lon, item.tideLevel.toInt())
+                            } else {
+                                Log.d(TAG, "  ${station.name}(${station.code}) → 조위 데이터 없음")
+                                null
+                            }
+                        }
+                    }.onFailure {
+                        Log.w(TAG, "  ${station.code} 호출 실패: ${it.message}")
+                    }.getOrNull()
+                }
+            }.awaitAll().filterNotNull()
+        }.also { result ->
+            Log.d(TAG, "  배치 완료: ${result.size}/${stations.size}개 수신")
+        }
     }
 
     private fun parseDateToMillis(dateStr: String): Long {

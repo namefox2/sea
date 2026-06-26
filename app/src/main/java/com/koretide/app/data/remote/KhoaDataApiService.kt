@@ -12,7 +12,8 @@ import retrofit2.http.Query
 interface KhoaDataApiService {
 
     // dtRecent: 복합해양환경관측소 실시간 데이터 (조위 bscTdlvHgt + 풍향/풍속 포함)
-    // obsCode nullable → null이면 전체 관측소 조회 후 좌표로 최근접 선택
+    // obsCode: 특정 관측소 코드, null이면 전체 관측소 조회
+    // include: 응답에 포함할 필드만 지정 (예: "lat,lot,bscTdlvHgt") → 불필요한 필드 제외로 속도 향상
     @GET("dtRecent/GetDTRecentApiService")
     suspend fun getTideRecent(
         @Query("serviceKey") serviceKey: String,
@@ -20,7 +21,8 @@ interface KhoaDataApiService {
         @Query("reqDate")    date: String,
         @Query("numOfRows")  numOfRows: Int = 100,
         @Query("pageNo")     pageNo: Int = 1,
-        @Query("type")       type: String = "json"
+        @Query("type")       type: String = "json",
+        @Query("include")    include: String? = null
     ): KhoaTideRecentResponse
 
     @GET("tideFcstHghLw/GetTideFcstHghLwApiService")
@@ -30,7 +32,8 @@ interface KhoaDataApiService {
         @Query("reqDate")    date: String,
         @Query("numOfRows")  numOfRows: Int = 20,
         @Query("pageNo")     pageNo: Int = 1,
-        @Query("type")       type: String = "json"
+        @Query("type")       type: String = "json",
+        @Query("include")    include: String? = null
     ): KhoaTideFcstResponse
 
     @GET("noonWave/GetNoonWaveApiService")
