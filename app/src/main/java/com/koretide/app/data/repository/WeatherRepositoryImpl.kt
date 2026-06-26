@@ -25,26 +25,31 @@ class WeatherRepositoryImpl @Inject constructor(
     override suspend fun getWindData(lat: Double, lng: Double, stationCode: String): WindData {
         val date = SimpleDateFormat("yyyyMMdd", Locale.KOREA).format(Date())
 
+        Log.d(TAG, "▶ getWindData station=$stationCode lat=$lat lng=$lng date=$date")
+
         return try {
             // dtRecent에 풍향/풍속도 포함 → obsCode null로 전체 조회 후 최근접 선택
             val items = khoaDataApi.getTideRecent(apiKey, null, date, numOfRows = 200).body?.items?.item.orEmpty()
+            Log.d(TAG, "  dtRecent total items=${items.size}")
             val item = items.nearestTo(lat, lng)
-            Log.d(TAG, "dtRecent wind nearest=${item?.stationName} wspd=${item?.windSpeed} wndrct=${item?.windDir}")
+            Log.d(TAG, "  nearest station=${item?.stationName}(${item?.lat},${item?.lon})  wspd=${item?.windSpeed}m/s  wndrct=${item?.windDir}°  wtem=${item?.waterTemp}℃  artmp=${item?.airTemp}℃")
 
             val speedMs = item?.windSpeed ?: 0f
             val dirDeg  = item?.windDir ?: 0f
             val bft     = BeaufortConverter.toBft(speedMs)
+            Log.d(TAG, "  → beaufort=${bft}bft  name=${BeaufortConverter.name(bft)}")
 
             val waveHeightM: Float? = runCatching {
                 val waveItems = khoaDataApi.getWave(apiKey, null, date).body?.items?.item.orEmpty()
                 val wave = waveItems.nearestWaveTo(lat, lng)
-                wave?.waveHeight.also { Log.d(TAG, "noonWave nearest=${wave?.stationName} wh=$it") }
-            }.onFailure { Log.d(TAG, "noonWave skipped: ${it.message}") }
+                Log.d(TAG, "  noonWave nearest=${wave?.stationName}  wh=${wave?.waveHeight}m")
+                wave?.waveHeight
+            }.onFailure { Log.w(TAG, "  noonWave failed: ${it.message}") }
              .getOrNull()
 
             WindData(stationCode, speedMs, bft, dirDeg, BeaufortConverter.name(bft), waveHeightM)
         } catch (e: Exception) {
-            Log.w(TAG, "getWindData [$stationCode] failed", e)
+            Log.w(TAG, "getWindData [$stationCode] failed: ${e.message}", e)
             WindData(stationCode, 0f, 0, 0f, "--", null)
         }
     }

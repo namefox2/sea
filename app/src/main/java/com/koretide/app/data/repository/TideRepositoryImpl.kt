@@ -26,13 +26,17 @@ class TideRepositoryImpl @Inject constructor(
 
     override suspend fun getTideData(stationCode: String): TideData {
         val date = SimpleDateFormat("yyyyMMdd", Locale.KOREA).format(Date())
+        Log.d(TAG, "▶ getTideData station=$stationCode date=$date")
+
         val current = khoaDataApi.getTideRecent(apiKey, stationCode, date)
         val table   = khoaDataApi.getTideForecast(apiKey, stationCode, date)
 
         val dataItems  = current.body?.items?.item ?: emptyList()
         val tableItems = table.body?.items?.item   ?: emptyList()
+        Log.d(TAG, "  dtRecent items=${dataItems.size}  tideFcst items=${tableItems.size}")
 
         val currentLevel = dataItems.lastOrNull()?.tideLevel?.toInt() ?: 300
+        Log.d(TAG, "  lastItem obsrvnDt=${dataItems.lastOrNull()?.obsrvnDt}  tideLevel=${dataItems.lastOrNull()?.tideLevel}cm")
 
         val allHigh  = tableItems.filter { it.hlCode == "HH" }
         val allLow   = tableItems.filter { it.hlCode == "LL" }
@@ -42,6 +46,7 @@ class TideRepositoryImpl @Inject constructor(
         val tidePercent = if (range > 0f)
             ((currentLevel - minLevel).toFloat() / range).coerceIn(0f, 1f)
         else 0.5f
+        Log.d(TAG, "  maxLevel=${maxLevel}cm  minLevel=${minLevel}cm  currentLevel=${currentLevel}cm  tidePercent=${"%.2f".format(tidePercent)}")
 
         val prevLevel = if (dataItems.size >= 2)
             dataItems[dataItems.size - 2].tideLevel?.toInt() ?: currentLevel
@@ -56,6 +61,7 @@ class TideRepositoryImpl @Inject constructor(
         val nowTime  = SimpleDateFormat("HH:mm", Locale.KOREA).format(Date())
         val highItem = allHigh.firstOrNull { it.tphTime.orEmpty() >= nowTime } ?: allHigh.lastOrNull()
         val lowItem  = allLow.firstOrNull  { it.tphTime.orEmpty() >= nowTime } ?: allLow.lastOrNull()
+        Log.d(TAG, "  tideStatus=${tideStatus.displayName}  nextHigh=${highItem?.tphTime}(${highItem?.tphLevel}cm)  nextLow=${lowItem?.tphTime}(${lowItem?.tphLevel}cm)")
 
         val records = dataItems.map { item ->
             val ts = parseDateToMillis(item.obsrvnDt ?: date)
@@ -81,6 +87,7 @@ class TideRepositoryImpl @Inject constructor(
     override suspend fun getTideHistory(stationCode: String, date: String): List<TideRecord> {
         val since = System.currentTimeMillis() - 24 * 3_600_000L
         val cached = tideRecordDao.getRecords(stationCode, since)
+        Log.d(TAG, "▶ getTideHistory station=$stationCode  cached=${cached.size}")
         if (cached.isNotEmpty()) return cached.map { it.toDomain() }
         val data = getTideData(stationCode)
         return data.records
@@ -88,10 +95,13 @@ class TideRepositoryImpl @Inject constructor(
 
     override suspend fun getBatchRecentLevels(): List<RecentTideLevel> {
         val date = SimpleDateFormat("yyyyMMdd", Locale.KOREA).format(Date())
-        val items = khoaDataApi.getTideRecent(apiKey, null, date, 200).body?.items?.item.orEmpty()
-        return items
+        Log.d(TAG, "▶ getBatchRecentLevels date=$date numOfRows=200")
+        val raw = khoaDataApi.getTideRecent(apiKey, null, date, 200).body?.items?.item.orEmpty()
+        val result = raw
             .filter { it.lat != null && it.lon != null && it.tideLevel != null }
             .map { RecentTideLevel(it.lat!!, it.lon!!, it.tideLevel!!.toInt()) }
+        Log.d(TAG, "  raw=${raw.size}  valid(lat+lon+level)=${result.size}")
+        return result
     }
 
     private fun parseDateToMillis(dateStr: String): Long {
@@ -101,5 +111,9 @@ class TideRepositoryImpl @Inject constructor(
                 .getOrNull()?.let { return it }
         }
         return System.currentTimeMillis()
+    }
+
+    companion object {
+        private const val TAG = "TideRepo"
     }
 }
