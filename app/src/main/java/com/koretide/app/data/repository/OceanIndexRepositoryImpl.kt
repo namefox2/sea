@@ -8,6 +8,7 @@ import com.koretide.app.data.SurfingPlaceData
 import com.koretide.app.data.TidalFlatPlaceData
 import com.koretide.app.data.remote.KhoaIndexApiService
 import com.koretide.app.data.remote.dto.KhoaIndexItem
+import com.koretide.app.domain.model.BeachIndexItem
 import com.koretide.app.domain.model.IndexGrade
 import com.koretide.app.domain.model.IndexType
 import com.koretide.app.domain.model.OceanIndex
@@ -114,6 +115,43 @@ class OceanIndexRepositoryImpl @Inject constructor(
                 keywords.any { kw -> item.bbchNm?.contains(kw) == true }
             }
             region to (item?.toDomain(type) ?: unavailableIndex(type))
+        }
+    }
+
+    override suspend fun getBeachIndicesForRegion(
+        date: String,
+        type: IndexType,
+        region: StationRegion
+    ): List<BeachIndexItem> {
+        if (key.isBlank()) throw IllegalStateException("API 키가 설정되지 않았습니다")
+        val beaches = BeachPlaceData.byRegion(region)
+        val allItems: List<KhoaIndexItem> = when (type) {
+            IndexType.BEACH_SWIM   -> api.getBeachForecast(key, null, date, 100)
+            IndexType.SEA_FISHING  -> api.getFishingForecast(key, null, date, 100)
+            IndexType.SEASICKNESS  -> api.getSeasicknessForecast(key, null, date, 100)
+            IndexType.SCUBA_DIVING -> api.getScubaForecast(key, null, date, 100)
+            IndexType.TIDAL_FLAT   -> api.getTidalFlatForecast(key, null, date, 100)
+            IndexType.SURFING      -> api.getSurfingForecast(key, null, date, 100)
+            IndexType.SEA_TRAVEL   -> api.getSeaTravelForecast(key, null, date, 100)
+        }.body?.items?.item ?: emptyList()
+        return beaches.map { beach ->
+            val item = allItems.minByOrNull { apiItem ->
+                val dLat = (apiItem.lat ?: 999.0) - beach.lat
+                val dLon = (apiItem.lot ?: 999.0) - beach.lon
+                dLat * dLat + dLon * dLon
+            }?.takeIf { apiItem ->
+                val dLat = (apiItem.lat ?: 999.0) - beach.lat
+                val dLon = (apiItem.lot ?: 999.0) - beach.lon
+                dLat * dLat + dLon * dLon < 0.01
+            }
+            BeachIndexItem(
+                code   = beach.code,
+                name   = beach.name,
+                lat    = beach.lat,
+                lon    = beach.lon,
+                region = beach.region,
+                index  = item?.toDomain(type) ?: unavailableIndex(type)
+            )
         }
     }
 

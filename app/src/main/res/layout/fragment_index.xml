@@ -128,7 +128,65 @@
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
 
-    <!-- ── Screen 3: 7-day Forecast ──────────────────────────────── -->
+    <!-- ── Screen 3: Beach List ──────────────────────────────────── -->
+    <androidx.core.widget.NestedScrollView
+        android:id="@+id/screenBeachList"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="@dimen/spacing_md">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="@dimen/spacing_md">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnBackFromBeach"
+                    style="@style/Widget.MaterialComponents.Button.TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="‹"
+                    android:textSize="22sp"
+                    android:minWidth="0dp"
+                    android:paddingStart="0dp"
+                    android:paddingEnd="8dp"
+                    app:iconPadding="0dp" />
+
+                <TextView
+                    android:id="@+id/tvBeachListTitle"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    android:textColor="?android:textColorPrimary" />
+            </LinearLayout>
+
+            <ProgressBar
+                android:id="@+id/progressBeachList"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_horizontal"
+                android:visibility="gone" />
+
+            <LinearLayout
+                android:id="@+id/containerBeachList"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
+
+    <!-- ── Screen 4: 7-day Forecast ──────────────────────────────── -->
     <androidx.core.widget.NestedScrollView
         android:id="@+id/screenForecast"
         android:layout_width="match_parent"

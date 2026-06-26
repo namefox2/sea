@@ -1,5 +1,6 @@
 package com.koretide.app.domain.repository
 
+import com.koretide.app.domain.model.BeachIndexItem
 import com.koretide.app.domain.model.IndexType
 import com.koretide.app.domain.model.OceanIndex
 import com.koretide.app.domain.model.StationRegion
@@ -19,4 +20,10 @@ interface OceanIndexRepository {
         date: String,
         type: IndexType
     ): List<Pair<StationRegion, OceanIndex>>
+
+    suspend fun getBeachIndicesForRegion(
+        date: String,
+        type: IndexType,
+        region: StationRegion
+    ): List<BeachIndexItem>
 }

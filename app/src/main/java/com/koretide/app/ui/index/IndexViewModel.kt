@@ -3,6 +3,7 @@ package com.koretide.app.ui.index
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.koretide.app.data.BeachPlaceData
+import com.koretide.app.domain.model.BeachIndexItem
 import com.koretide.app.domain.model.DayForecast
 import com.koretide.app.domain.model.IndexType
 import com.koretide.app.domain.model.OceanIndex
@@ -27,32 +28,32 @@ import javax.inject.Inject
 
 sealed class IndexUiState {
     object Loading : IndexUiState()
-
-    // Screen 1: list of all index types (optional grade if station selected)
     data class TypeList(
         val stationName: String?,
         val gradeByType: Map<IndexType, OceanIndex?>
     ) : IndexUiState()
-
-    // Screen 2: grades for all 4 regions for a specific index type
     data class RegionList(
         val type: IndexType,
         val grades: List<Pair<StationRegion, OceanIndex>>
     ) : IndexUiState()
-
-    // Screen 3: 7-day forecast for a selected region
+    data class BeachList(
+        val type: IndexType,
+        val region: StationRegion,
+        val beaches: List<BeachIndexItem>
+    ) : IndexUiState()
     data class Forecast(
         val type: IndexType,
         val region: StationRegion,
+        val beachName: String?,
         val forecast: List<DayForecast>
     ) : IndexUiState()
-
     data class Error(val message: String) : IndexUiState()
 }
 
 sealed class IndexNav {
     object TypeList : IndexNav()
     data class RegionList(val type: IndexType) : IndexNav()
+    data class BeachList(val type: IndexType, val region: StationRegion) : IndexNav()
     data class Forecast(val type: IndexType, val region: StationRegion) : IndexNav()
 }
 
@@ -73,12 +74,16 @@ class IndexViewModel @Inject constructor(
     private val navStack = mutableListOf<IndexNav>(IndexNav.TypeList)
     private var cachedTypeList: IndexUiState.TypeList? = null
     private var cachedRegionList: IndexUiState.RegionList? = null
+    private var cachedBeachList: IndexUiState.BeachList? = null
     private var currentForecastRegion: StationRegion? = null
+    private var currentBeach: BeachIndexItem? = null
 
     fun loadTypeList(station: Station?, tideData: TideData?) {
         navStack.clear()
         navStack.add(IndexNav.TypeList)
         cachedRegionList = null
+        cachedBeachList = null
+        currentBeach = null
 
         viewModelScope.launch {
             _uiState.value = IndexUiState.Loading
@@ -103,6 +108,8 @@ class IndexViewModel @Inject constructor(
 
     fun selectType(type: IndexType) {
         navStack.add(IndexNav.RegionList(type))
+        cachedBeachList = null
+        currentBeach = null
 
         viewModelScope.launch {
             _uiState.value = IndexUiState.Loading
@@ -119,34 +126,56 @@ class IndexViewModel @Inject constructor(
     }
 
     fun selectRegion(type: IndexType, region: StationRegion) {
-        navStack.add(IndexNav.Forecast(type, region))
         currentForecastRegion = region
+        currentBeach = null
+        if (type == IndexType.BEACH_SWIM) {
+            navStack.add(IndexNav.BeachList(type, region))
+            loadBeachList(type, region)
+        } else {
+            navStack.add(IndexNav.Forecast(type, region))
+            loadForecast(type, region, null)
+        }
+    }
 
+    fun selectBeach(beach: BeachIndexItem, type: IndexType, region: StationRegion) {
+        navStack.add(IndexNav.Forecast(type, region))
+        currentBeach = beach
+        loadForecast(type, region, beach.name)
+    }
+
+    private fun loadBeachList(type: IndexType, region: StationRegion) {
         viewModelScope.launch {
             _uiState.value = IndexUiState.Loading
-            val forecast = getSevenDayForecast(region.displayName, null)
-            _uiState.value = IndexUiState.Forecast(type, region, forecast)
+            try {
+                val date = SimpleDateFormat("yyyyMMdd", Locale.KOREA).format(Date())
+                val beaches = indexRepo.getBeachIndicesForRegion(date, type, region)
+                val state = IndexUiState.BeachList(type, region, beaches)
+                cachedBeachList = state
+                _uiState.value = state
+            } catch (e: Exception) {
+                _uiState.value = IndexUiState.Error("지수를 불러올 수 없습니다")
+            }
         }
     }
 
-    fun requestWatchForCurrentRegion() {
-        val region = currentForecastRegion ?: return
+    private fun loadForecast(type: IndexType, region: StationRegion, beachName: String?) {
         viewModelScope.launch {
-            val beach = BeachPlaceData.representativeFor(region)
-            val station = if (beach != null) getNearestStation(beach.lat, beach.lon) else null
-            _watchStation.emit(station)
+            _uiState.value = IndexUiState.Loading
+            val forecast = getSevenDayForecast(beachName ?: region.displayName, region.displayName)
+            _uiState.value = IndexUiState.Forecast(type, region, beachName, forecast)
         }
     }
 
-    // Returns true if handled (still in a sub-screen), false if already at root
     fun navigateBack(): Boolean {
         if (navStack.size <= 1) return false
         navStack.removeLast()
         when (val screen = navStack.last()) {
             is IndexNav.TypeList -> {
+                currentBeach = null
                 _uiState.value = cachedTypeList ?: IndexUiState.TypeList(null, emptyMap())
             }
             is IndexNav.RegionList -> {
+                currentBeach = null
                 val cached = cachedRegionList
                 if (cached != null && cached.type == screen.type) {
                     _uiState.value = cached
@@ -154,12 +183,40 @@ class IndexViewModel @Inject constructor(
                     selectType(screen.type)
                 }
             }
-            is IndexNav.Forecast -> selectRegion(screen.type, screen.region)
+            is IndexNav.BeachList -> {
+                currentBeach = null
+                val cached = cachedBeachList
+                if (cached != null && cached.type == screen.type && cached.region == screen.region) {
+                    _uiState.value = cached
+                } else {
+                    loadBeachList(screen.type, screen.region)
+                }
+            }
+            is IndexNav.Forecast -> {
+                // Edge case: go back to beach list if available
+                val cached = cachedBeachList
+                if (cached != null) _uiState.value = cached
+            }
         }
         return true
     }
 
     fun isAtRoot(): Boolean = navStack.size <= 1
+
+    fun requestWatchForCurrentRegion() {
+        viewModelScope.launch {
+            val beach = currentBeach
+            if (beach != null) {
+                val station = getNearestStation(beach.lat, beach.lon)
+                _watchStation.emit(station)
+            } else {
+                val region = currentForecastRegion ?: return@launch
+                val repBeach = BeachPlaceData.representativeFor(region)
+                val station = if (repBeach != null) getNearestStation(repBeach.lat, repBeach.lon) else null
+                _watchStation.emit(station)
+            }
+        }
+    }
 
     private fun StationRegion.representativeName(): String = when (this) {
         StationRegion.WEST  -> "인천"

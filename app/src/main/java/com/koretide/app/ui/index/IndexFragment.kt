@@ -14,11 +14,8 @@ import androidx.fragment.app.activityViewModels
 import androidx.fragment.app.viewModels
 import com.koretide.app.R
 import com.koretide.app.databinding.FragmentIndexBinding
-import com.koretide.app.domain.model.DayForecast
 import com.koretide.app.domain.model.IndexGrade
 import com.koretide.app.domain.model.IndexType
-import com.koretide.app.domain.model.OceanIndex
-import com.koretide.app.domain.model.StationRegion
 import com.koretide.app.ui.main.SharedViewModel
 import com.koretide.app.util.collectFlow
 import dagger.hilt.android.AndroidEntryPoint
@@ -57,6 +54,7 @@ class IndexFragment : Fragment() {
         }
         binding.btnBackFromRegion.setOnClickListener { viewModel.navigateBack() }
         binding.btnBackFromForecast.setOnClickListener { viewModel.navigateBack() }
+        binding.btnBackFromBeach.setOnClickListener { viewModel.navigateBack() }
 
         collectFlow(sharedViewModel.selectedStation) { station ->
             viewModel.loadTypeList(station, sharedViewModel.tideData.value)
@@ -73,6 +71,7 @@ class IndexFragment : Fragment() {
                 is IndexUiState.Loading    -> showLoading()
                 is IndexUiState.TypeList   -> showTypeList(state)
                 is IndexUiState.RegionList -> showRegionList(state)
+                is IndexUiState.BeachList  -> showBeachList(state)
                 is IndexUiState.Forecast   -> showForecast(state)
                 is IndexUiState.Error      -> showError(state.message)
             }
@@ -84,18 +83,20 @@ class IndexFragment : Fragment() {
     private fun showScreen(screen: Int) {
         binding.screenTypeList.isVisible   = screen == 1
         binding.screenRegionList.isVisible = screen == 2
-        binding.screenForecast.isVisible   = screen == 3
+        binding.screenBeachList.isVisible  = screen == 3
+        binding.screenForecast.isVisible   = screen == 4
     }
 
     private fun showLoading() {
         // keep current screen, show progress on the active one
         binding.progressTypeList.isVisible   = binding.screenTypeList.isVisible
         binding.progressRegionList.isVisible = binding.screenRegionList.isVisible
+        binding.progressBeachList.isVisible  = binding.screenBeachList.isVisible
         binding.progressBar.isVisible        = binding.screenForecast.isVisible
     }
 
     private fun showError(msg: String) {
-        showScreen(3)
+        showScreen(4)
         binding.tvError.isVisible = true
         binding.tvError.text = msg
         binding.progressBar.isVisible = false
@@ -167,14 +168,49 @@ class IndexFragment : Fragment() {
         }
     }
 
-    // ── Screen 3: Forecast ────────────────────────────────────────
+    // ── Screen 3: BeachList ──────────────────────────────────────
+
+    private fun showBeachList(state: IndexUiState.BeachList) {
+        showScreen(3)
+        binding.progressBeachList.isVisible = false
+        binding.tvBeachListTitle.text = "${state.region.displayName} · ${state.type.emoji} ${state.type.displayName}"
+
+        binding.containerBeachList.removeAllViews()
+        for (item in state.beaches) {
+            val row = LayoutInflater.from(requireContext())
+                .inflate(R.layout.item_region_grade_row, binding.containerBeachList, false)
+
+            row.findViewById<TextView>(R.id.tvRegionName).text = item.name
+
+            val grade = item.index.grade
+            val tvGrade = row.findViewById<TextView>(R.id.tvRegionGrade)
+            if (grade != null && item.index.isAvailable) {
+                tvGrade.text = "${grade.emoji} Lv.${grade.level} ${grade.label}"
+                tvGrade.setTextColor(ContextCompat.getColor(requireContext(), gradeTextColor(grade)))
+                tvGrade.setBackgroundResource(gradeBg(grade))
+            } else {
+                tvGrade.text = "정보 없음"
+                tvGrade.setTextColor(ContextCompat.getColor(requireContext(), android.R.color.darker_gray))
+                tvGrade.background = null
+            }
+
+            row.setOnClickListener { viewModel.selectBeach(item, state.type, state.region) }
+            binding.containerBeachList.addView(row)
+        }
+    }
+
+    // ── Screen 4: Forecast ────────────────────────────────────────
 
     private fun showForecast(state: IndexUiState.Forecast) {
-        showScreen(3)
+        showScreen(4)
         binding.progressBar.isVisible = false
         binding.tvError.isVisible = false
-        binding.tvForecastHeaderTitle.text =
+        val title = if (state.beachName != null) {
+            "${state.beachName} · ${state.type.emoji} 7일 예보"
+        } else {
             "${state.region.displayName} · ${state.type.emoji} 7일 예보"
+        }
+        binding.tvForecastHeaderTitle.text = title
 
         binding.containerForecast.removeAllViews()
         val inflater = LayoutInflater.from(requireContext())
