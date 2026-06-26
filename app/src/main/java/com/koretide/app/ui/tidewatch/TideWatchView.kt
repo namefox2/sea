@@ -90,6 +90,15 @@ class TideWatchView @JvmOverloads constructor(
         }
     }
 
+    fun setSunTimes(sunriseHour: Float, sunsetHour: Float, moonriseHour: Float, moonsetHour: Float) {
+        queueEvent {
+            renderer.sunriseHour  = sunriseHour
+            renderer.sunsetHour   = sunsetHour
+            renderer.moonriseHour = moonriseHour
+            renderer.moonsetHour  = moonsetHour
+        }
+    }
+
     fun requestDebugDump() { renderer.debugDumpRequested = true }
 
     val initError: String? get() = renderer.initError

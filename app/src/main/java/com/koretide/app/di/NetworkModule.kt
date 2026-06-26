@@ -55,12 +55,17 @@ object NetworkModule {
                     else HttpLoggingInterceptor.Level.NONE
         })
         .addInterceptor { chain ->
-            val response = chain.proceed(chain.request())
+            val request  = chain.request()
+            val response = chain.proceed(request)
             val raw = response.body?.string() ?: ""
             val text = raw.trimStart('﻿').trim()
 
-            // data.go.kr KHOA API는 _type=json 무시하고 XML 반환 → JSON으로 변환
-            val json = if (text.startsWith("<")) khoaXmlToJson(text) else text
+            // data.go.kr KHOA/KASI API는 XML 반환 → JSON으로 변환
+            // KASI(RiseSetInfoService)는 시간 값("1957" 등)을 항상 문자열로 유지해야 함
+            val isKasi = request.url.toString().contains("RiseSetInfoService")
+            val json = if (text.startsWith("<")) {
+                if (isKasi) kasiXmlToJson(text) else khoaXmlToJson(text)
+            } else text
 
             if (BuildConfig.DEBUG && json.isNotEmpty() && !json.startsWith("{") && !json.startsWith("[")) {
                 Log.w("RawResponse", "${chain.request().url} → ${json.take(400)}")
@@ -121,9 +126,9 @@ object NetworkModule {
     fun provideKasiApiService(@KasiRetrofit retrofit: Retrofit): KasiApiService =
         retrofit.create(KasiApiService::class.java)
 
-    // KHOA data.go.kr XML 응답 → JSON 변환
-    // 구조: <response><header>...</header><body><items><item>...</item></items></body></response>
-    private fun khoaXmlToJson(xml: String): String = try {
+    // 공통 XML 파싱: <response><header>…</header><body><items><item>…</item></items></body></response>
+    // valueSerializer 로 값 직렬화 방식을 주입받아 KHOA/KASI 양쪽에서 재사용
+    private fun xmlToJson(xml: String, valueSerializer: (String?) -> String): String = try {
         val parser = android.util.Xml.newPullParser()
         parser.setInput(xml.reader())
 
@@ -165,7 +170,7 @@ object NetworkModule {
             append("{\"header\":{")
             header.entries.forEachIndexed { i, (k, v) ->
                 if (i > 0) append(',')
-                append("\"$k\":${toJsonVal(v)}")
+                append("\"$k\":${valueSerializer(v)}")
             }
             append("},\"body\":{\"items\":{\"item\":[")
             items.forEachIndexed { i, item ->
@@ -173,17 +178,26 @@ object NetworkModule {
                 append('{')
                 item.entries.forEachIndexed { j, (k, v) ->
                     if (j > 0) append(',')
-                    append("\"$k\":${toJsonVal(v)}")
+                    append("\"$k\":${valueSerializer(v)}")
                 }
                 append('}')
             }
             append("]}")
-            bodyExt.forEach { (k, v) -> append(",\"$k\":${toJsonVal(v)}") }
+            bodyExt.forEach { (k, v) -> append(",\"$k\":${valueSerializer(v)}") }
             append("}}")
         }
     } catch (e: Exception) {
         Log.e("XmlConvert", "failed: ${e.message}")
         "{}"
+    }
+
+    // KHOA: 숫자는 JSON number 로, 선행 0 코드값은 문자열로
+    private fun khoaXmlToJson(xml: String) = xmlToJson(xml) { toJsonVal(it) }
+
+    // KASI: 모든 값을 문자열로 유지 (일출/일몰 "1957" 등이 숫자로 변환되면 Moshi 파싱 실패)
+    private fun kasiXmlToJson(xml: String) = xmlToJson(xml) { s ->
+        if (s == null) "null"
+        else "\"${s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "")}\""
     }
 
     private fun toJsonVal(s: String?): String {

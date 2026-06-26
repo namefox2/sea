@@ -5,6 +5,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.koretide.app.domain.model.TideData
 import com.koretide.app.domain.model.WindData
+import com.koretide.app.domain.model.SunTimes
+import com.koretide.app.domain.usecase.GetRenderSunTimesUseCase
 import com.koretide.app.domain.usecase.GetTideUseCase
 import com.koretide.app.domain.usecase.GetWindUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -20,7 +22,8 @@ import javax.inject.Inject
 @HiltViewModel
 class TideWatchViewModel @Inject constructor(
     private val getTideUseCase: GetTideUseCase,
-    private val getWindUseCase: GetWindUseCase
+    private val getWindUseCase: GetWindUseCase,
+    private val getRenderSunTimesUseCase: GetRenderSunTimesUseCase
 ) : ViewModel() {
 
     private val _tideData = MutableStateFlow<TideData?>(null)
@@ -28,6 +31,9 @@ class TideWatchViewModel @Inject constructor(
 
     private val _windData = MutableStateFlow<WindData?>(null)
     val windData: StateFlow<WindData?> = _windData.asStateFlow()
+
+    private val _sunTimes = MutableStateFlow<SunTimes?>(null)
+    val sunTimes: StateFlow<SunTimes?> = _sunTimes.asStateFlow()
 
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
@@ -48,6 +54,10 @@ class TideWatchViewModel @Inject constructor(
         if (stationCode != currentStation) {
             lastPollTime = 0L
             currentStation = stationCode
+            viewModelScope.launch {
+                try { _sunTimes.value = getRenderSunTimesUseCase(lat, lng) }
+                catch (e: Exception) { Log.w(TAG, "SunTimes fetch failed", e) }
+            }
         }
         pollJob?.cancel()
         pollJob = viewModelScope.launch {

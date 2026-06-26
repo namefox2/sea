@@ -231,6 +231,13 @@ class TideWatchFragment : Fragment() {
             }
         }
 
+        collectFlow(viewModel.sunTimes) { times ->
+            val b = _binding ?: return@collectFlow
+            if (times != null) {
+                b.tideWatchView.setSunTimes(times.sunriseHour, times.sunsetHour, times.moonriseHour, times.moonsetHour)
+            }
+        }
+
         collectFlow(viewModel.tideData) { data ->
             val b = _binding ?: return@collectFlow
             if (data != null && !isImmersivePreset) {

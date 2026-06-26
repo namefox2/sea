@@ -45,6 +45,11 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
     @Volatile var centerLightInView = false
     // When non-null: replaces lutLight after LUT+tint (use for themed 윤슬 color)
     @Volatile var lightColorOverride: FloatArray? = null
+    // Real sun/moon times from KASI API — only used when useDefaultSun=false (station mode)
+    @Volatile var sunriseHour  = 6.0f
+    @Volatile var sunsetHour   = 18.0f
+    @Volatile var moonriseHour = -1f   // < 0 = no data
+    @Volatile var moonsetHour  = -1f   // cross-midnight-adjusted (e.g. 25.48 for 01:29 next day)
 
     // ── GL state ──────────────────────────────────────────────────────────────
     private var startMs = 0L
@@ -238,7 +243,8 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
             lightDir[2] = zComp / len
         }
 
-        sampleSkyLut(hour)      // writes into lutHorizon/Zenith/Light/Ambient/isDark members
+        // Station mode: map clock hour → solar-normalized LUT hour so colors match real sunrise/sunset
+        sampleSkyLut(if (useDefaultSun) hour else toSolarLutHour(hour))
 
         // Blend theme seasonal tint into LUT result (LUT drives time-of-day, theme adds seasonal flavor)
         val tint = 0.25f
@@ -371,13 +377,61 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         for (j in 0..2) lutAmbient[j] = a[j + 11] + (b[j + 11] - a[j + 11]) * tf
     }
 
-    // Write sun direction into pre-allocated lightDir member (no heap allocation)
+    // Write sun/moon direction into pre-allocated lightDir member (no heap allocation)
     private fun computeLightDir(hour: Float) {
-        val hourAngle = ((hour - 6f) / 12f) * PI.toFloat()
-        val elevation = (sin(hourAngle.toDouble()).toFloat() * 0.8f + 0.1f).coerceAtLeast(0.05f)
-        val azimuth   = cos(hourAngle.toDouble()).toFloat()
-        val len = sqrt((azimuth * azimuth + elevation * elevation + 0.36f).toDouble()).toFloat()
-        lightDir[0] = azimuth / len; lightDir[1] = elevation / len; lightDir[2] = -0.6f / len
+        if (useDefaultSun) {
+            // Theme mode: hardcoded sunrise=6 sunset=18 so theme hours look correct
+            val hourAngle = ((hour - 6f) / 12f) * PI.toFloat()
+            val elevation = (sin(hourAngle.toDouble()).toFloat() * 0.8f + 0.1f).coerceAtLeast(0.05f)
+            val azimuth   = cos(hourAngle.toDouble()).toFloat()
+            val len = sqrt((azimuth * azimuth + elevation * elevation + 0.36f).toDouble()).toFloat()
+            lightDir[0] = azimuth / len; lightDir[1] = elevation / len; lightDir[2] = -0.6f / len
+            return
+        }
+        // Station mode: real sun/moon arc from KASI API times
+        val isDay = hour in sunriseHour..sunsetHour
+        if (isDay) {
+            val dayFrac   = (hour - sunriseHour) / (sunsetHour - sunriseHour).coerceAtLeast(0.1f)
+            val hourAngle = (dayFrac * PI).toFloat()
+            val elevation = (sin(hourAngle.toDouble()).toFloat() * 0.8f + 0.1f).coerceAtLeast(0.05f)
+            val azimuth   = cos(hourAngle.toDouble()).toFloat()
+            val len = sqrt((azimuth * azimuth + elevation * elevation + 0.36f).toDouble()).toFloat()
+            lightDir[0] = azimuth / len; lightDir[1] = elevation / len; lightDir[2] = -0.6f / len
+        } else {
+            val moonFrac  = moonArcFraction(hour).coerceIn(0f, 1f)
+            val hourAngle = (moonFrac * PI).toFloat()
+            val elevation = (sin(hourAngle.toDouble()).toFloat() * 0.7f + 0.05f).coerceAtLeast(0.02f)
+            val azimuth   = cos(hourAngle.toDouble()).toFloat()
+            val len = sqrt((azimuth * azimuth + elevation * elevation + 0.36f).toDouble()).toFloat()
+            lightDir[0] = azimuth / len; lightDir[1] = elevation / len; lightDir[2] = -0.6f / len
+        }
+    }
+
+    // 태양 정규화 LUT 시간: [일출, 일몰] → [6, 18], 나머지는 선형 매핑
+    private fun toSolarLutHour(clockHour: Float): Float {
+        val rise = sunriseHour; val set = sunsetHour
+        return when {
+            clockHour < rise -> clockHour / rise.coerceAtLeast(0.1f) * 6f
+            clockHour <= set -> (clockHour - rise) / (set - rise).coerceAtLeast(0.1f) * 12f + 6f
+            else             -> 18f + (clockHour - set) / (24f - set).coerceAtLeast(0.1f) * 6f
+        }
+    }
+
+    // 달 호(arc)에서의 0..1 위치. 자정을 넘는 월몰은 moonsetHour > 24 로 전달됨.
+    private fun moonArcFraction(hour: Float): Float {
+        val mr = moonriseHour; val ms = moonsetHour
+        if (mr < 0f || ms < 0f) {
+            // 폴백: 태양 정오 반대편을 피크로 하는 단순 호
+            val solarNoon = (sunriseHour + sunsetHour) / 2f
+            val moonMid   = (solarNoon + 12f) % 24f
+            val dist      = ((hour - moonMid + 36f) % 24f) - 12f   // [-12, 12]
+            return 1f - (kotlin.math.abs(dist) / 12f)
+        }
+        // ms > 24 이면 자정을 넘는 월몰 (예: 25.48 = 다음날 01:29)
+        // 자정 이후 월몰 전 시간대는 hour+24 로 변환해 arc 범위 [mr, ms] 안에 포함
+        val adjHour = if (ms > 24f && hour < ms - 24f) hour + 24f else hour
+        return if (adjHour < mr || adjHour > ms) -0.05f
+        else (adjHour - mr) / (ms - mr)
     }
 
     // ── Normal map ────────────────────────────────────────────────────────────
