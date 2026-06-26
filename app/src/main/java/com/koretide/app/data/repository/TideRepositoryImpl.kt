@@ -99,18 +99,22 @@ class TideRepositoryImpl @Inject constructor(
     // 개별 obsCode 병렬 호출은 OkHttp maxRequestsPerHost=5 기본값에 막혀 ~6초 소요
     override suspend fun getBatchRecentLevels(): List<RecentTideLevel> {
         val date = SimpleDateFormat("yyyyMMdd", Locale.KOREA).format(Date())
-        Log.d(TAG, "▶ getBatchRecentLevels date=$date (단일 호출, numOfRows=200)")
+        Log.d(TAG, "▶ getBatchRecentLevels date=$date (단일 호출, numOfRows=1000)")
         val t0 = System.currentTimeMillis()
 
         val raw = khoaDataApi.getTideRecent(
             serviceKey = apiKey,
             obsCode    = null,
             date       = date,
-            numOfRows  = 200
+            numOfRows  = 1000
         ).body?.items?.item.orEmpty()
 
+        // API returns time-series rows per station — keep only the latest row per station
         val result = raw
             .filter { it.lat != null && it.lon != null && (it.tideLevel != null || it.windSpeed != null) }
+            .groupBy { it.stationName ?: "${it.lat}_${it.lon}" }
+            .values
+            .map { group -> group.maxByOrNull { it.obsrvnDt ?: "" }!! }
             .map { RecentTideLevel(it.lat!!, it.lon!!, it.tideLevel?.toInt(), it.windSpeed) }
 
         Log.d(TAG, "  완료 ${System.currentTimeMillis() - t0}ms  raw=${raw.size}  valid=${result.size}")

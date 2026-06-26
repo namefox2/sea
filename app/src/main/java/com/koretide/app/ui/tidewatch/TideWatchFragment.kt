@@ -147,14 +147,18 @@ class TideWatchFragment : Fragment() {
 
     private fun setupImmersiveButton() {
         binding.btnImmersive.setOnClickListener {
-            isImmersivePreset = true
+            // Note: isImmersivePreset intentionally NOT set here — keeps double-tap from
+            // calling restoreStationView() and changing slider values unexpectedly.
             cachedTidalRangeM = 5.5f
-            binding.tideWatchView.applyImmersivePreset()
+            // Set sliders first; their listeners may queue a mudflatExposure GL event
             binding.seekWind.progress       = 2
             binding.seekTide.progress       = 35
             binding.seekTidalRange.progress = 55
             binding.tvTidalRange.text       = "5.5m"
-            // Clear station info overlay so UI shows the neutral preset state
+            // Apply preset AFTER sliders so its GL events queue last and win.
+            // Sets useDefaultSun=true, defaultHour=noon, tide=35%, wind=2bft, mudflat=0.
+            binding.tideWatchView.applyImmersivePreset()
+            // Clear station info overlay
             binding.tvStationName.text      = ""
             binding.tvTideInfo.text         = ""
             binding.tvWindInfo.text         = ""

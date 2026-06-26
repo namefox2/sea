@@ -78,7 +78,7 @@ class TideWatchView @JvmOverloads constructor(
         }
     }
 
-    // Immersive preset: noon sun, bft-2 wind, 35% tide, ~5.5m tidal range feel.
+    // Reset preset: noon sun, bft-2 wind, 35% tide, clean sandy beach (no mudflat).
     // Does NOT override calibVisualMinZ/MaxZ so regional range stays correct.
     fun applyImmersivePreset() {
         queueEvent {
@@ -86,7 +86,7 @@ class TideWatchView @JvmOverloads constructor(
             renderer.defaultHour     = 12.0f
             renderer.tidePercent     = 0.35f
             renderer.windAmp         = 2f / 12f
-            renderer.mudflatExposure = 0.50f
+            renderer.mudflatExposure = 0f    // always clean beach regardless of region
         }
     }
 
