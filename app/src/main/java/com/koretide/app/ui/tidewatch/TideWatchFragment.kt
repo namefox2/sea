@@ -225,19 +225,11 @@ class TideWatchFragment : Fragment() {
             b.tideWatchView.setHasStation(station != null)
             if (station != null) {
                 b.tvStationName.text = station.name
-                // 폴링 완료 전 Detail에서 미리 받아둔 데이터로 즉시 표시
+                // Detail에서 받아둔 캐시가 있으면 선적재 → 즉시 표시 + 5분 폴링 지연
                 if (viewModel.tideData.value == null) {
-                    sharedViewModel.tideData.value?.let { applyTideData(b, it) }
-                }
-                if (viewModel.windData.value == null) {
-                    sharedViewModel.windData.value?.let { wind ->
-                        val waveBasedBft = wind.waveHeightM?.let { h ->
-                            (h * 2.0 + 1.0).coerceIn(0.0, 12.0).toInt()
-                        }
-                        val effectiveBft = if (waveBasedBft != null) maxOf(wind.beaufort, waveBasedBft) else wind.beaufort
-                        b.seekWind.progress = effectiveBft
-                        b.tideWatchView.windDirectionDeg = wind.directionDeg
-                    }
+                    val cachedTide = sharedViewModel.tideData.value
+                    val cachedWind = sharedViewModel.windData.value
+                    if (cachedTide != null) viewModel.preloadFromCache(cachedTide, cachedWind)
                 }
                 viewModel.startPolling(station.code, station.lat, station.lng)
             }
@@ -274,17 +266,16 @@ class TideWatchFragment : Fragment() {
     private fun applyTideData(b: FragmentTideWatchBinding, data: TideData) {
         cachedTidalRangeM = data.tidalRangeM
 
-        // Map the actual API water level (cm) to calibrated T using historical regional extremes.
-        // This ensures 강화 간조=80cm→갯벌, 강화 만조=870cm→바다가득, regardless of daily range.
-        val calibratedT = cachedCalibration.calibratedT(data.currentLevel)
-        val sliderPct   = (calibratedT * 100).toInt().coerceIn(0, 100)
-        b.seekTide.progress = sliderPct
-        b.tvTidePct.text    = "$sliderPct%"
+        // Display % matches Detail screen (today's relative position)
+        val displayPct = (data.tidePercent * 100).toInt().coerceIn(0, 100)
+        b.seekTide.progress = displayPct
+        b.tvTidePct.text    = "$displayPct%"
 
-        // 조차 slider: display-only — shows today's actual tidal range from API
         b.seekTidalRange.progress = (data.tidalRangeM * 10).toInt().coerceIn(0, 100)
         b.tvTidalRange.text = "%.1fm".format(data.tidalRangeM)
 
+        // 3D scene uses historical regional calibration for visual accuracy
+        val calibratedT = cachedCalibration.calibratedT(data.currentLevel)
         b.tideWatchView.setTide(calibratedT)
         b.tideWatchView.setMudflatExposure(
             computeMudflatExposure(calibratedT, data.tidalRangeM, cachedRegion)
