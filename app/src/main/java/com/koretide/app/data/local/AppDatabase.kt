@@ -9,7 +9,7 @@ import com.koretide.app.data.local.entity.TideRecordEntity
 
 @Database(
     entities = [StationEntity::class, TideRecordEntity::class],
-    version = 1,
+    version = 2,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
