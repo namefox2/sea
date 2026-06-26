@@ -4,25 +4,28 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.koretide.app.domain.model.StationRegion
+import com.koretide.app.domain.model.TideData
 import com.koretide.app.domain.usecase.GetAllStationsUseCase
+import com.koretide.app.domain.usecase.GetTideUseCase
 import com.koretide.app.domain.usecase.SearchStationsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.update
 import javax.inject.Inject
 
 @HiltViewModel
 class SearchViewModel @Inject constructor(
     private val searchStationsUseCase: SearchStationsUseCase,
-    private val getAllStationsUseCase: GetAllStationsUseCase
+    private val getAllStationsUseCase: GetAllStationsUseCase,
+    private val getTideUseCase: GetTideUseCase
 ) : ViewModel() {
 
     private val _query = MutableStateFlow("")
@@ -37,21 +40,23 @@ class SearchViewModel @Inject constructor(
     private val _loadError = MutableStateFlow<String?>(null)
     val loadError: StateFlow<String?> = _loadError.asStateFlow()
 
+    private val _tideMap = MutableStateFlow<Map<String, TideData>>(emptyMap())
+
     @OptIn(ExperimentalCoroutinesApi::class)
     private val stations = combine(_query, _selectedRegion) { q, r -> Pair(q, r) }
         .flatMapLatest { (q, r) -> searchStationsUseCase(q, r) }
 
-    // 즉시 emit — API 호출 없이 DB 데이터만 사용
-    // 조위/바람 실시간 정보는 지역 선택 후 TideWatchFragment에서 로드
-    val stationItems: StateFlow<List<StationAdapter.StationItem>> = stations
-        .map { list ->
+    val stationItems: StateFlow<List<StationAdapter.StationItem>> =
+        combine(stations, _tideMap) { list, tideMap ->
             list.map { station ->
+                val tide = tideMap[station.code]
                 StationAdapter.StationItem(
-                    station = station,
-                    tidePercent = station.lastTideLevel?.let { (it.toFloat() / 600f).coerceIn(0f, 1f) },
-                    tideStatus = null,
-                    windBft = null,
-                    waterLevelCm = station.lastTideLevel
+                    station      = station,
+                    tidePercent  = tide?.tidePercent
+                        ?: station.lastTideLevel?.let { (it.toFloat() / 600f).coerceIn(0f, 1f) },
+                    tideStatus   = tide?.tideStatus,
+                    windBft      = null,
+                    waterLevelCm = tide?.currentLevel ?: station.lastTideLevel
                 )
             }
         }
@@ -59,6 +64,7 @@ class SearchViewModel @Inject constructor(
 
     init {
         refreshStations()
+        loadTideDataForAll()
     }
 
     fun setQuery(query: String) {
@@ -80,6 +86,23 @@ class SearchViewModel @Inject constructor(
                 _loadError.value = "자료를 가져오는데 실패했습니다"
             } finally {
                 _isLoading.value = false
+            }
+        }
+    }
+
+    private fun loadTideDataForAll() {
+        viewModelScope.launch {
+            stations.collect { stationList ->
+                stationList.forEach { station ->
+                    if (_tideMap.value.containsKey(station.code)) return@forEach
+                    launch {
+                        runCatching { getTideUseCase(station.code) }
+                            .onSuccess { tideData ->
+                                _tideMap.update { it + (station.code to tideData) }
+                            }
+                            .onFailure { Log.w("SearchViewModel", "tide fetch failed: ${station.code}") }
+                    }
+                }
             }
         }
     }
