@@ -53,13 +53,18 @@ class IndexFragment : Fragment() {
 
         binding.btnIndexInfo.setOnClickListener { showIndexInfoDialog() }
         binding.btnGoWatch.setOnClickListener {
-            sharedViewModel.requestTabNavigation(R.id.navigation_watch)
+            viewModel.requestWatchForCurrentRegion()
         }
         binding.btnBackFromRegion.setOnClickListener { viewModel.navigateBack() }
         binding.btnBackFromForecast.setOnClickListener { viewModel.navigateBack() }
 
         collectFlow(sharedViewModel.selectedStation) { station ->
             viewModel.loadTypeList(station, sharedViewModel.tideData.value)
+        }
+
+        collectFlow(viewModel.watchStation) { station ->
+            if (station != null) sharedViewModel.selectStation(station)
+            sharedViewModel.requestTabNavigation(R.id.navigation_watch)
         }
 
         collectFlow(viewModel.uiState) { state ->

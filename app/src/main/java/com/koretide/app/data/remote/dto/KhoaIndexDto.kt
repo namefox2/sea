@@ -22,15 +22,15 @@ data class KhoaIndexItems(
 
 @JsonClass(generateAdapter = true)
 data class KhoaIndexItem(
-    @Json(name = "obs_post_nm") val obsPostNm: String?,   // 관측소/해수욕장명
-    @Json(name = "obs_code")    val obsCode: String?,      // 관측소코드
-    @Json(name = "fcst_date")   val fcstDate: String?,     // 예보일자 YYYYMMDD
-    @Json(name = "fcst_grade")  val fcstGrade: String?,    // 예보등급 A-E
-    @Json(name = "fcst_value")  val fcstValue: Float?,     // 예보값 0-100
-    @Json(name = "wt")          val waterTemp: String?,    // 수온 °C
-    @Json(name = "at")          val airTemp: String?,      // 기온 °C
-    @Json(name = "wh")          val waveHeight: String?,   // 파고 m
-    @Json(name = "ws")          val windSpeed: String?,    // 풍속 m/s
-    @Json(name = "wd")          val windDir: String?,      // 풍향 deg
-    @Json(name = "ww")          val weather: String?       // 날씨
+    @Json(name = "bbchNm")        val bbchNm: String?,        // 해수욕장명
+    @Json(name = "lat")           val lat: Double?,           // 위도
+    @Json(name = "lot")           val lot: Double?,           // 경도
+    @Json(name = "predcYmd")      val predcYmd: String?,      // 예보일자 (yyyy-MM-dd)
+    @Json(name = "predcNoonSeCd") val predcNoonSeCd: String?, // 오전/오후
+    @Json(name = "totalIndex")    val totalIndex: String?,    // 종합지수 (매우좋음/좋음/보통/나쁨/매우나쁨)
+    @Json(name = "maxWvhgt")      val maxWvhgt: String?,      // 최대파고 m
+    @Json(name = "avgWtem")       val avgWtem: String?,       // 평균수온 °C
+    @Json(name = "avgArtmp")      val avgArtmp: String?,      // 평균기온 °C
+    @Json(name = "maxWspd")       val maxWspd: String?,       // 최대풍속 m/s
+    @Json(name = "opnStat")       val opnStat: String?        // 개장상태 (개장/폐장/비개장)
 )

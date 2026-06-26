@@ -52,6 +52,11 @@ class StationRepositoryImpl @Inject constructor(
     override suspend fun getStation(code: String): Station? =
         stationDao.getStation(code)?.toDomain()
 
+    override suspend fun getNearestStation(lat: Double, lon: Double): Station? =
+        stationDao.getAllStationsSnapshot()
+            .minByOrNull { (it.lat - lat) * (it.lat - lat) + (it.lng - lon) * (it.lng - lon) }
+            ?.toDomain()
+
     // 좌표 기반 지역 판별
     private fun regionFromCoords(lat: Double, lon: Double): StationRegion = when {
         lat < 34.1                   -> StationRegion.JEJU   // 제주 (위도 34.1° 미만)

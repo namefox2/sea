@@ -35,4 +35,7 @@ interface StationDao {
 
     @Query("SELECT COUNT(*) FROM stations")
     suspend fun count(): Int
+
+    @Query("SELECT * FROM stations")
+    suspend fun getAllStationsSnapshot(): List<StationEntity>
 }

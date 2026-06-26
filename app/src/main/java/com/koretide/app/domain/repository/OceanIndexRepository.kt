@@ -10,6 +10,8 @@ interface OceanIndexRepository {
         date: String,
         region: String?,
         stationCode: String? = null,
+        lat: Double? = null,
+        lon: Double? = null,
         tideData: TideData? = null
     ): List<OceanIndex>
 

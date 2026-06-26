@@ -9,4 +9,5 @@ interface StationRepository {
     fun getAllStations(): Flow<List<Station>>
     suspend fun refreshStations()
     suspend fun getStation(code: String): Station?
+    suspend fun getNearestStation(lat: Double, lon: Double): Station?
 }

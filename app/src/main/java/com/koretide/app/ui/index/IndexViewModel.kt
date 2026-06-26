@@ -2,6 +2,7 @@ package com.koretide.app.ui.index
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.koretide.app.data.BeachPlaceData
 import com.koretide.app.domain.model.DayForecast
 import com.koretide.app.domain.model.IndexType
 import com.koretide.app.domain.model.OceanIndex
@@ -9,10 +10,14 @@ import com.koretide.app.domain.model.Station
 import com.koretide.app.domain.model.StationRegion
 import com.koretide.app.domain.model.TideData
 import com.koretide.app.domain.repository.OceanIndexRepository
+import com.koretide.app.domain.usecase.GetNearestStationUseCase
 import com.koretide.app.domain.usecase.GetOceanIndicesUseCase
 import com.koretide.app.domain.usecase.GetSevenDayForecastUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -55,15 +60,20 @@ sealed class IndexNav {
 class IndexViewModel @Inject constructor(
     private val getOceanIndices: GetOceanIndicesUseCase,
     private val getSevenDayForecast: GetSevenDayForecastUseCase,
-    private val indexRepo: OceanIndexRepository
+    private val indexRepo: OceanIndexRepository,
+    private val getNearestStation: GetNearestStationUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<IndexUiState>(IndexUiState.Loading)
     val uiState = _uiState.asStateFlow()
 
+    private val _watchStation = MutableSharedFlow<Station?>(extraBufferCapacity = 1)
+    val watchStation: SharedFlow<Station?> = _watchStation.asSharedFlow()
+
     private val navStack = mutableListOf<IndexNav>(IndexNav.TypeList)
     private var cachedTypeList: IndexUiState.TypeList? = null
     private var cachedRegionList: IndexUiState.RegionList? = null
+    private var currentForecastRegion: StationRegion? = null
 
     fun loadTypeList(station: Station?, tideData: TideData?) {
         navStack.clear()
@@ -75,7 +85,7 @@ class IndexViewModel @Inject constructor(
             try {
                 val gradeByType: Map<IndexType, OceanIndex?> = if (station != null) {
                     val region = station.region.representativeName()
-                    val indices = getOceanIndices(region, station.code, tideData)
+                    val indices = getOceanIndices(region, station.code, station.lat, station.lng, tideData)
                     indices.associate { it.type to it }
                 } else {
                     emptyMap()
@@ -110,11 +120,21 @@ class IndexViewModel @Inject constructor(
 
     fun selectRegion(type: IndexType, region: StationRegion) {
         navStack.add(IndexNav.Forecast(type, region))
+        currentForecastRegion = region
 
         viewModelScope.launch {
             _uiState.value = IndexUiState.Loading
             val forecast = getSevenDayForecast(region.displayName, null)
             _uiState.value = IndexUiState.Forecast(type, region, forecast)
+        }
+    }
+
+    fun requestWatchForCurrentRegion() {
+        val region = currentForecastRegion ?: return
+        viewModelScope.launch {
+            val beach = BeachPlaceData.representativeFor(region)
+            val station = if (beach != null) getNearestStation(beach.lat, beach.lon) else null
+            _watchStation.emit(station)
         }
     }
 

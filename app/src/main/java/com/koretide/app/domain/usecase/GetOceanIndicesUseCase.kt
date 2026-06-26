@@ -14,9 +14,11 @@ class GetOceanIndicesUseCase @Inject constructor(
     suspend operator fun invoke(
         region: String?,
         stationCode: String? = null,
+        lat: Double? = null,
+        lon: Double? = null,
         tideData: TideData? = null
     ): List<OceanIndex> {
         val date = SimpleDateFormat("yyyyMMdd", Locale.KOREA).format(Date())
-        return repo.getAllIndices(date, region, stationCode, tideData)
+        return repo.getAllIndices(date, region, stationCode, lat, lon, tideData)
     }
 }
