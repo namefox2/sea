@@ -137,6 +137,20 @@ class SearchFragment : Fragment() {
                 binding.recyclerStations.gone()
             }
         }
+        // 선택된 관측소의 조위 상태를 리스트에 반영 (지역 옆 밀물/썰물 표시)
+        collectFlow(sharedViewModel.tideData) { tideData ->
+            tideData ?: return@collectFlow
+            val current = adapter.currentList
+            val idx = current.indexOfFirst { it.station.code == tideData.stationCode }
+            if (idx < 0) return@collectFlow
+            val updated = current.toMutableList()
+            updated[idx] = updated[idx].copy(
+                tideStatus   = tideData.tideStatus,
+                tidePercent  = tideData.tidePercent,
+                waterLevelCm = tideData.currentLevel
+            )
+            adapter.submitList(updated)
+        }
     }
 
     private var currentTooltipStation: Station? = null
