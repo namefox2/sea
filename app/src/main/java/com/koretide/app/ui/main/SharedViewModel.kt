@@ -19,6 +19,7 @@ class SharedViewModel @Inject constructor() : ViewModel() {
 
     private val _tideData = MutableStateFlow<TideData?>(null)
     val tideData: StateFlow<TideData?> = _tideData.asStateFlow()
+    private var tideDataStation: String? = null
 
     private val _windData = MutableStateFlow<WindData?>(null)
     val windData: StateFlow<WindData?> = _windData.asStateFlow()
@@ -36,9 +37,13 @@ class SharedViewModel @Inject constructor() : ViewModel() {
         _selectedStation.value = station
     }
 
-    fun updateTideData(data: TideData) {
+    fun updateTideData(data: TideData, forStation: String? = null) {
+        tideDataStation = forStation ?: _selectedStation.value?.code
         _tideData.value = data
     }
+
+    fun cachedTideFor(stationCode: String): TideData? =
+        _tideData.value?.takeIf { tideDataStation == stationCode }
 
     fun updateWindData(data: WindData) {
         _windData.value = data

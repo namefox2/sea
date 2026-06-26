@@ -8,8 +8,6 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.SeekBar
-import android.widget.Toast
-import com.koretide.app.BuildConfig
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.fragment.app.viewModels
@@ -75,7 +73,6 @@ class TideWatchFragment : Fragment() {
         setupSliders()
         setupSound()
         setupImmersiveButton()
-        setupDebugButton()
 
         // Tap background to toggle immersive; slider panel consumes its own touches
         binding.root.setOnClickListener { toggleImmersive() }
@@ -145,15 +142,6 @@ class TideWatchFragment : Fragment() {
                 .getSharedPreferences(PREFS_WATCH, Context.MODE_PRIVATE)
                 .edit().putBoolean(KEY_WAVE_SOUND, isChecked).apply()
             if (isChecked) oceanSound.start() else oceanSound.stop()
-        }
-    }
-
-    private fun setupDebugButton() {
-        if (!BuildConfig.DEBUG) return
-        binding.btnDebugDump.visibility = View.VISIBLE
-        binding.btnDebugDump.setOnClickListener {
-            binding.tideWatchView.requestDebugDump()
-            Toast.makeText(requireContext(), "Logcat → tag:OceanDebug", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -232,11 +220,9 @@ class TideWatchFragment : Fragment() {
             if (station != null) {
                 b.tvStationName.text = station.name
                 // Detail에서 받아둔 캐시가 있으면 선적재 → 즉시 표시 + 5분 폴링 지연
-                if (viewModel.tideData.value == null) {
-                    val cachedTide = sharedViewModel.tideData.value
-                    val cachedWind = sharedViewModel.windData.value
-                    if (cachedTide != null) viewModel.preloadFromCache(cachedTide, cachedWind)
-                }
+                val cachedTide = sharedViewModel.cachedTideFor(station.code)
+                val cachedWind = sharedViewModel.windData.value
+                if (cachedTide != null) viewModel.preloadFromCache(cachedTide, cachedWind)
                 viewModel.startPolling(station.code, station.lat, station.lng)
             }
         }
@@ -324,7 +310,7 @@ class TideWatchFragment : Fragment() {
         _binding?.tideWatchView?.onResume()
         if (soundEnabled) oceanSound.start()
         val station = sharedViewModel.selectedStation.value
-        if (station != null) {
+        if (station != null && !viewModel.isPolling()) {
             viewModel.startPolling(station.code, station.lat, station.lng)
         }
     }

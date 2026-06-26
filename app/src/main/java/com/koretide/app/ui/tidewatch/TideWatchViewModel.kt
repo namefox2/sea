@@ -34,6 +34,9 @@ class TideWatchViewModel @Inject constructor(
 
     private var pollJob: Job? = null
     private var lastPollTime: Long = 0L
+    private var currentStation: String? = null
+
+    fun isPolling(): Boolean = pollJob?.isActive == true
 
     fun preloadFromCache(tide: TideData, wind: WindData?) {
         if (wind != null) _windData.value = wind
@@ -42,6 +45,10 @@ class TideWatchViewModel @Inject constructor(
     }
 
     fun startPolling(stationCode: String, lat: Double, lng: Double) {
+        if (stationCode != currentStation) {
+            lastPollTime = 0L
+            currentStation = stationCode
+        }
         pollJob?.cancel()
         pollJob = viewModelScope.launch {
             while (isActive) {
@@ -53,9 +60,9 @@ class TideWatchViewModel @Inject constructor(
                 try {
                     val tide = getTideUseCase(stationCode)
                     _tideData.value = tide
-                    lastPollTime = System.currentTimeMillis()
                     val wind = getWindUseCase(lat, lng, stationCode)
                     _windData.value = wind
+                    lastPollTime = System.currentTimeMillis()
                 } catch (e: Exception) {
                     Log.w(TAG, "Poll failed for $stationCode", e)
                 } finally {
