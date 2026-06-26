@@ -16,6 +16,7 @@ import com.koretide.app.R
 import com.koretide.app.databinding.FragmentIndexBinding
 import com.koretide.app.domain.model.IndexGrade
 import com.koretide.app.domain.model.IndexType
+import com.koretide.app.domain.model.StationRegion
 import com.koretide.app.ui.main.SharedViewModel
 import com.koretide.app.util.collectFlow
 import dagger.hilt.android.AndroidEntryPoint
@@ -56,8 +57,8 @@ class IndexFragment : Fragment() {
         binding.btnBackFromForecast.setOnClickListener { viewModel.navigateBack() }
         binding.btnBackFromBeach.setOnClickListener { viewModel.navigateBack() }
 
-        collectFlow(sharedViewModel.selectedStation) { station ->
-            viewModel.loadTypeList(station, sharedViewModel.tideData.value)
+        collectFlow(sharedViewModel.selectedStation) {
+            if (viewModel.isAtRoot()) viewModel.loadTypeList()
         }
 
         collectFlow(viewModel.watchStation) { station ->
@@ -69,7 +70,7 @@ class IndexFragment : Fragment() {
             backCallback.isEnabled = !viewModel.isAtRoot()
             when (state) {
                 is IndexUiState.Loading    -> showLoading()
-                is IndexUiState.TypeList   -> showTypeList(state)
+                is IndexUiState.TypeList   -> showTypeList()
                 is IndexUiState.RegionList -> showRegionList(state)
                 is IndexUiState.BeachList  -> showBeachList(state)
                 is IndexUiState.Forecast   -> showForecast(state)
@@ -105,12 +106,10 @@ class IndexFragment : Fragment() {
 
     // ── Screen 1: TypeList ────────────────────────────────────────
 
-    private fun showTypeList(state: IndexUiState.TypeList) {
+    private fun showTypeList() {
         showScreen(1)
         binding.progressTypeList.isVisible = false
-
-        binding.tvStationHint.text = state.stationName?.let { "📍 $it 기준" }
-            ?: "관측소를 선택하면 해당 지역 지수를 표시합니다"
+        binding.tvStationHint.isVisible = false
 
         binding.containerTypeList.removeAllViews()
         for (type in IndexType.values()) {
@@ -119,18 +118,7 @@ class IndexFragment : Fragment() {
 
             card.findViewById<TextView>(R.id.tvTypeEmoji).text = type.emoji
             card.findViewById<TextView>(R.id.tvTypeName).text  = type.displayName
-
-            val index = state.gradeByType[type]
-            val grade = index?.grade
-            val tvGrade = card.findViewById<TextView>(R.id.tvTypeGrade)
-            if (grade != null && index.isAvailable) {
-                tvGrade.isVisible = true
-                tvGrade.text = "${grade.emoji} Lv.${grade.level}"
-                tvGrade.setTextColor(ContextCompat.getColor(requireContext(), gradeTextColor(grade)))
-                tvGrade.setBackgroundResource(gradeBg(grade))
-            } else {
-                tvGrade.isVisible = false
-            }
+            card.findViewById<TextView>(R.id.tvTypeGrade).isVisible = false
 
             card.setOnClickListener { viewModel.selectType(type) }
             binding.containerTypeList.addView(card)
@@ -145,23 +133,12 @@ class IndexFragment : Fragment() {
         binding.tvRegionListTitle.text = "${state.type.emoji} ${state.type.displayName}"
 
         binding.containerRegionList.removeAllViews()
-        for ((region, index) in state.grades) {
+        for (region in StationRegion.values()) {
             val row = LayoutInflater.from(requireContext())
                 .inflate(R.layout.item_region_grade_row, binding.containerRegionList, false)
 
             row.findViewById<TextView>(R.id.tvRegionName).text = region.displayName
-
-            val grade = index.grade
-            val tvGrade = row.findViewById<TextView>(R.id.tvRegionGrade)
-            if (grade != null) {
-                tvGrade.text = "${grade.emoji} Lv.${grade.level} ${grade.label}"
-                tvGrade.setTextColor(ContextCompat.getColor(requireContext(), gradeTextColor(grade)))
-                tvGrade.setBackgroundResource(gradeBg(grade))
-            } else {
-                tvGrade.text = "정보 없음"
-                tvGrade.setTextColor(ContextCompat.getColor(requireContext(), android.R.color.darker_gray))
-                tvGrade.background = null
-            }
+            row.findViewById<TextView>(R.id.tvRegionGrade).isVisible = false
 
             row.setOnClickListener { viewModel.selectRegion(state.type, region) }
             binding.containerRegionList.addView(row)
