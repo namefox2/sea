@@ -38,8 +38,7 @@ class WeatherRepositoryImpl @Inject constructor(
                 serviceKey = apiKey,
                 obsCode    = obsCode,
                 date       = date,
-                numOfRows  = 1,
-                include    = "lat,lot,obsrvnDt,wspd,wndrct,artmp,wtem"
+                numOfRows  = 1
             ).body?.items?.item.orEmpty()
 
             val item = items.lastOrNull()

@@ -30,8 +30,8 @@ class TideRepositoryImpl @Inject constructor(
         val date = SimpleDateFormat("yyyyMMdd", Locale.KOREA).format(Date())
         Log.d(TAG, "▶ getTideData station=$stationCode date=$date")
 
-        val current = khoaDataApi.getTideRecent(apiKey, stationCode, date, include = "obsrvnDt,bscTdlvHgt")
-        val table   = khoaDataApi.getTideForecast(apiKey, stationCode, date, include = "tphTime,tphLevel,hlCode")
+        val current = khoaDataApi.getTideRecent(apiKey, stationCode, date)
+        val table   = khoaDataApi.getTideForecast(apiKey, stationCode, date)
 
         val dataItems  = current.body?.items?.item ?: emptyList()
         val tableItems = table.body?.items?.item   ?: emptyList()
@@ -106,8 +106,7 @@ class TideRepositoryImpl @Inject constructor(
             serviceKey = apiKey,
             obsCode    = null,
             date       = date,
-            numOfRows  = 200,
-            include    = "lat,lot,bscTdlvHgt,obsrvnDt"
+            numOfRows  = 200
         ).body?.items?.item.orEmpty()
 
         val result = raw

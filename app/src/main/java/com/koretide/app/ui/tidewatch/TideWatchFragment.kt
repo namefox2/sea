@@ -218,8 +218,6 @@ class TideWatchFragment : Fragment() {
         collectFlow(sharedViewModel.selectedStation) { station ->
             val b = _binding ?: return@collectFlow
             cachedRegion = station?.region
-            // Apply regional calibration immediately so the scene reflects the correct
-            // coast type while waiting for the first API response.
             cachedCalibration = TidalCalibration.forRegion(
                 station?.region ?: StationRegion.WEST
             )
@@ -227,6 +225,20 @@ class TideWatchFragment : Fragment() {
             b.tideWatchView.setHasStation(station != null)
             if (station != null) {
                 b.tvStationName.text = station.name
+                // 폴링 완료 전 Detail에서 미리 받아둔 데이터로 즉시 표시
+                if (viewModel.tideData.value == null) {
+                    sharedViewModel.tideData.value?.let { applyTideData(b, it) }
+                }
+                if (viewModel.windData.value == null) {
+                    sharedViewModel.windData.value?.let { wind ->
+                        val waveBasedBft = wind.waveHeightM?.let { h ->
+                            (h * 2.0 + 1.0).coerceIn(0.0, 12.0).toInt()
+                        }
+                        val effectiveBft = if (waveBasedBft != null) maxOf(wind.beaufort, waveBasedBft) else wind.beaufort
+                        b.seekWind.progress = effectiveBft
+                        b.tideWatchView.windDirectionDeg = wind.directionDeg
+                    }
+                }
                 viewModel.startPolling(station.code, station.lat, station.lng)
             }
         }

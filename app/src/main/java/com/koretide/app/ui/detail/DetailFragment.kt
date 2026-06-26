@@ -83,6 +83,7 @@ class DetailFragment : Fragment() {
                 is Result.Success -> {
                     b.progressBar.gone()
                     bindTideData(result.data)
+                    sharedViewModel.updateTideData(result.data)
                 }
                 is Result.Error -> {
                     b.progressBar.gone()
@@ -96,6 +97,7 @@ class DetailFragment : Fragment() {
             val b = _binding ?: return@collectFlow
             if (result is Result.Success) {
                 b.tvWind.text = "${result.data.beaufortName} (${result.data.beaufort}bft)"
+                sharedViewModel.updateWindData(result.data)
             }
         }
     }
