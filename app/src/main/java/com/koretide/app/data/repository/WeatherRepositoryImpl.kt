@@ -3,7 +3,6 @@ package com.koretide.app.data.repository
 import android.util.Log
 import com.koretide.app.BuildConfig
 import com.koretide.app.data.remote.KhoaDataApiService
-import com.koretide.app.data.remote.MockDataSource
 import com.koretide.app.data.remote.dto.KhoaTideRecentItem
 import com.koretide.app.data.remote.dto.KhoaWaveItem
 import com.koretide.app.domain.model.WindData
@@ -24,8 +23,6 @@ class WeatherRepositoryImpl @Inject constructor(
     private val apiKey get() = BuildConfig.KHOA_API_KEY
 
     override suspend fun getWindData(lat: Double, lng: Double, stationCode: String): WindData {
-        if (apiKey.isBlank()) return MockDataSource.mockWindData(stationCode)
-
         val date = SimpleDateFormat("yyyyMMdd", Locale.KOREA).format(Date())
 
         return try {
@@ -34,7 +31,7 @@ class WeatherRepositoryImpl @Inject constructor(
             val item = items.nearestTo(lat, lng)
             Log.d(TAG, "dtRecent wind nearest=${item?.stationName} wspd=${item?.windSpeed} wndrct=${item?.windDir}")
 
-            val speedMs = item?.windSpeed ?: return MockDataSource.mockWindData(stationCode)
+            val speedMs = item?.windSpeed ?: throw IllegalStateException("No wind speed data from nearest station")
             val dirDeg  = item.windDir ?: 225f
             val bft     = BeaufortConverter.toBft(speedMs)
 
@@ -47,8 +44,8 @@ class WeatherRepositoryImpl @Inject constructor(
 
             WindData(stationCode, speedMs, bft, dirDeg, BeaufortConverter.name(bft), waveHeightM)
         } catch (e: Exception) {
-            Log.w(TAG, "getWindData [$stationCode] failed → mock", e)
-            MockDataSource.mockWindData(stationCode)
+            Log.w(TAG, "getWindData [$stationCode] failed", e)
+            throw e
         }
     }
 

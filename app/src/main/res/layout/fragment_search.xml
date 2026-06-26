@@ -179,7 +179,8 @@
                     android:layout_height="wrap_content"
                     android:text="📊 지수"
                     android:textSize="13sp"
-                    android:layout_marginStart="8dp" />
+                    android:layout_marginStart="8dp"
+                    android:visibility="gone" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnTooltipDetail"

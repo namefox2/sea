@@ -101,11 +101,6 @@ class SearchFragment : Fragment() {
             dismissTooltip()
             safeNavigate { findNavController().navigate(R.id.action_global_to_detail) }
         }
-        binding.btnTooltipIndex.setOnClickListener {
-            val station = currentTooltipStation ?: return@setOnClickListener
-            dismissTooltip()
-            sharedViewModel.openIndexForStation(station)
-        }
         binding.btnTooltipWatch.setOnClickListener {
             val station = currentTooltipStation ?: return@setOnClickListener
             sharedViewModel.selectStation(station)

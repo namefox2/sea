@@ -46,9 +46,6 @@ class DetailFragment : Fragment() {
             sharedViewModel.requestTabNavigation(R.id.navigation_watch)
         }
 
-        binding.btnViewIndex.setOnClickListener {
-            sharedViewModel.requestTabNavigation(R.id.navigation_index)
-        }
     }
 
     private fun setupChart() {
