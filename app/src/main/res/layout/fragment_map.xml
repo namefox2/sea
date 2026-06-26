@@ -5,88 +5,48 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <!-- Filter chips row -->
-    <HorizontalScrollView
-        android:id="@+id/scrollActivityChips"
+    <!-- 카테고리 탭 + 지수보기 버튼 -->
+    <LinearLayout
+        android:id="@+id/topBar"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:scrollbars="none"
-        android:paddingStart="@dimen/spacing_md"
-        android:paddingVertical="@dimen/spacing_sm"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
         android:background="?android:attr/windowBackground"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toStartOf="@id/btnViewIndex">
+        app:layout_constraintEnd_toEndOf="parent">
 
-        <com.google.android.material.chip.ChipGroup
+        <com.google.android.material.tabs.TabLayout
+            android:id="@+id/tabActivities"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            app:tabMode="scrollable"
+            app:tabGravity="start"
+            app:tabPaddingStart="10dp"
+            app:tabPaddingEnd="10dp">
+
+            <com.google.android.material.tabs.TabItem android:text="전체" />
+            <com.google.android.material.tabs.TabItem android:text="관측소" />
+            <com.google.android.material.tabs.TabItem android:text="바다낚시" />
+            <com.google.android.material.tabs.TabItem android:text="서핑" />
+            <com.google.android.material.tabs.TabItem android:text="갯벌체험" />
+            <com.google.android.material.tabs.TabItem android:text="해수욕" />
+            <com.google.android.material.tabs.TabItem android:text="스킨스쿠버" />
+            <com.google.android.material.tabs.TabItem android:text="바다여행" />
+        </com.google.android.material.tabs.TabLayout>
+
+        <!-- 지수보기 button — shown when a non-관측소 category is active -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnViewIndex"
+            style="@style/Widget.MaterialComponents.Button.TextButton"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            app:singleSelection="true">
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chipActivityAll"
-                style="@style/Widget.MaterialComponents.Chip.Filter"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="전체"
-                android:checked="true" />
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chipHighTide"
-                style="@style/Widget.MaterialComponents.Chip.Filter"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="만조" />
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chipFishing"
-                style="@style/Widget.MaterialComponents.Chip.Filter"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="바다낚시" />
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chipSurfing"
-                style="@style/Widget.MaterialComponents.Chip.Filter"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="서핑" />
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chipTidalFlat"
-                style="@style/Widget.MaterialComponents.Chip.Filter"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="갯벌체험" />
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chipSwimming"
-                style="@style/Widget.MaterialComponents.Chip.Filter"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="해수욕" />
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chipScuba"
-                style="@style/Widget.MaterialComponents.Chip.Filter"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="스킨스쿠버" />
-        </com.google.android.material.chip.ChipGroup>
-    </HorizontalScrollView>
-
-    <!-- 지수보기 button — shown when non-만조 activity filter is active -->
-    <com.google.android.material.button.MaterialButton
-        android:id="@+id/btnViewIndex"
-        style="@style/Widget.MaterialComponents.Button.TextButton"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="지수보기"
-        android:textSize="13sp"
-        android:visibility="gone"
-        app:layout_constraintTop_toTopOf="@id/scrollActivityChips"
-        app:layout_constraintBottom_toBottomOf="@id/scrollActivityChips"
-        app:layout_constraintEnd_toEndOf="parent" />
+            android:text="지수보기"
+            android:textSize="13sp"
+            android:visibility="gone" />
+    </LinearLayout>
 
     <!-- AdMob 배너 -->
     <com.google.android.gms.ads.AdView
@@ -95,7 +55,7 @@
         android:layout_height="wrap_content"
         app:adSize="BANNER"
         app:adUnitId="@string/admob_banner_map_unit_id"
-        app:layout_constraintTop_toBottomOf="@id/scrollActivityChips"
+        app:layout_constraintTop_toBottomOf="@id/topBar"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 

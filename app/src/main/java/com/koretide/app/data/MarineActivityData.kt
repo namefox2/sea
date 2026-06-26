@@ -58,7 +58,30 @@ object MarineActivityData {
         ActivitySpot("삼척 이사부", ActivityType.SCUBA, 37.44, 129.16)
     )
 
-    fun getSpots(type: ActivityType): List<ActivitySpot> = spots.filter { it.type == type }
+    // 지수 API용 좌표 데이터셋(IndexPlaceData/BeachPlaceData)을 같은 카테고리의 ActivitySpot으로 변환.
+    // "위경도 좌표가 있는 모든 지점"을 지도에 노출하기 위함.
+    private fun indexSpots(type: ActivityType): List<ActivitySpot> = when (type) {
+        ActivityType.SURFING    -> SurfingPlaceData.places.map  { ActivitySpot(it.name, type, it.lat, it.lon) }
+        ActivityType.TIDAL_FLAT -> TidalFlatPlaceData.places.map { ActivitySpot(it.name, type, it.lat, it.lon) }
+        ActivityType.SCUBA      -> ScubaPlaceData.places.map    { ActivitySpot(it.name, type, it.lat, it.lon) }
+        ActivityType.SEA_TRAVEL -> SeaTravelPlaceData.places.map { ActivitySpot(it.name, type, it.lat, it.lon) }
+        ActivityType.SWIMMING   -> BeachPlaceData.places.map    { ActivitySpot(it.name, type, it.lat, it.lon) }
+        else                    -> emptyList()
+    }
 
-    fun getAllSpots(): List<ActivitySpot> = spots
+    fun getSpots(type: ActivityType): List<ActivitySpot> =
+        dedup(spots.filter { it.type == type } + indexSpots(type))
+
+    fun getAllSpots(): List<ActivitySpot> =
+        ActivityType.values()
+            .filter { it != ActivityType.HIGH_TIDE }   // 관측소는 별도 레이어
+            .flatMap { getSpots(it) }
+
+    // 같은 카테고리 내 ~1km(0.01°) 이내 중복 지점은 핀이 겹치지 않도록 하나만 남김
+    private fun dedup(list: List<ActivitySpot>): List<ActivitySpot> {
+        val seen = HashSet<String>()
+        return list.filter { s ->
+            seen.add("${s.type}:${Math.round(s.lat * 100)}:${Math.round(s.lng * 100)}")
+        }
+    }
 }

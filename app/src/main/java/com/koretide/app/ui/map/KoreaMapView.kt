@@ -456,6 +456,7 @@ class KoreaMapView @JvmOverloads constructor(
                 ActivityType.TIDAL_FLAT -> drawSquare(canvas, x, y, r, paint)
                 ActivityType.SWIMMING  -> canvas.drawCircle(x, y, r, paint)
                 ActivityType.SCUBA     -> drawHeart(canvas, x, y, r, paint)
+                ActivityType.SEA_TRAVEL -> drawDiamond(canvas, x, y, r, paint)
             }
             if (isSelected) {
                 canvas.drawCircle(x, y, r + 3f * density, selectedRingPaint)

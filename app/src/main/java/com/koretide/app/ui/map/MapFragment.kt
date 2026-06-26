@@ -51,7 +51,7 @@ class MapFragment : Fragment(), OnMapReadyCallback {
         super.onViewCreated(view, savedInstanceState)
         binding.mapView.onCreate(savedInstanceState)
         binding.mapView.getMapAsync(this)
-        setupActivityChips()
+        setupTabs()
         setupAdMob()
         observeState()
     }
@@ -135,26 +135,31 @@ class MapFragment : Fragment(), OnMapReadyCallback {
         ActivityType.TIDAL_FLAT -> Color.rgb(121, 85, 72)
         ActivityType.SWIMMING   -> Color.rgb(33, 150, 243)
         ActivityType.SCUBA      -> Color.rgb(13, 71, 161)
+        ActivityType.SEA_TRAVEL -> Color.rgb(0, 137, 123)
         ActivityType.HIGH_TIDE  -> Color.rgb(21, 101, 192)
     }
 
-    private fun setupActivityChips() {
-        val allChips = listOf(
-            binding.chipActivityAll, binding.chipHighTide, binding.chipFishing,
-            binding.chipSurfing, binding.chipTidalFlat, binding.chipSwimming, binding.chipScuba
-        )
-        fun selectChip(chip: com.google.android.material.chip.Chip, filter: ActivityType?) {
-            allChips.forEach { it.isChecked = false }
-            chip.isChecked = true
-            viewModel.setActivityFilter(filter)
-        }
-        binding.chipActivityAll.setOnClickListener  { selectChip(binding.chipActivityAll, null) }
-        binding.chipHighTide.setOnClickListener     { selectChip(binding.chipHighTide,    ActivityType.HIGH_TIDE) }
-        binding.chipFishing.setOnClickListener      { selectChip(binding.chipFishing,     ActivityType.FISHING) }
-        binding.chipSurfing.setOnClickListener      { selectChip(binding.chipSurfing,     ActivityType.SURFING) }
-        binding.chipTidalFlat.setOnClickListener    { selectChip(binding.chipTidalFlat,   ActivityType.TIDAL_FLAT) }
-        binding.chipSwimming.setOnClickListener     { selectChip(binding.chipSwimming,    ActivityType.SWIMMING) }
-        binding.chipScuba.setOnClickListener        { selectChip(binding.chipScuba,       ActivityType.SCUBA) }
+    // 탭 위치 → 활동 필터 (null = 전체). fragment_map.xml의 TabItem 순서와 일치해야 함.
+    private val tabFilters = listOf<ActivityType?>(
+        null,                     // 전체
+        ActivityType.HIGH_TIDE,   // 관측소
+        ActivityType.FISHING,     // 바다낚시
+        ActivityType.SURFING,     // 서핑
+        ActivityType.TIDAL_FLAT,  // 갯벌체험
+        ActivityType.SWIMMING,    // 해수욕
+        ActivityType.SCUBA,       // 스킨스쿠버
+        ActivityType.SEA_TRAVEL   // 바다여행
+    )
+
+    private fun setupTabs() {
+        binding.tabActivities.addOnTabSelectedListener(object : com.google.android.material.tabs.TabLayout.OnTabSelectedListener {
+            override fun onTabSelected(tab: com.google.android.material.tabs.TabLayout.Tab) {
+                dismissTooltip()
+                viewModel.setActivityFilter(tabFilters.getOrNull(tab.position))
+            }
+            override fun onTabUnselected(tab: com.google.android.material.tabs.TabLayout.Tab) {}
+            override fun onTabReselected(tab: com.google.android.material.tabs.TabLayout.Tab) {}
+        })
 
         binding.btnViewIndex.setOnClickListener {
             sharedViewModel.requestTabNavigation(R.id.navigation_index)

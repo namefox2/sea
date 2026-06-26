@@ -6,5 +6,6 @@ enum class ActivityType(val displayName: String, val colorHex: String) {
     SURFING("서핑", "#0097A7"),
     TIDAL_FLAT("갯벌체험", "#8D6E63"),
     SWIMMING("해수욕", "#F06292"),
-    SCUBA("스킨스쿠버", "#1565C0")
+    SCUBA("스킨스쿠버", "#1565C0"),
+    SEA_TRAVEL("바다여행", "#00897B")
 }
