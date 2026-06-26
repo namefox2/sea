@@ -27,12 +27,12 @@ class WeatherRepositoryImpl @Inject constructor(
 
         return try {
             // dtRecent에 풍향/풍속도 포함 → obsCode null로 전체 조회 후 최근접 선택
-            val items = khoaDataApi.getTideRecent(apiKey, null, date).body?.items?.item.orEmpty()
+            val items = khoaDataApi.getTideRecent(apiKey, null, date, numOfRows = 200).body?.items?.item.orEmpty()
             val item = items.nearestTo(lat, lng)
             Log.d(TAG, "dtRecent wind nearest=${item?.stationName} wspd=${item?.windSpeed} wndrct=${item?.windDir}")
 
-            val speedMs = item?.windSpeed ?: throw IllegalStateException("No wind speed data from nearest station")
-            val dirDeg  = item.windDir ?: 225f
+            val speedMs = item?.windSpeed ?: 0f
+            val dirDeg  = item?.windDir ?: 0f
             val bft     = BeaufortConverter.toBft(speedMs)
 
             val waveHeightM: Float? = runCatching {
@@ -45,7 +45,7 @@ class WeatherRepositoryImpl @Inject constructor(
             WindData(stationCode, speedMs, bft, dirDeg, BeaufortConverter.name(bft), waveHeightM)
         } catch (e: Exception) {
             Log.w(TAG, "getWindData [$stationCode] failed", e)
-            throw e
+            WindData(stationCode, 0f, 0, 0f, "--", null)
         }
     }
 
