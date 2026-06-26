@@ -78,14 +78,15 @@ class TideWatchView @JvmOverloads constructor(
         }
     }
 
-    // Immersive preset: noon sun, mid-tide position, theme already applied.
+    // Immersive preset: noon sun, bft-2 wind, 35% tide, ~5.5m tidal range feel.
     // Does NOT override calibVisualMinZ/MaxZ so regional range stays correct.
     fun applyImmersivePreset() {
         queueEvent {
             renderer.useDefaultSun   = true
             renderer.defaultHour     = 12.0f
-            renderer.tidePercent     = 0.50f
-            renderer.mudflatExposure = 0.40f
+            renderer.tidePercent     = 0.35f
+            renderer.windAmp         = 2f / 12f
+            renderer.mudflatExposure = 0.50f
         }
     }
 

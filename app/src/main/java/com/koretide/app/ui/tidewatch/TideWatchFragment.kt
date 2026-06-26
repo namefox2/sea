@@ -160,8 +160,14 @@ class TideWatchFragment : Fragment() {
     private fun setupImmersiveButton() {
         binding.btnImmersive.setOnClickListener {
             isImmersivePreset = true
+            // Set cached range before slider so mudflat computation uses preset value
+            cachedTidalRangeM = 5.5f
             binding.tideWatchView.applyImmersivePreset()
-            // Hide the UI to enter full immersive view
+            // Reset sliders to preset defaults (listeners also propagate to renderer)
+            binding.seekWind.progress      = 2
+            binding.seekTide.progress      = 35
+            binding.seekTidalRange.progress = 55
+            binding.tvTidalRange.text       = "5.5m"
             uiVisible = false
             binding.overlayCard.visibility = View.GONE
             binding.sliderPanel.visibility = View.GONE
