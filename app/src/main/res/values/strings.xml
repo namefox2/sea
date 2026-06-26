@@ -55,13 +55,13 @@
     <string name="btn_go_watch">물멍하러가기</string>
 
     <!-- ====================================================================
-         AdMob — 출시 전 반드시 실제 프로덕션 ID로 교체하세요.
-         현재 값은 Google 테스트 ID입니다 (실제 광고 미노출, 수익 없음).
-         AdMob 콘솔에서 앱 등록 후 발급받은 ID를 사용하세요.
+         AdMob — 배너 단위 ID는 실제 프로덕션 ID로 교체됨.
+         ⚠ admob_app_id는 아직 Google 테스트 앱 ID입니다.
+         AdMob 콘솔의 "앱 ID"(ca-app-pub-9392221797396472~XXXXXXXXXX)로 교체하세요.
          ===================================================================== -->
     <string name="admob_app_id" translatable="false">ca-app-pub-3940256099942544~3347511713</string>
-    <string name="admob_banner_map_unit_id" translatable="false">ca-app-pub-3940256099942544/6300978111</string>
-    <string name="admob_banner_search_unit_id" translatable="false">ca-app-pub-3940256099942544/6300978111</string>
+    <string name="admob_banner_map_unit_id" translatable="false">ca-app-pub-9392221797396472/2539361985</string>
+    <string name="admob_banner_search_unit_id" translatable="false">ca-app-pub-9392221797396472/2539361985</string>
 
     <!-- 법적 고지 -->
     <string name="open_source_licenses">오픈소스 라이선스</string>
