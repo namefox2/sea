@@ -23,9 +23,12 @@
             android:name="com.google.android.gms.ads.APPLICATION_ID"
             android:value="@string/admob_app_id" />
 
-        <!-- Naver Maps — set NAVER_CLIENT_ID in local.properties -->
+        <!-- Naver Maps — set NAVER_CLIENT_ID in local.properties.
+             SDK 3.19+(NAVER Cloud Platform Maps)는 인증 키 이름이 NCP_KEY_ID 임.
+             (예전 com.naver.maps.map.CLIENT_ID 는 구형 AI·NAVER API 용 — 인증 실패하면
+              지도 타일이 안 뜨고 마커만 보임) -->
         <meta-data
-            android:name="com.naver.maps.map.CLIENT_ID"
+            android:name="com.naver.maps.map.NCP_KEY_ID"
             android:value="${naverClientId}" />
 
         <activity
