@@ -41,19 +41,28 @@ class TideWatchViewModel @Inject constructor(
     private var pollJob: Job? = null
     private var lastPollTime: Long = 0L
     private var currentStation: String? = null
+    private var sunStation: String? = null
 
     fun isPolling(): Boolean = pollJob?.isActive == true
 
-    fun preloadFromCache(tide: TideData, wind: WindData?) {
+    // 캐시로 즉시 표시 + 폴링 첫 호출을 POLL_INTERVAL 만큼 지연.
+    // currentStation을 함께 세팅해 startPolling이 lastPollTime을 0으로 리셋(=즉시 재호출)하지 않도록 한다.
+    fun preloadFromCache(stationCode: String, tide: TideData, wind: WindData?) {
         if (wind != null) _windData.value = wind
         _tideData.value = tide
+        currentStation = stationCode
         lastPollTime = System.currentTimeMillis()
     }
 
     fun startPolling(stationCode: String, lat: Double, lng: Double) {
         if (stationCode != currentStation) {
+            // 캐시 프리로드가 없었던(새) 관측소 → 즉시 1회 조회
             lastPollTime = 0L
             currentStation = stationCode
+        }
+        // 일출/일몰 시간은 관측소가 바뀔 때 1회만 조회 (프리로드 여부와 무관)
+        if (stationCode != sunStation) {
+            sunStation = stationCode
             viewModelScope.launch {
                 try { _sunTimes.value = getRenderSunTimesUseCase(lat, lng) }
                 catch (e: Exception) { Log.w(TAG, "SunTimes fetch failed", e) }

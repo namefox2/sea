@@ -232,7 +232,7 @@ class TideWatchFragment : Fragment() {
                 // Detail에서 받아둔 캐시가 있으면 선적재 → 즉시 표시 + 5분 폴링 지연
                 val cachedTide = sharedViewModel.cachedTideFor(station.code)
                 val cachedWind = sharedViewModel.windData.value
-                if (cachedTide != null) viewModel.preloadFromCache(cachedTide, cachedWind)
+                if (cachedTide != null) viewModel.preloadFromCache(station.code, cachedTide, cachedWind)
                 viewModel.startPolling(station.code, station.lat, station.lng)
             }
         }
