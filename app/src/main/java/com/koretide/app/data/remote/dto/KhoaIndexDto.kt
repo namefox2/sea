@@ -23,12 +23,10 @@ data class KhoaIndexItems(
 @JsonClass(generateAdapter = true)
 data class KhoaIndexItem(
     @Json(name = "bbchNm")        val bbchNm: String?,        // 해수욕장명
-    @Json(name = "placeName")     val placeName: String?,     // 바다낚시 지점명 (갯바위/선상)
-    @Json(name = "seafsNm")       val seafsNm: String?,       // 바다낚시 지점명 (대체 필드명 후보)
-    @Json(name = "nvgtCode")      val nvgtCode: String?,      // 뱃멀미 운항코드 (SK1~SK32)
-    @Json(name = "nvgtNm")        val nvgtNm: String?,        // 뱃멀미 운항 노선명 (대체 필드명 후보)
-    @Json(name = "lat")           val lat: Double?,           // 위도
-    @Json(name = "lot")           val lot: Double?,           // 경도
+    @Json(name = "seafsPstnNm")   val seafsPstnNm: String?,   // 바다낚시 지점명
+    @Json(name = "nvgtNm")        val nvgtNm: String?,        // 뱃멀미 운항 노선명 (예: 인천-백령)
+    @Json(name = "lat")           val lat: Double?,           // 위도 (뱃멀미는 응답에 없음)
+    @Json(name = "lot")           val lot: Double?,           // 경도 (뱃멀미는 응답에 없음)
     @Json(name = "predcYmd")      val predcYmd: String?,      // 예보일자 (yyyy-MM-dd)
     @Json(name = "predcNoonSeCd") val predcNoonSeCd: String?, // 오전/오후
     @Json(name = "totalIndex")    val totalIndex: String?,    // 종합지수 (매우좋음/좋음/보통/나쁨/매우나쁨)

@@ -4,7 +4,6 @@ import com.koretide.app.BuildConfig
 import com.koretide.app.data.BeachPlaceData
 import com.koretide.app.data.PlaceGazetteer
 import com.koretide.app.data.ScubaPlaceData
-import com.koretide.app.data.SeasicknessRouteData
 import com.koretide.app.data.SeaTravelPlaceData
 import com.koretide.app.data.SurfingPlaceData
 import com.koretide.app.data.TidalFlatPlaceData
@@ -144,7 +143,7 @@ class OceanIndexRepositoryImpl @Inject constructor(
                     val nm = item.displayName(type)?.takeIf { it.isNotBlank() }
                         ?: "지점 %.3f, %.3f".format(la, lo)
                     BeachIndexItem(
-                        code   = item.nvgtCode ?: item.placeName ?: "$la,$lo",
+                        code   = item.seafsPstnNm ?: item.nvgtNm ?: "$la,$lo",
                         name   = nm,
                         lat    = la,
                         lon    = lo,
@@ -226,13 +225,11 @@ class OceanIndexRepositoryImpl @Inject constructor(
         opnStat     = opnStat
     )
 
-    // 지수 유형별 표시 이름: 낚시는 placeName(또는 seafsNm), 뱃멀미는 운항코드→경로명(또는 nvgtNm),
-    // 그 외는 해수욕장명. 응답 필드명이 확실치 않아 후보 필드를 순서대로 시도한다.
+    // 지수 유형별 표시 이름: 낚시는 seafsPstnNm(지점명), 뱃멀미는 nvgtNm(운항 노선명),
+    // 그 외는 bbchNm(해수욕장명). (API 문서 기준 실제 응답 필드)
     private fun KhoaIndexItem.displayName(type: IndexType): String? = when (type) {
-        IndexType.SEA_FISHING -> firstNonBlank(placeName, seafsNm, bbchNm)
-        IndexType.SEASICKNESS -> firstNonBlank(
-            SeasicknessRouteData.nameFor(nvgtCode), nvgtNm, nvgtCode, bbchNm
-        )
+        IndexType.SEA_FISHING -> firstNonBlank(seafsPstnNm, bbchNm)
+        IndexType.SEASICKNESS -> firstNonBlank(nvgtNm, bbchNm)
         else                  -> bbchNm
     }
 

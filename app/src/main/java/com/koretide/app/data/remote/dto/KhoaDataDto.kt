@@ -91,13 +91,16 @@ data class KhoaWaveItems(
     @Json(name = "item") val item: List<KhoaWaveItem>?
 )
 
+// noonWave(국가해양관측망 실측 파랑) 실제 응답 필드: obsvtrNm/lat/lot/obsrvnDt/
+// wvhgt(파고)/wvpd(주기)/wvdrct(파향)/maxWvhgt/maxWvpd
 @JsonClass(generateAdapter = true)
 data class KhoaWaveItem(
     @Json(name = "obsvtrNm") val stationName: String?,
     @Json(name = "lat")      val lat: Double?,
     @Json(name = "lot")      val lon: Double?,
     @Json(name = "obsrvnDt") val obsrvnDt: String?,
-    @Json(name = "wh")       val waveHeight: Float?,
-    @Json(name = "wp")       val wavePeriod: Float?,
-    @Json(name = "wd")       val waveDir: Float?
+    @Json(name = "wvhgt")    val waveHeight: Float?,   // 파고 m
+    @Json(name = "wvpd")     val wavePeriod: Float?,   // 파주기 s
+    @Json(name = "wvdrct")   val waveDir: Float?,      // 파향 deg
+    @Json(name = "maxWvhgt") val maxWaveHeight: Float? // 최대파고 m
 )

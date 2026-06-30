@@ -21,6 +21,7 @@ object PlaceGazetteer {
         ScubaPlaceData.places.forEach          { add(it.name, it.lat, it.lon) }
         TidalFlatPlaceData.places.forEach      { add(it.name, it.lat, it.lon) }
         SeaTravelPlaceData.places.forEach      { add(it.name, it.lat, it.lon) }
+        SeasicknessRouteData.routes.forEach    { add(it.name, it.lat, it.lon) }
         m
     }
 
