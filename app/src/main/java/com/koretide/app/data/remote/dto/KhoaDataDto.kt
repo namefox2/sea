@@ -62,11 +62,15 @@ data class KhoaTideFcstItems(
     @Json(name = "item") val item: List<KhoaTideFcstItem>?
 )
 
+// tideFcstHghLw 실제 응답 필드 (API 문서 기준):
+//   obsvtrNm(관측소명), predcDt(예보일시 "yyyy-MM-dd HH:mm"),
+//   predcTdlvVl(예보 조위, cm), extrSe(극치구분: 1=오전고조 2=오전저조 3=오후고조 4=오후저조)
 @JsonClass(generateAdapter = true)
 data class KhoaTideFcstItem(
-    @Json(name = "tphTime")  val tphTime: String?,
-    @Json(name = "tphLevel") val tphLevel: Int?,
-    @Json(name = "hlCode")   val hlCode: String?
+    @Json(name = "obsvtrNm")    val stationName: String?,
+    @Json(name = "predcDt")     val predcDt: String?,
+    @Json(name = "predcTdlvVl") val predcTdlvVl: Double?,
+    @Json(name = "extrSe")      val extrSe: Int?
 )
 
 // ── noonWave: 실측파랑 ────────────────────────────────────────────────────────

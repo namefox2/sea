@@ -95,11 +95,13 @@ class TideRepositoryImpl @Inject constructor(
         val currentLevel = dataItems.lastOrNull()?.tideLevel?.toInt() ?: 300
         Log.d(TAG, "  lastItem obsrvnDt=${dataItems.lastOrNull()?.obsrvnDt}  tideLevel=${dataItems.lastOrNull()?.tideLevel}cm")
 
-        val allHigh  = tableItems.filter { it.hlCode == "HH" }
-        val allLow   = tableItems.filter { it.hlCode == "LL" }
-        val maxLevel = allHigh.mapNotNull { it.tphLevel }.maxOrNull() ?: 600
-        val minLevel = allLow.mapNotNull  { it.tphLevel }.minOrNull() ?: 50
+        // 하루 조석예보(고/저조)에서 고조(extrSe 1,3)·저조(extrSe 2,4)를 모아 일조차 계산
+        val allHigh  = tableItems.filter { it.extrSe == 1 || it.extrSe == 3 }
+        val allLow   = tableItems.filter { it.extrSe == 2 || it.extrSe == 4 }
+        val maxLevel = allHigh.mapNotNull { it.predcTdlvVl?.toInt() }.maxOrNull() ?: 600
+        val minLevel = allLow.mapNotNull  { it.predcTdlvVl?.toInt() }.minOrNull() ?: 50
         val range    = (maxLevel - minLevel).toFloat()
+        Log.d(TAG, "  조석예보 items=${tableItems.size}  고조=${allHigh.size} 저조=${allLow.size}  조차=${range}cm")
         val tidePercent = if (range > 0f)
             ((currentLevel - minLevel).toFloat() / range).coerceIn(0f, 1f)
         else 0.5f
@@ -115,10 +117,13 @@ class TideRepositoryImpl @Inject constructor(
             else                      -> TideStatus.FALLING
         }
 
+        // predcDt "yyyy-MM-dd HH:mm" → "HH:mm"
+        fun com.koretide.app.data.remote.dto.KhoaTideFcstItem.hm(): String =
+            predcDt?.substringAfter(' ', "")?.take(5).orEmpty()
         val nowTime  = SimpleDateFormat("HH:mm", Locale.KOREA).format(Date())
-        val highItem = allHigh.firstOrNull { it.tphTime.orEmpty() >= nowTime } ?: allHigh.lastOrNull()
-        val lowItem  = allLow.firstOrNull  { it.tphTime.orEmpty() >= nowTime } ?: allLow.lastOrNull()
-        Log.d(TAG, "  tideStatus=${tideStatus.displayName}  nextHigh=${highItem?.tphTime}(${highItem?.tphLevel}cm)  nextLow=${lowItem?.tphTime}(${lowItem?.tphLevel}cm)")
+        val highItem = allHigh.firstOrNull { it.hm() >= nowTime } ?: allHigh.lastOrNull()
+        val lowItem  = allLow.firstOrNull  { it.hm() >= nowTime } ?: allLow.lastOrNull()
+        Log.d(TAG, "  tideStatus=${tideStatus.displayName}  nextHigh=${highItem?.hm()}(${highItem?.predcTdlvVl}cm)  nextLow=${lowItem?.hm()}(${lowItem?.predcTdlvVl}cm)")
 
         val records = dataItems.map { item ->
             val ts = parseDateToMillis(item.obsrvnDt ?: date)
@@ -135,8 +140,8 @@ class TideRepositoryImpl @Inject constructor(
             minLevel     = minLevel,
             tidePercent  = tidePercent,
             tideStatus   = tideStatus,
-            highTideTime = highItem?.tphTime,
-            lowTideTime  = lowItem?.tphTime,
+            highTideTime = highItem?.hm(),
+            lowTideTime  = lowItem?.hm(),
             records      = records.map { it.toDomain() }
         )
     }

@@ -233,13 +233,9 @@ class OceanIndexRepositoryImpl @Inject constructor(
     private fun firstNonBlank(vararg values: String?): String? =
         values.firstOrNull { !it.isNullOrBlank() }
 
-    // 좌표 기반 지역 판별 (StationRepositoryImpl.regionFromCoords와 동일 기준)
-    private fun regionFromCoords(lat: Double, lon: Double): StationRegion = when {
-        lat < 34.1                  -> StationRegion.JEJU
-        lon >= 128.5                -> StationRegion.EAST
-        lat < 35.5 && lon >= 125.5  -> StationRegion.SOUTH
-        else                        -> StationRegion.WEST
-    }
+    // 좌표 기반 지역 판별 (공용 분류기 사용)
+    private fun regionFromCoords(lat: Double, lon: Double): StationRegion =
+        StationRegion.fromCoords(lat, lon)
 
     private fun KhoaIndexItem.statsFor(type: IndexType): List<Pair<String, String>> = buildList {
         when (type) {
