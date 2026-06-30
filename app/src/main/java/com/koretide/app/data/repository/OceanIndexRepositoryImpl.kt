@@ -2,6 +2,7 @@ package com.koretide.app.data.repository
 
 import com.koretide.app.BuildConfig
 import com.koretide.app.data.BeachPlaceData
+import com.koretide.app.data.PlaceGazetteer
 import com.koretide.app.data.ScubaPlaceData
 import com.koretide.app.data.SeasicknessRouteData
 import com.koretide.app.data.SeaTravelPlaceData
@@ -127,22 +128,26 @@ class OceanIndexRepositoryImpl @Inject constructor(
     ): List<BeachIndexItem> {
         if (key.isBlank()) throw IllegalStateException("API 키가 설정되지 않았습니다")
 
-        // 낚시/뱃멀미: 전용 해수욕장 좌표가 없으므로 API 응답의 좌표(lat/lot)로 지역 분류 후 그대로 나열
+        // 낚시/뱃멀미: 전용 해수욕장 좌표가 없으므로 API 응답의 좌표(lat/lot)로 지역 분류 후 그대로 나열.
+        // 응답에 좌표가 없으면 이름으로 PlaceGazetteer에서 좌표를 빌려온다.
         if (type == IndexType.SEA_FISHING || type == IndexType.SEASICKNESS) {
             return fetchAllItems(type, date)
-                .filter { it.lat != null && it.lot != null }
-                .filter { regionFromCoords(it.lat!!, it.lot!!) == region }
+                .mapNotNull { item ->
+                    val coords = item.resolvedCoords(type) ?: return@mapNotNull null
+                    Triple(item, coords.first, coords.second)
+                }
+                .filter { (_, la, lo) -> regionFromCoords(la, lo) == region }
                 // 좌표 기준 중복 제거(오전/오후 등). 이름이 비어도 항목이 하나로 합쳐지지 않도록
                 // name 대신 좌표를 키로 사용한다.
-                .distinctBy { (Math.round(it.lat!! * 100)) to (Math.round(it.lot!! * 100)) }
-                .map { item ->
+                .distinctBy { (_, la, lo) -> Math.round(la * 100) to Math.round(lo * 100) }
+                .map { (item, la, lo) ->
                     val nm = item.displayName(type)?.takeIf { it.isNotBlank() }
-                        ?: "지점 %.3f, %.3f".format(item.lat!!, item.lot!!)
+                        ?: "지점 %.3f, %.3f".format(la, lo)
                     BeachIndexItem(
-                        code   = item.nvgtCode ?: item.placeName ?: "${item.lat},${item.lot}",
+                        code   = item.nvgtCode ?: item.placeName ?: "$la,$lo",
                         name   = nm,
-                        lat    = item.lat!!,
-                        lon    = item.lot!!,
+                        lat    = la,
+                        lon    = lo,
                         region = region,
                         index  = item.toDomain(type)
                     )
@@ -202,8 +207,9 @@ class OceanIndexRepositoryImpl @Inject constructor(
         if (lat == null || lon == null) return unavailableIndex(type)
         return try {
             val item = fetchAllItems(type, date)
-                .filter { it.lat != null && it.lot != null }
-                .minByOrNull { val dLat = it.lat!! - lat; val dLon = it.lot!! - lon; dLat * dLat + dLon * dLon }
+                .mapNotNull { it.resolvedCoords(type)?.let { c -> it to c } }
+                .minByOrNull { (_, c) -> val dLat = c.first - lat; val dLon = c.second - lon; dLat * dLat + dLon * dLon }
+                ?.first
             item?.toDomain(type) ?: unavailableIndex(type)
         } catch (e: Exception) {
             unavailableIndex(type)
@@ -232,6 +238,12 @@ class OceanIndexRepositoryImpl @Inject constructor(
 
     private fun firstNonBlank(vararg values: String?): String? =
         values.firstOrNull { !it.isNullOrBlank() }
+
+    // 좌표 해석: 응답에 lat/lot가 있으면 사용, 없으면 이름으로 PlaceGazetteer에서 조회
+    private fun KhoaIndexItem.resolvedCoords(type: IndexType): Pair<Double, Double>? {
+        if (lat != null && lot != null) return lat to lot
+        return PlaceGazetteer.coordsFor(displayName(type))
+    }
 
     // 좌표 기반 지역 판별 (공용 분류기 사용)
     private fun regionFromCoords(lat: Double, lon: Double): StationRegion =
