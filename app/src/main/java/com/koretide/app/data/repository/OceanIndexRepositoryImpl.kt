@@ -3,6 +3,7 @@ package com.koretide.app.data.repository
 import com.koretide.app.BuildConfig
 import com.koretide.app.data.BeachPlaceData
 import com.koretide.app.data.ScubaPlaceData
+import com.koretide.app.data.SeasicknessRouteData
 import com.koretide.app.data.SeaTravelPlaceData
 import com.koretide.app.data.SurfingPlaceData
 import com.koretide.app.data.TidalFlatPlaceData
@@ -49,8 +50,9 @@ class OceanIndexRepositoryImpl @Inject constructor(
 
         return coroutineScope {
             val beach   = async { fetch(date, hsCode, IndexType.BEACH_SWIM)   { api.getBeachForecast(key, it, date) } }
-            val fishing = async { fetch(date, hsCode, IndexType.SEA_FISHING)  { api.getFishingForecast(key, it, date) } }
-            val sick    = async { fetch(date, hsCode, IndexType.SEASICKNESS)  { api.getSeasicknessForecast(key, it, date) } }
+            // 낚시/뱃멀미는 전용 placeCode 데이터셋이 없어 전체 응답에서 좌표로 가장 가까운 지점 선택
+            val fishing = async { nearestIndex(date, lat, lon, IndexType.SEA_FISHING) }
+            val sick    = async { nearestIndex(date, lat, lon, IndexType.SEASICKNESS) }
             val scuba   = async { fetch(date, ssCode, IndexType.SCUBA_DIVING) { api.getScubaForecast(key, it, date) } }
             val tidal   = async { tidalFlatIndex(date, tlCode, tideData) }
             val surf    = async { fetch(date, srCode, IndexType.SURFING)      { api.getSurfingForecast(key, it, date) } }
@@ -124,16 +126,27 @@ class OceanIndexRepositoryImpl @Inject constructor(
         region: StationRegion
     ): List<BeachIndexItem> {
         if (key.isBlank()) throw IllegalStateException("API 키가 설정되지 않았습니다")
+
+        // 낚시/뱃멀미: 전용 해수욕장 좌표가 없으므로 API 응답의 좌표(lat/lot)로 지역 분류 후 그대로 나열
+        if (type == IndexType.SEA_FISHING || type == IndexType.SEASICKNESS) {
+            return fetchAllItems(type, date)
+                .filter { it.lat != null && it.lot != null }
+                .filter { regionFromCoords(it.lat!!, it.lot!!) == region }
+                .map { item ->
+                    BeachIndexItem(
+                        code   = item.nvgtCode ?: item.placeName ?: item.displayName(type) ?: "",
+                        name   = item.displayName(type) ?: "",
+                        lat    = item.lat!!,
+                        lon    = item.lot!!,
+                        region = region,
+                        index  = item.toDomain(type)
+                    )
+                }
+                .distinctBy { it.name }   // 오전/오후 등 중복 항목 제거
+        }
+
         val beaches = BeachPlaceData.byRegion(region)
-        val allItems: List<KhoaIndexItem> = when (type) {
-            IndexType.BEACH_SWIM   -> api.getBeachForecast(key, null, date, 100)
-            IndexType.SEA_FISHING  -> api.getFishingForecast(key, null, date, 100)
-            IndexType.SEASICKNESS  -> api.getSeasicknessForecast(key, null, date, 100)
-            IndexType.SCUBA_DIVING -> api.getScubaForecast(key, null, date, 100)
-            IndexType.TIDAL_FLAT   -> api.getTidalFlatForecast(key, null, date, 100)
-            IndexType.SURFING      -> api.getSurfingForecast(key, null, date, 100)
-            IndexType.SEA_TRAVEL   -> api.getSeaTravelForecast(key, null, date, 100)
-        }.body?.items?.item ?: emptyList()
+        val allItems: List<KhoaIndexItem> = fetchAllItems(type, date, 100)
         return beaches.map { beach ->
             val item = allItems.minByOrNull { apiItem ->
                 val dLat = (apiItem.lat ?: 999.0) - beach.lat
@@ -168,15 +181,55 @@ class OceanIndexRepositoryImpl @Inject constructor(
         unavailableIndex(type)
     }
 
+    // 전체 응답 조회 (placeCode=null). 낚시/뱃멀미는 응답에 포함된 좌표로 매칭한다.
+    private suspend fun fetchAllItems(type: IndexType, date: String, rows: Int = 200): List<KhoaIndexItem> =
+        (when (type) {
+            IndexType.BEACH_SWIM   -> api.getBeachForecast(key, null, date, rows)
+            IndexType.SEA_FISHING  -> api.getFishingForecast(key, null, date, rows)
+            IndexType.SEASICKNESS  -> api.getSeasicknessForecast(key, null, date, rows)
+            IndexType.SCUBA_DIVING -> api.getScubaForecast(key, null, date, rows)
+            IndexType.TIDAL_FLAT   -> api.getTidalFlatForecast(key, null, date, rows)
+            IndexType.SURFING      -> api.getSurfingForecast(key, null, date, rows)
+            IndexType.SEA_TRAVEL   -> api.getSeaTravelForecast(key, null, date, rows)
+        }).body?.items?.item ?: emptyList()
+
+    // 좌표로 가장 가까운 지점의 지수 (낚시/뱃멀미 — 전용 placeCode 데이터셋이 없는 유형)
+    private suspend fun nearestIndex(date: String, lat: Double?, lon: Double?, type: IndexType): OceanIndex {
+        if (lat == null || lon == null) return unavailableIndex(type)
+        return try {
+            val item = fetchAllItems(type, date)
+                .filter { it.lat != null && it.lot != null }
+                .minByOrNull { val dLat = it.lat!! - lat; val dLon = it.lot!! - lon; dLat * dLat + dLon * dLon }
+            item?.toDomain(type) ?: unavailableIndex(type)
+        } catch (e: Exception) {
+            unavailableIndex(type)
+        }
+    }
+
     private fun KhoaIndexItem.toDomain(type: IndexType) = OceanIndex(
         type        = type,
         grade       = IndexGrade.fromString(totalIndex),
         stats       = statsFor(type),
-        beachName   = bbchNm,
+        beachName   = displayName(type),
         date        = predcYmd?.let { formatDate(it) },
         isAvailable = true,
         opnStat     = opnStat
     )
+
+    // 지수 유형별 표시 이름: 낚시는 placeName, 뱃멀미는 운항코드→경로명, 그 외는 해수욕장명
+    private fun KhoaIndexItem.displayName(type: IndexType): String? = when (type) {
+        IndexType.SEA_FISHING -> placeName ?: bbchNm
+        IndexType.SEASICKNESS -> SeasicknessRouteData.nameFor(nvgtCode) ?: nvgtCode ?: bbchNm
+        else                  -> bbchNm
+    }
+
+    // 좌표 기반 지역 판별 (StationRepositoryImpl.regionFromCoords와 동일 기준)
+    private fun regionFromCoords(lat: Double, lon: Double): StationRegion = when {
+        lat < 34.1                  -> StationRegion.JEJU
+        lon >= 128.5                -> StationRegion.EAST
+        lat < 35.5 && lon >= 125.5  -> StationRegion.SOUTH
+        else                        -> StationRegion.WEST
+    }
 
     private fun KhoaIndexItem.statsFor(type: IndexType): List<Pair<String, String>> = buildList {
         when (type) {

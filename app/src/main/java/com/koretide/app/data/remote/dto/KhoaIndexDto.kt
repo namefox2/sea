@@ -23,6 +23,8 @@ data class KhoaIndexItems(
 @JsonClass(generateAdapter = true)
 data class KhoaIndexItem(
     @Json(name = "bbchNm")        val bbchNm: String?,        // 해수욕장명
+    @Json(name = "placeName")     val placeName: String?,     // 바다낚시 지점명 (갯바위/선상)
+    @Json(name = "nvgtCode")      val nvgtCode: String?,      // 뱃멀미 운항코드 (SK1~SK32)
     @Json(name = "lat")           val lat: Double?,           // 위도
     @Json(name = "lot")           val lot: Double?,           // 경도
     @Json(name = "predcYmd")      val predcYmd: String?,      // 예보일자 (yyyy-MM-dd)
