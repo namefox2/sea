@@ -14,7 +14,6 @@ import androidx.fragment.app.viewModels
 import com.koretide.app.databinding.FragmentTideWatchBinding
 import com.koretide.app.domain.model.StationRegion
 import com.koretide.app.domain.model.TideData
-import com.koretide.app.domain.model.TidalCalibration
 import com.koretide.app.theme.SeasonThemeManager
 import com.koretide.app.ui.main.SharedViewModel
 import com.koretide.app.util.collectFlow
@@ -51,9 +50,8 @@ class TideWatchFragment : Fragment() {
     private var isImmersivePreset = false
 
     private var cachedRegion: StationRegion? = null
-    // Per-region historical calibration; drives waterlineZ via absolute cm → visual Z mapping.
-    private var cachedCalibration: TidalCalibration = TidalCalibration.forRegion(StationRegion.WEST)
-    // Today's actual tidal range in metres (from API) — used only for mudflat exposure.
+    // 오늘 실제 조차(m, API). 물때 슬라이더의 visual Z 범위와 갯벌 노출 계산에 사용.
+    // (수면 매핑은 지역 보정범위가 아니라 조차 기준으로 통일 → 초기/수동 동작 동일)
     private var cachedTidalRangeM: Float = 4.5f
 
     private val oceanSound = OceanSoundPlayer()
@@ -101,8 +99,11 @@ class TideWatchFragment : Fragment() {
     }
 
     private fun setupSliders() {
-        // Apply default (서해) calibration visual range on startup
-        binding.tideWatchView.setVisualRange(cachedCalibration.visualMinZ, cachedCalibration.visualMaxZ)
+        // 조차 기준 visual 범위 (수동 슬라이더와 동일 매핑)
+        run {
+            val (minZ, maxZ) = tidalRangeVisualRange(cachedTidalRangeM)
+            binding.tideWatchView.setVisualRange(minZ, maxZ)
+        }
 
         val initialT = binding.seekTide.progress / 100f
         binding.tideWatchView.setTide(initialT)
@@ -171,8 +172,10 @@ class TideWatchFragment : Fragment() {
             // (좁은 지역 범위가 남아 있으면 물때를 올릴 때 수면선이 거의 안 올라가
             //  beach 셰이더의 underwater 어둡게 처리만 커져 "바다 아래가 까매지는" 문제 발생)
             cachedRegion = null
-            cachedCalibration = TidalCalibration.forRegion(StationRegion.WEST)
-            binding.tideWatchView.setVisualRange(cachedCalibration.visualMinZ, cachedCalibration.visualMaxZ)
+            run {
+                val (minZ, maxZ) = tidalRangeVisualRange(cachedTidalRangeM)  // 5.5m 기준
+                binding.tideWatchView.setVisualRange(minZ, maxZ)
+            }
             // Set sliders first; their listeners may queue a mudflatExposure GL event
             binding.seekWind.progress       = 2
             binding.seekTide.progress       = 35
@@ -239,10 +242,11 @@ class TideWatchFragment : Fragment() {
             val b = _binding ?: return@collectFlow
             isImmersivePreset = false
             cachedRegion = station?.region
-            cachedCalibration = TidalCalibration.forRegion(
-                station?.region ?: StationRegion.WEST
-            )
-            b.tideWatchView.setVisualRange(cachedCalibration.visualMinZ, cachedCalibration.visualMaxZ)
+            // 조차 데이터가 오기 전 임시 범위(직전 조차값). 데이터 도착 시 applyTideData가 갱신.
+            run {
+                val (minZ, maxZ) = tidalRangeVisualRange(cachedTidalRangeM)
+                b.tideWatchView.setVisualRange(minZ, maxZ)
+            }
             b.tideWatchView.setHasStation(station != null)
             if (station != null) {
                 b.tvStationName.text = station.name
@@ -292,19 +296,26 @@ class TideWatchFragment : Fragment() {
     private fun applyTideData(b: FragmentTideWatchBinding, data: TideData) {
         cachedTidalRangeM = data.tidalRangeM
 
-        // Display % matches Detail screen (today's relative position)
-        val displayPct = (data.tidePercent * 100).toInt().coerceIn(0, 100)
-        b.seekTide.progress = displayPct
-        b.tvTidePct.text    = "$displayPct%"
+        // 조차 기준 visual 범위를 먼저 적용 — 수동 슬라이더와 '완전히 동일'한 매핑이라
+        // 물때 %를 같은 값으로 되돌리면 항상 같은 바다가 된다(idempotent).
+        run {
+            val (minZ, maxZ) = tidalRangeVisualRange(data.tidalRangeM)
+            b.tideWatchView.setVisualRange(minZ, maxZ)
+        }
+
+        // Display % = 오늘 상대 위치(상세화면과 동일). 3D 수면도 같은 값(daily %)으로 그린다.
+        val pct = (data.tidePercent * 100).toInt().coerceIn(0, 100)
+        b.seekTide.progress = pct
+        b.tvTidePct.text    = "$pct%"
 
         b.seekTidalRange.progress = (data.tidalRangeM * 10).toInt().coerceIn(0, 100)
         b.tvTidalRange.text = "%.1fm".format(data.tidalRangeM)
 
-        // 3D scene uses historical regional calibration for visual accuracy
-        val calibratedT = cachedCalibration.calibratedT(data.currentLevel)
-        b.tideWatchView.setTide(calibratedT)
+        // 슬라이더는 정수 %만 표현 → 수동으로 같은 %로 돌렸을 때와 100% 동일하도록 pct/100 사용
+        val t = pct / 100f
+        b.tideWatchView.setTide(t)
         b.tideWatchView.setMudflatExposure(
-            computeMudflatExposure(calibratedT, data.tidalRangeM, cachedRegion)
+            computeMudflatExposure(t, data.tidalRangeM, cachedRegion)
         )
         b.tvTideInfo.text = "${data.tideStatus.displayName} ${data.currentLevel}cm"
     }
@@ -313,8 +324,7 @@ class TideWatchFragment : Fragment() {
         val region = cachedRegion
         val hasTidalFlat = region == StationRegion.WEST || region == StationRegion.SOUTH
         if (hasTidalFlat && data.tidalRangeM > 1.0f) {
-            val calibratedT = cachedCalibration.calibratedT(data.currentLevel)
-            val exposure = computeMudflatExposure(calibratedT, data.tidalRangeM, region)
+            val exposure = computeMudflatExposure(data.tidePercent, data.tidalRangeM, region)
             b.tvMudflatGrade.text = when {
                 exposure >= 0.60f -> "🦀 갯벌 매우 많이 드러남"
                 exposure >= 0.30f -> "🦀 갯벌 보통 드러남"
