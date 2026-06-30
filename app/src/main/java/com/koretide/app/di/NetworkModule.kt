@@ -71,6 +71,12 @@ object NetworkModule {
                 Log.w("RawResponse", "${chain.request().url} → ${json.take(400)}")
             }
 
+            // 낚시/뱃멀미 응답의 실제 필드명 확인용 (지점/운항 이름 필드 파악)
+            val urlStr = request.url.toString()
+            if (BuildConfig.DEBUG && (urlStr.contains("fcstFishing") || urlStr.contains("fcstSickness"))) {
+                Log.w("IndexRawResp", "${request.url.encodedPath} → ${json.take(900)}")
+            }
+
             val jsonType = "application/json; charset=utf-8".toMediaTypeOrNull()
             response.newBuilder().body(json.toResponseBody(jsonType)).build()
         }

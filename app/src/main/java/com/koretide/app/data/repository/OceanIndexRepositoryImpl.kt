@@ -132,17 +132,21 @@ class OceanIndexRepositoryImpl @Inject constructor(
             return fetchAllItems(type, date)
                 .filter { it.lat != null && it.lot != null }
                 .filter { regionFromCoords(it.lat!!, it.lot!!) == region }
+                // 좌표 기준 중복 제거(오전/오후 등). 이름이 비어도 항목이 하나로 합쳐지지 않도록
+                // name 대신 좌표를 키로 사용한다.
+                .distinctBy { (Math.round(it.lat!! * 100)) to (Math.round(it.lot!! * 100)) }
                 .map { item ->
+                    val nm = item.displayName(type)?.takeIf { it.isNotBlank() }
+                        ?: "지점 %.3f, %.3f".format(item.lat!!, item.lot!!)
                     BeachIndexItem(
-                        code   = item.nvgtCode ?: item.placeName ?: item.displayName(type) ?: "",
-                        name   = item.displayName(type) ?: "",
+                        code   = item.nvgtCode ?: item.placeName ?: "${item.lat},${item.lot}",
+                        name   = nm,
                         lat    = item.lat!!,
                         lon    = item.lot!!,
                         region = region,
                         index  = item.toDomain(type)
                     )
                 }
-                .distinctBy { it.name }   // 오전/오후 등 중복 항목 제거
         }
 
         val beaches = BeachPlaceData.byRegion(region)
@@ -216,12 +220,18 @@ class OceanIndexRepositoryImpl @Inject constructor(
         opnStat     = opnStat
     )
 
-    // 지수 유형별 표시 이름: 낚시는 placeName, 뱃멀미는 운항코드→경로명, 그 외는 해수욕장명
+    // 지수 유형별 표시 이름: 낚시는 placeName(또는 seafsNm), 뱃멀미는 운항코드→경로명(또는 nvgtNm),
+    // 그 외는 해수욕장명. 응답 필드명이 확실치 않아 후보 필드를 순서대로 시도한다.
     private fun KhoaIndexItem.displayName(type: IndexType): String? = when (type) {
-        IndexType.SEA_FISHING -> placeName ?: bbchNm
-        IndexType.SEASICKNESS -> SeasicknessRouteData.nameFor(nvgtCode) ?: nvgtCode ?: bbchNm
+        IndexType.SEA_FISHING -> firstNonBlank(placeName, seafsNm, bbchNm)
+        IndexType.SEASICKNESS -> firstNonBlank(
+            SeasicknessRouteData.nameFor(nvgtCode), nvgtNm, nvgtCode, bbchNm
+        )
         else                  -> bbchNm
     }
+
+    private fun firstNonBlank(vararg values: String?): String? =
+        values.firstOrNull { !it.isNullOrBlank() }
 
     // 좌표 기반 지역 판별 (StationRepositoryImpl.regionFromCoords와 동일 기준)
     private fun regionFromCoords(lat: Double, lon: Double): StationRegion = when {
