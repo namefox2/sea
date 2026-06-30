@@ -26,6 +26,10 @@ private const val KEY_THEME_ID = "selected_theme_id"
 private const val PREFS_WATCH = "watch_prefs"
 private const val KEY_WAVE_SOUND = "wave_sound_enabled"
 
+// 사용자가 물때 슬라이더를 직접 조절할 때 쓰는 전체 수위 범위(서해 기준).
+// 지역별 좁은 보정범위와 달리 슬라이더 전체 구간에서 물이 충분히 늘고 줄게 한다.
+private val FULL_RANGE = TidalCalibration.forRegion(StationRegion.WEST)
+
 @AndroidEntryPoint
 class TideWatchFragment : Fragment() {
 
@@ -118,6 +122,12 @@ class TideWatchFragment : Fragment() {
             override fun onProgressChanged(sb: SeekBar, progress: Int, fromUser: Boolean) {
                 binding.tvTidePct.text = "$progress%"
                 val t = progress / 100f
+                // 사용자가 직접 물때를 조절할 땐 지역의 좁은 보정범위(예: 동해 -3~3) 대신
+                // 전체 범위(서해 기준)로 매핑해 물이 확실히 늘고 줄도록 한다.
+                // (지역 보정범위는 API 실측값을 사실적으로 보여줄 때만 의미가 있음)
+                if (fromUser) {
+                    binding.tideWatchView.setVisualRange(FULL_RANGE.visualMinZ, FULL_RANGE.visualMaxZ)
+                }
                 binding.tideWatchView.setTide(t)
                 binding.tideWatchView.setMudflatExposure(
                     computeMudflatExposure(t, cachedTidalRangeM, cachedRegion)
