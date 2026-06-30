@@ -37,6 +37,10 @@ class SearchViewModel @Inject constructor(
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
+    // 관측소별 밀물/썰물·바람 정보를 API에서 가져오는 중인지 (첫 화면 로딩 표시용)
+    private val _batchLoading = MutableStateFlow(false)
+    val batchLoading: StateFlow<Boolean> = _batchLoading.asStateFlow()
+
     private val _loadError = MutableStateFlow<String?>(null)
     val loadError: StateFlow<String?> = _loadError.asStateFlow()
 
@@ -74,7 +78,15 @@ class SearchViewModel @Inject constructor(
 
     init {
         refreshStations()
-        refreshBatch()
+        viewModelScope.launch {
+            // 1) 캐시(디스크/메모리)가 있으면 즉시 표시 — 첫 화면 대기시간 제거
+            runCatching { getBatchTideStatusUseCase.cached() }
+                .getOrNull()
+                ?.takeIf { it.isNotEmpty() }
+                ?.let { _batchLevels.value = it }
+            // 2) 신선도에 따라 백그라운드 새로고침 (캐시가 신선하면 즉시 반환)
+            doRefreshBatch()
+        }
     }
 
     fun setQuery(query: String) {
@@ -101,13 +113,20 @@ class SearchViewModel @Inject constructor(
     }
 
     fun refreshBatch() {
-        viewModelScope.launch {
-            runCatching { getBatchTideStatusUseCase() }
-                .onSuccess { levels ->
-                    if (levels.isNotEmpty()) _batchLevels.value = levels
-                }
-                .onFailure { Log.w("SearchViewModel", "batch tide fetch failed", it) }
-        }
+        viewModelScope.launch { doRefreshBatch() }
+    }
+
+    // 캐시가 비어 있을 때(=보여줄 게 없을 때)만 로딩 인디케이터를 켠다.
+    // 캐시가 이미 있으면 조용히 백그라운드 갱신만 한다.
+    private suspend fun doRefreshBatch() {
+        val hadData = _batchLevels.value.isNotEmpty()
+        if (!hadData) _batchLoading.value = true
+        runCatching { getBatchTideStatusUseCase() }
+            .onSuccess { levels ->
+                if (levels.isNotEmpty()) _batchLevels.value = levels
+            }
+            .onFailure { Log.w("SearchViewModel", "batch tide fetch failed", it) }
+        _batchLoading.value = false
     }
 
     private fun List<RecentTideLevel>.nearestTo(lat: Double, lng: Double): RecentTideLevel? =

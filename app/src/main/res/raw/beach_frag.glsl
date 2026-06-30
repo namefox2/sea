@@ -290,15 +290,22 @@ void main() {
     float fogFact = clamp(1.0 - exp(-fogZ * 0.008), 0.0, 0.45);
     baseColor = mix(baseColor, u_Horizon * 0.82, fogFact);
 
-    // ── Underwater suppression near camera ─────────────────────────────────────
+    // ── Underwater tint near camera ────────────────────────────────────────────
     // At high tide the ocean mesh becomes transparent in front of the waterline
-    // (shore-fade zone), revealing the sandy beach below the water surface.
-    // Only apply on the seaward side (distToWater < 0) so exposed mudflat
-    // (distToWater > 0) does not darken as tide rises.
-    float tideY_b       = u_TidePercent * 1.4 - 0.7;
-    float belowSurf     = clamp((tideY_b - v_World.y) / 0.20, 0.0, 1.0);
-    float underwaterMask = smoothstep(0.5, -1.5, distToWater);
-    baseColor = mix(baseColor, vec3(0.05, 0.13, 0.22), belowSurf * underwaterMask);
+    // (shore-fade zone), revealing the submerged beach. Tint it like sand seen
+    // through water — darkening with depth but NEVER to black, so a region's
+    // compressed tide range at high water stays readable instead of going dark.
+    // Only seaward (distToWater < 0) so exposed mudflat does not darken.
+    // depthBelow ramps over ~3 m (was a hard 0.2 m step that painted a flat dark
+    // slab); colour blends shallow teal → muted deep teal, capped at 0.72 mix so
+    // the beach colour is never fully replaced (no black).
+    float tideY_b          = u_TidePercent * 1.4 - 0.7;
+    float depthBelow       = clamp((tideY_b - v_World.y) / 3.0, 0.0, 1.0);
+    float underwaterMask   = smoothstep(0.5, -1.5, distToWater);
+    vec3  submergedShallow = mix(baseColor, vec3(0.10, 0.30, 0.32), 0.55);
+    vec3  submergedDeep    = vec3(0.06, 0.16, 0.22);
+    vec3  submerged        = mix(submergedShallow, submergedDeep, depthBelow);
+    baseColor = mix(baseColor, submerged, depthBelow * underwaterMask * 0.72);
 
     gl_FragColor = vec4(baseColor, 1.0);
 }

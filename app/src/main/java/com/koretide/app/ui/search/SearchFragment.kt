@@ -125,6 +125,9 @@ class SearchFragment : Fragment() {
         collectFlow(viewModel.isLoading) { loading ->
             binding.progressBar.visibility = if (loading) View.VISIBLE else View.GONE
         }
+        collectFlow(viewModel.batchLoading) { loading ->
+            binding.cardBatchLoading.visibility = if (loading) View.VISIBLE else View.GONE
+        }
         collectFlow(viewModel.loadError) { error ->
             if (error != null) {
                 binding.tvEmpty.text = error

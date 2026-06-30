@@ -1,7 +1,9 @@
 package com.koretide.app.data.repository
 
 import com.koretide.app.BuildConfig
+import android.content.Context
 import android.util.Log
+import dagger.hilt.android.qualifiers.ApplicationContext
 import com.koretide.app.data.local.dao.StationDao
 import com.koretide.app.data.local.dao.TideRecordDao
 import com.koretide.app.data.local.entity.TideRecordEntity
@@ -11,11 +13,13 @@ import com.koretide.app.domain.model.TideData
 import com.koretide.app.domain.model.TideRecord
 import com.koretide.app.domain.model.TideStatus
 import com.koretide.app.domain.repository.TideRepository
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -24,6 +28,7 @@ import javax.inject.Singleton
 
 @Singleton
 class TideRepositoryImpl @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val stationDao: StationDao,
     private val tideRecordDao: TideRecordDao,
     private val khoaDataApi: KhoaDataApiService
@@ -31,11 +36,50 @@ class TideRepositoryImpl @Inject constructor(
 
     private val apiKey get() = BuildConfig.KHOA_API_KEY
 
-    // 30-min in-memory cache for batch recent levels (singleton lives for app lifetime)
+    // 30-min cache for batch recent levels. In-memory (singleton lives for app
+    // lifetime) + persisted to disk so cold starts within the TTL skip the
+    // ~60 parallel API calls entirely.
     private val batchMutex = Mutex()
     @Volatile private var batchCache: List<RecentTideLevel> = emptyList()
     @Volatile private var batchCacheTime: Long = 0L
+    @Volatile private var diskLoaded = false
     private val BATCH_CACHE_TTL = 30 * 60 * 1000L
+
+    private val batchPrefs by lazy { context.getSharedPreferences("tide_batch_cache", Context.MODE_PRIVATE) }
+
+    // 디스크 캐시를 메모리로 1회 적재 (process 재시작 후에도 캐시 재사용)
+    private fun ensureMemoryFromDisk() {
+        if (diskLoaded) return
+        if (batchCache.isEmpty()) {
+            val encoded = batchPrefs.getString(KEY_BATCH_DATA, null)
+            val time    = batchPrefs.getLong(KEY_BATCH_TIME, 0L)
+            if (!encoded.isNullOrBlank() && time > 0L) {
+                val list = encoded.split('\n').mapNotNull { line ->
+                    val p = line.split(',')
+                    if (p.size < 4) return@mapNotNull null
+                    val lat = p[0].toDoubleOrNull() ?: return@mapNotNull null
+                    val lon = p[1].toDoubleOrNull() ?: return@mapNotNull null
+                    RecentTideLevel(lat, lon, p[2].toIntOrNull(), p[3].toFloatOrNull())
+                }
+                if (list.isNotEmpty()) { batchCache = list; batchCacheTime = time }
+            }
+        }
+        diskLoaded = true
+    }
+
+    private fun persistBatch(levels: List<RecentTideLevel>, time: Long) {
+        val encoded = levels.joinToString("\n") { l ->
+            "${l.lat},${l.lon},${l.levelCm ?: ""},${l.windSpeedMs ?: ""}"
+        }
+        batchPrefs.edit().putString(KEY_BATCH_DATA, encoded).putLong(KEY_BATCH_TIME, time).apply()
+    }
+
+    // 캐시(메모리/디스크)만 즉시 반환 — 신선도 무관, 네트워크 호출 없음.
+    // 첫 화면에서 캐시를 바로 보여주고, 백그라운드 새로고침은 별도로 수행.
+    override suspend fun getCachedBatchLevels(): List<RecentTideLevel> = withContext(Dispatchers.IO) {
+        ensureMemoryFromDisk()
+        batchCache
+    }
 
     override suspend fun getTideData(stationCode: String): TideData {
         val date = SimpleDateFormat("yyyyMMdd", Locale.KOREA).format(Date())
@@ -109,6 +153,7 @@ class TideRepositoryImpl @Inject constructor(
     // 각 관측소 코드로 dtRecent 개별 병렬 호출 (obsCode=null 벌크 호출은 API가 지원하지 않음)
     // WeatherRepo.getWindData()와 동일한 방식 — numOfRows=1로 최신 1건만 요청
     override suspend fun getBatchRecentLevels(): List<RecentTideLevel> {
+        withContext(Dispatchers.IO) { ensureMemoryFromDisk() }
         // Return cache if still fresh
         val now = System.currentTimeMillis()
         if (batchCache.isNotEmpty() && now - batchCacheTime < BATCH_CACHE_TTL) {
@@ -155,6 +200,7 @@ class TideRepositoryImpl @Inject constructor(
             if (result.isNotEmpty()) {
                 batchCache = result
                 batchCacheTime = System.currentTimeMillis()
+                persistBatch(result, batchCacheTime)
             }
             result
         }
@@ -171,5 +217,7 @@ class TideRepositoryImpl @Inject constructor(
 
     companion object {
         private const val TAG = "TideRepo"
+        private const val KEY_BATCH_DATA = "batch_data"
+        private const val KEY_BATCH_TIME = "batch_time"
     }
 }

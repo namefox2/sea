@@ -34,6 +34,7 @@
     <string name="filter_jeju">제주</string>
     <string name="no_stations">검색 결과가 없습니다</string>
     <string name="loading">불러오는 중…</string>
+    <string name="loading_info">정보를 가져오는 중입니다…</string>
 
     <!-- Detail -->
     <string name="no_station_selected">관측소를 선택하세요</string>
