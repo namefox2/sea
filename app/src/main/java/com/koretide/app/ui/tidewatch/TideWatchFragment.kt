@@ -26,9 +26,15 @@ private const val KEY_THEME_ID = "selected_theme_id"
 private const val PREFS_WATCH = "watch_prefs"
 private const val KEY_WAVE_SOUND = "wave_sound_enabled"
 
-// 사용자가 물때 슬라이더를 직접 조절할 때 쓰는 전체 수위 범위(서해 기준).
-// 지역별 좁은 보정범위와 달리 슬라이더 전체 구간에서 물이 충분히 늘고 줄게 한다.
-private val FULL_RANGE = TidalCalibration.forRegion(StationRegion.WEST)
+// 사용자가 물때 슬라이더를 직접 조절할 때 쓰는 수위 범위 — 지역 보정범위가 아닌
+// 현재 '조차(m)'를 기준으로 한다. 조차가 클수록 물 변화 폭(span)이 커진다.
+//   만조(tide=1) 시 maxZ≈16 → 카메라 근처까지 물이 참
+//   조차 1 m ≈ Z 3.4단위 (서해 조차≈9.8 m → span≈34와 동일 기준)
+private fun tidalRangeVisualRange(rangeM: Float): Pair<Float, Float> {
+    val span = rangeM.coerceIn(0.5f, 10f) * 3.4f
+    val maxZ = 16f
+    return (maxZ - span) to maxZ
+}
 
 @AndroidEntryPoint
 class TideWatchFragment : Fragment() {
@@ -123,10 +129,11 @@ class TideWatchFragment : Fragment() {
                 binding.tvTidePct.text = "$progress%"
                 val t = progress / 100f
                 // 사용자가 직접 물때를 조절할 땐 지역의 좁은 보정범위(예: 동해 -3~3) 대신
-                // 전체 범위(서해 기준)로 매핑해 물이 확실히 늘고 줄도록 한다.
+                // 현재 '조차(m)' 기준으로 매핑해 조차가 클수록 물이 더 크게 늘고 줄게 한다.
                 // (지역 보정범위는 API 실측값을 사실적으로 보여줄 때만 의미가 있음)
                 if (fromUser) {
-                    binding.tideWatchView.setVisualRange(FULL_RANGE.visualMinZ, FULL_RANGE.visualMaxZ)
+                    val (minZ, maxZ) = tidalRangeVisualRange(cachedTidalRangeM)
+                    binding.tideWatchView.setVisualRange(minZ, maxZ)
                 }
                 binding.tideWatchView.setTide(t)
                 binding.tideWatchView.setMudflatExposure(
