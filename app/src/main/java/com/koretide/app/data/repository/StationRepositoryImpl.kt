@@ -28,7 +28,12 @@ class StationRepositoryImpl @Inject constructor(
         stationDao.searchStations(query, region?.name).map { list -> list.map { it.toDomain() } }
 
     override suspend fun refreshStations() {
-        if (stationDao.count() > 0) return
+        if (stationDao.count() > 0) {
+            // 이미 캐시된 관측소라도 좌표 기반 지역 분류 알고리즘이 바뀌었을 수 있으므로
+            // 저장된 좌표로 지역을 재계산해 갱신한다 (네트워크 호출 없음).
+            reclassifyRegions()
+            return
+        }
         if (apiKey.isBlank()) throw IllegalStateException("API 키가 설정되지 않았습니다")
         val items = odCloudApi.getStations(serviceKey = apiKey).data.orEmpty()
         Log.d(TAG, "▶ refreshStations: API 응답 ${items.size}개")
@@ -64,6 +69,19 @@ class StationRepositoryImpl @Inject constructor(
         stationDao.getAllStationsSnapshot()
             .minByOrNull { (it.lat - lat) * (it.lat - lat) + (it.lng - lon) * (it.lng - lon) }
             ?.toDomain()
+
+    // 저장된 관측소의 지역을 좌표로 재분류해, 분류 기준이 바뀐 경우 갱신
+    private suspend fun reclassifyRegions() {
+        val existing = stationDao.getAllStationsSnapshot()
+        val fixed = existing.mapNotNull { e ->
+            val correct = StationRegion.fromCoords(e.lat, e.lng).name
+            if (correct != e.region) e.copy(region = correct) else null
+        }
+        if (fixed.isNotEmpty()) {
+            stationDao.upsertAll(fixed)
+            Log.d(TAG, "  지역 재분류 ${fixed.size}개 갱신")
+        }
+    }
 
     companion object { private const val TAG = "StationRepo" }
 

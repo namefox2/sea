@@ -37,6 +37,10 @@ class SharedViewModel @Inject constructor() : ViewModel() {
         _selectedStation.value = station
     }
 
+    fun clearSelectedStation() {
+        _selectedStation.value = null
+    }
+
     fun updateTideData(data: TideData, forStation: String? = null) {
         tideDataStation = forStation ?: _selectedStation.value?.code
         _tideData.value = data
@@ -62,7 +66,10 @@ class SharedViewModel @Inject constructor() : ViewModel() {
     }
 
     fun setSelectedTheme(themeId: String) {
+        val changed = _selectedThemeId.value != themeId
         _selectedThemeId.value = themeId
+        // 테마를 바꾸면 선택된 관측소를 비워 물멍 화면이 기본값으로 초기화되게 한다.
+        if (changed) clearSelectedStation()
     }
 
     fun openIndexForStation(station: Station) {

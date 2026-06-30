@@ -164,32 +164,33 @@ class TideWatchFragment : Fragment() {
     }
 
     private fun setupImmersiveButton() {
-        binding.btnImmersive.setOnClickListener {
-            // Note: isImmersivePreset intentionally NOT set here — keeps double-tap from
-            // calling restoreStationView() and changing slider values unexpectedly.
-            cachedTidalRangeM = 5.5f
-            // 지역정보 삭제 → visual Z 범위도 기본(서해)값으로 복원해 첫 실행과 동일하게 동작.
-            // (좁은 지역 범위가 남아 있으면 물때를 올릴 때 수면선이 거의 안 올라가
-            //  beach 셰이더의 underwater 어둡게 처리만 커져 "바다 아래가 까매지는" 문제 발생)
-            cachedRegion = null
-            run {
-                val (minZ, maxZ) = tidalRangeVisualRange(cachedTidalRangeM)  // 5.5m 기준
-                binding.tideWatchView.setVisualRange(minZ, maxZ)
-            }
-            // Set sliders first; their listeners may queue a mudflatExposure GL event
-            binding.seekWind.progress       = 2
-            binding.seekTide.progress       = 35
-            binding.seekTidalRange.progress = 55
-            binding.tvTidalRange.text       = "5.5m"
-            // Apply preset AFTER sliders so its GL events queue last and win.
-            // Sets useDefaultSun=true, defaultHour=noon, tide=35%, wind=2bft, mudflat=0.
-            binding.tideWatchView.applyImmersivePreset()
-            // Clear station info overlay
-            binding.tvStationName.text      = ""
-            binding.tvTideInfo.text         = ""
-            binding.tvWindInfo.text         = ""
-            binding.tvMudflatGrade.visibility = View.GONE
+        binding.btnImmersive.setOnClickListener { resetToImmersiveDefault() }
+    }
+
+    // 기본 상태로 초기화: 지역정보 삭제 + 바람2/물때35/조차5.5 + 해 가운데(정오).
+    // 초기화 버튼과 테마 변경 시 공용 사용.
+    // Note: isImmersivePreset 는 일부러 건드리지 않음 — 더블탭 시 restoreStationView()가
+    // 슬라이더 값을 바꾸는 것을 막기 위함.
+    private fun resetToImmersiveDefault() {
+        val b = _binding ?: return
+        cachedTidalRangeM = 5.5f
+        cachedRegion = null
+        run {
+            val (minZ, maxZ) = tidalRangeVisualRange(cachedTidalRangeM)  // 5.5m 기준
+            b.tideWatchView.setVisualRange(minZ, maxZ)
         }
+        // Set sliders first; their listeners may queue a mudflatExposure GL event
+        b.seekWind.progress       = 2
+        b.seekTide.progress       = 35
+        b.seekTidalRange.progress = 55
+        b.tvTidalRange.text       = "5.5m"
+        // Apply preset AFTER sliders so its GL events queue last and win.
+        b.tideWatchView.applyImmersivePreset()
+        // Clear station info overlay
+        b.tvStationName.text      = ""
+        b.tvTideInfo.text         = ""
+        b.tvWindInfo.text         = ""
+        b.tvMudflatGrade.visibility = View.GONE
     }
 
     private fun toggleImmersive() {
@@ -234,6 +235,8 @@ class TideWatchFragment : Fragment() {
             val b = _binding ?: return@collectFlow
             if (themeId != null) {
                 val newTheme = seasonThemeManager.allThemes().firstOrNull { it.id == themeId }
+                // 테마 변경 시 지역정보 초기화는 SharedViewModel.setSelectedTheme가 관측소를
+                // 비우는 것으로 처리(아래 selectedStation 관측에서 기본값으로 리셋). 여기선 색/시각만 적용.
                 if (newTheme != null) b.tideWatchView.themeConfig = newTheme
             }
         }
@@ -242,19 +245,35 @@ class TideWatchFragment : Fragment() {
             val b = _binding ?: return@collectFlow
             isImmersivePreset = false
             cachedRegion = station?.region
-            // 조차 데이터가 오기 전 임시 범위(직전 조차값). 데이터 도착 시 applyTideData가 갱신.
-            run {
-                val (minZ, maxZ) = tidalRangeVisualRange(cachedTidalRangeM)
-                b.tideWatchView.setVisualRange(minZ, maxZ)
-            }
             b.tideWatchView.setHasStation(station != null)
             if (station != null) {
+                // 조차 데이터가 오기 전 임시 범위(직전 조차값). 데이터 도착 시 applyTideData가 갱신.
+                run {
+                    val (minZ, maxZ) = tidalRangeVisualRange(cachedTidalRangeM)
+                    b.tideWatchView.setVisualRange(minZ, maxZ)
+                }
                 b.tvStationName.text = station.name
                 // Detail에서 받아둔 캐시가 있으면 선적재 → 즉시 표시 + 5분 폴링 지연
                 val cachedTide = sharedViewModel.cachedTideFor(station.code)
                 val cachedWind = sharedViewModel.windData.value
                 if (cachedTide != null) viewModel.preloadFromCache(station.code, cachedTide, cachedWind)
                 viewModel.startPolling(station.code, station.lat, station.lng)
+            } else {
+                // 관측소 없음(앱 시작 또는 테마 변경으로 초기화) → 지역정보 제거 + 기본값.
+                // 해 위치/색은 테마값을 유지(applyImmersivePreset의 정오 강제 사용 안 함).
+                viewModel.stopPolling()
+                cachedTidalRangeM = 5.5f
+                val (minZ, maxZ) = tidalRangeVisualRange(cachedTidalRangeM)
+                b.tideWatchView.setVisualRange(minZ, maxZ)
+                b.seekWind.progress       = 2     // 리스너 → setWind(2)
+                b.seekTide.progress       = 35    // 리스너 → setTide(0.35)
+                b.seekTidalRange.progress = 55
+                b.tvTidalRange.text       = "5.5m"
+                b.tideWatchView.setMudflatExposure(0f)   // 슬라이더 리스너가 계산한 갯벌값 덮어쓰기
+                b.tvStationName.text = ""
+                b.tvTideInfo.text    = ""
+                b.tvWindInfo.text    = ""
+                b.tvMudflatGrade.visibility = View.GONE
             }
         }
 
