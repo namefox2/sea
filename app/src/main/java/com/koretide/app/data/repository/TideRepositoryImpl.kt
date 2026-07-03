@@ -95,12 +95,13 @@ class TideRepositoryImpl @Inject constructor(
         val currentLevel = dataItems.lastOrNull()?.tideLevel?.toInt() ?: 300
         Log.d(TAG, "  lastItem obsrvnDt=${dataItems.lastOrNull()?.obsrvnDt}  tideLevel=${dataItems.lastOrNull()?.tideLevel}cm")
 
-        // 하루 조석예보(고/저조)에서 고조(extrSe 1,3)·저조(extrSe 2,4)를 모아 일조차 계산
+        // 하루 조석예보(고/저조)에서 고조(extrSe 1,3)·저조(extrSe 2,4)를 모아 일조차 계산.
+        // 예보가 없으면 허구값(600/50, =조차 5.5)을 실제처럼 보이면 안 되므로 현재 수위로 폴백.
         val allHigh  = tableItems.filter { it.extrSe == 1 || it.extrSe == 3 }
         val allLow   = tableItems.filter { it.extrSe == 2 || it.extrSe == 4 }
-        val maxLevel = allHigh.mapNotNull { it.predcTdlvVl?.toInt() }.maxOrNull() ?: 600
-        val minLevel = allLow.mapNotNull  { it.predcTdlvVl?.toInt() }.minOrNull() ?: 50
-        val range    = (maxLevel - minLevel).toFloat()
+        val maxLevel = allHigh.mapNotNull { it.predcTdlvVl?.toInt() }.maxOrNull() ?: currentLevel
+        val minLevel = allLow.mapNotNull  { it.predcTdlvVl?.toInt() }.minOrNull() ?: currentLevel
+        val range    = (maxLevel - minLevel).coerceAtLeast(0).toFloat()
         Log.d(TAG, "  조석예보 items=${tableItems.size}  고조=${allHigh.size} 저조=${allLow.size}  조차=${range}cm")
         val tidePercent = if (range > 0f)
             ((currentLevel - minLevel).toFloat() / range).coerceIn(0f, 1f)
@@ -207,7 +208,8 @@ class TideRepositoryImpl @Inject constructor(
                 batchCacheTime = System.currentTimeMillis()
                 persistBatch(result, batchCacheTime)
             }
-            result
+            // 갱신 실패(전부 실패로 result 비었을 때)엔 오래된 캐시라도 유지해 반환
+            result.ifEmpty { batchCache }
         }
     }
 

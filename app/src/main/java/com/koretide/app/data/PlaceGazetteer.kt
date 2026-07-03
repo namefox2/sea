@@ -25,12 +25,14 @@ object PlaceGazetteer {
         m
     }
 
-    /** 이름으로 좌표 조회. 정확히 일치 → 부분 일치 순. 없으면 null. */
+    /** 이름으로 좌표 조회. 정확히 일치 → 안전한 부분 일치(질의가 등록명의 부분집합). 없으면 null. */
     fun coordsFor(name: String?): Pair<Double, Double>? {
         val key = normalize(name).ifEmpty { return null }
         byName[key]?.let { return it }
-        // 부분 일치 (예: "송정해수욕장" ↔ "송정") — 서로 포함 관계면 채택
-        return byName.entries.firstOrNull { (k, _) -> k.contains(key) || key.contains(k) }?.value
+        // 안전한 방향만: 질의(key)가 등록명(k)의 부분 문자열일 때만 채택.
+        // 반대 방향(key.contains(k))은 짧은 등록명이 긴 질의(예: 노선명 "여수-제주")에
+        // 잘못 매칭돼 엉뚱한 좌표를 빌려오므로 사용하지 않음.
+        return byName.entries.firstOrNull { (k, _) -> k.length >= 2 && k.contains(key) }?.value
     }
 
     // "송정해수욕장(남해)" → "송정해수욕장", 공백 제거 등 가벼운 정규화

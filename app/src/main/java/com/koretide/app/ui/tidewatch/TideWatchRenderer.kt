@@ -431,7 +431,7 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         // 자정 이후 월몰 전 시간대는 hour+24 로 변환해 arc 범위 [mr, ms] 안에 포함
         val adjHour = if (ms > 24f && hour < ms - 24f) hour + 24f else hour
         return if (adjHour < mr || adjHour > ms) -0.05f
-        else (adjHour - mr) / (ms - mr)
+        else (adjHour - mr) / (ms - mr).coerceAtLeast(0.1f)
     }
 
     // ── Normal map ────────────────────────────────────────────────────────────

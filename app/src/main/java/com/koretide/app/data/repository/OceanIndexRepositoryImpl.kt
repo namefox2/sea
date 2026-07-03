@@ -86,40 +86,6 @@ class OceanIndexRepositoryImpl @Inject constructor(
         return fetch(date, placeCode, IndexType.TIDAL_FLAT) { api.getTidalFlatForecast(key, it, date) }
     }
 
-    // bbchNm 키워드로 지역 구분 (placeCode가 응답에 포함되지 않으므로 이름으로 매핑)
-    private val regionBeachKeywords = mapOf(
-        StationRegion.WEST  to listOf("대천", "춘장대", "무창포", "꽃지", "만리포", "몽산포", "을왕리", "변산", "신두리", "어은돌", "학암포", "연포", "가계", "선유도", "구시포"),
-        StationRegion.SOUTH to listOf("해운대", "광안리", "송도", "구조라", "다대포", "일광", "진하", "임랑", "상주해수욕장", "만성리", "율포", "송호"),
-        StationRegion.EAST  to listOf("경포", "망상", "속초", "낙산", "영일대", "삼척", "주문진", "고래불", "화진포", "관성", "칠포", "송지호"),
-        StationRegion.JEJU  to listOf("함덕", "협재", "중문", "이호", "표선", "명사십리")
-    )
-
-    override suspend fun getRegionGrades(
-        date: String,
-        type: IndexType
-    ): List<Pair<StationRegion, OceanIndex>> {
-        if (key.isBlank()) throw IllegalStateException("API 키가 설정되지 않았습니다")
-
-        // placeCode=null → 전국 해수욕장 데이터 가져온 뒤 bbchNm 키워드로 지역 분류
-        val allItems: List<KhoaIndexItem> = when (type) {
-            IndexType.BEACH_SWIM   -> api.getBeachForecast(key, null, date, 100)
-            IndexType.SEA_FISHING  -> api.getFishingForecast(key, null, date, 100)
-            IndexType.SEASICKNESS  -> api.getSeasicknessForecast(key, null, date, 100)
-            IndexType.SCUBA_DIVING -> api.getScubaForecast(key, null, date, 100)
-            IndexType.TIDAL_FLAT   -> api.getTidalFlatForecast(key, null, date, 100)
-            IndexType.SURFING      -> api.getSurfingForecast(key, null, date, 100)
-            IndexType.SEA_TRAVEL   -> api.getSeaTravelForecast(key, null, date, 100)
-        }.body?.items?.item ?: emptyList()
-
-        return StationRegion.values().map { region ->
-            val keywords = regionBeachKeywords[region] ?: emptyList()
-            val item = allItems.firstOrNull { item ->
-                keywords.any { kw -> item.bbchNm?.contains(kw) == true }
-            }
-            region to (item?.toDomain(type) ?: unavailableIndex(type))
-        }
-    }
-
     override suspend fun getBeachIndicesForRegion(
         date: String,
         type: IndexType,
@@ -132,18 +98,13 @@ class OceanIndexRepositoryImpl @Inject constructor(
         if (type == IndexType.SEA_FISHING || type == IndexType.SEASICKNESS) {
             return fetchAllItems(type, date)
                 .mapNotNull { item ->
-                    val coords = item.resolvedCoords(type) ?: return@mapNotNull null
-                    Triple(item, coords.first, coords.second)
-                }
-                .filter { (_, la, lo) -> regionFromCoords(la, lo) == region }
-                // 좌표 기준 중복 제거(오전/오후 등). 이름이 비어도 항목이 하나로 합쳐지지 않도록
-                // name 대신 좌표를 키로 사용한다.
-                .distinctBy { (_, la, lo) -> Math.round(la * 100) to Math.round(lo * 100) }
-                .map { (item, la, lo) ->
+                    val (la, lo) = item.resolvedCoords(type) ?: return@mapNotNull null
+                    if (regionFromCoords(la, lo) != region) return@mapNotNull null
+                    // 이름이 비면 좌표 라벨로 폴백 (아래 이름 기준 중복 제거가 좌표별로 유지되도록)
                     val nm = item.displayName(type)?.takeIf { it.isNotBlank() }
                         ?: "지점 %.3f, %.3f".format(la, lo)
                     BeachIndexItem(
-                        code   = item.seafsPstnNm ?: item.nvgtNm ?: "$la,$lo",
+                        code   = nm,
                         name   = nm,
                         lat    = la,
                         lon    = lo,
@@ -151,6 +112,9 @@ class OceanIndexRepositoryImpl @Inject constructor(
                         index  = item.toDomain(type)
                     )
                 }
+                // 이름 기준 중복 제거(오전/오후 등). 뱃멀미는 출발항이 같아도 노선명이 달라
+                // 좌표 기준으로 합치면 안 됨(인천발 6개 노선 등).
+                .distinctBy { it.name }
         }
 
         val beaches = BeachPlaceData.byRegion(region)

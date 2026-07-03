@@ -16,11 +16,6 @@ interface OceanIndexRepository {
         tideData: TideData? = null
     ): List<OceanIndex>
 
-    suspend fun getRegionGrades(
-        date: String,
-        type: IndexType
-    ): List<Pair<StationRegion, OceanIndex>>
-
     suspend fun getBeachIndicesForRegion(
         date: String,
         type: IndexType,
