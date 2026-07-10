@@ -230,13 +230,25 @@ class TideWatchFragment : Fragment() {
         }
     }
 
+    // 사용자가 고른 테마(prefs). 관측소 없을 때(테마 미리보기)에만 적용.
+    private fun userTheme() = run {
+        val savedId = requireContext().getSharedPreferences(PREFS_THEME, Context.MODE_PRIVATE)
+            .getString(KEY_THEME_ID, null)
+        savedId?.let { id -> seasonThemeManager.allThemes().firstOrNull { it.id == id } }
+            ?: seasonThemeManager.getThemeForContext(requireContext())
+    }
+
+    // 지역(관측소) 모드용 중립(맑은 낮바다) 자연색. 해 위치·시각·날씨는 실제값으로 반영되고
+    // 물/모래 바탕색만 테마 무관하게 자연색으로 고정된다.
+    private fun neutralTheme() =
+        seasonThemeManager.allThemes().firstOrNull { it.id == "SUMMER_LIGHT" } ?: userTheme()
+
     private fun observeState() {
         collectFlow(sharedViewModel.selectedThemeId) { themeId ->
             val b = _binding ?: return@collectFlow
-            if (themeId != null) {
+            // 사용자 테마는 '관측소 없을 때(테마 미리보기)'에만 적용. 관측소 모드는 중립 자연색.
+            if (themeId != null && sharedViewModel.selectedStation.value == null) {
                 val newTheme = seasonThemeManager.allThemes().firstOrNull { it.id == themeId }
-                // 테마 변경 시 지역정보 초기화는 SharedViewModel.setSelectedTheme가 관측소를
-                // 비우는 것으로 처리(아래 selectedStation 관측에서 기본값으로 리셋). 여기선 색/시각만 적용.
                 if (newTheme != null) b.tideWatchView.themeConfig = newTheme
             }
         }
@@ -247,6 +259,8 @@ class TideWatchFragment : Fragment() {
             cachedRegion = station?.region
             b.tideWatchView.setHasStation(station != null)
             if (station != null) {
+                // 지역 모드: 물/모래 바탕은 중립 자연색, 해 위치·시각·바람/파도는 실제값 반영.
+                b.tideWatchView.themeConfig = neutralTheme()
                 // 조차 데이터가 오기 전 임시 범위(직전 조차값). 데이터 도착 시 applyTideData가 갱신.
                 run {
                     val (minZ, maxZ) = tidalRangeVisualRange(cachedTidalRangeM)
@@ -260,8 +274,9 @@ class TideWatchFragment : Fragment() {
                 viewModel.startPolling(station.code, station.lat, station.lng)
             } else {
                 // 관측소 없음(앱 시작 또는 테마 변경으로 초기화) → 지역정보 제거 + 기본값.
-                // 해 위치/색은 테마값을 유지(applyImmersivePreset의 정오 강제 사용 안 함).
+                // 이 모드(테마 미리보기)에선 사용자 테마 색/시각을 적용.
                 viewModel.stopPolling()
+                b.tideWatchView.themeConfig = userTheme()
                 cachedTidalRangeM = 5.5f
                 val (minZ, maxZ) = tidalRangeVisualRange(cachedTidalRangeM)
                 b.tideWatchView.setVisualRange(minZ, maxZ)

@@ -233,8 +233,9 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
                    else calendar.get(Calendar.HOUR_OF_DAY) + calendar.get(Calendar.MINUTE) / 60f
         computeLightDir(hour)   // writes into lightDir member
 
-        // Centre sun/moon horizontally in view for themed presets (밤바다, 노을해안)
-        if (centerLightInView) {
+        // Centre sun/moon horizontally in view for themed presets (밤바다, 노을해안).
+        // 지역(관측소) 모드에서는 실제 방위를 그대로 써야 하므로 테마 중앙고정을 끈다.
+        if (centerLightInView && useDefaultSun) {
             val elev = lightDir[1]
             val zComp = lightDir[2]
             val len = sqrt((elev * elev + zComp * zComp).toDouble()).toFloat().coerceAtLeast(0.001f)
@@ -246,19 +247,22 @@ class TideWatchRenderer(private val appContext: Context) : GLSurfaceView.Rendere
         // Station mode: map clock hour → solar-normalized LUT hour so colors match real sunrise/sunset
         sampleSkyLut(if (useDefaultSun) hour else toSolarLutHour(hour))
 
-        // Blend theme seasonal tint into LUT result (LUT drives time-of-day, theme adds seasonal flavor)
-        val tint = 0.25f
-        val tintInv = 1f - tint
-        val sh = skyHorizonTheme; val sz = skyZenithTheme; val sc = sunColorTheme
-        for (j in 0..2) {
-            lutHorizon[j] = lutHorizon[j] * tintInv + sh[j] * tint
-            lutZenith[j]  = lutZenith[j]  * tintInv + sz[j] * tint
-            lutLight[j]   = lutLight[j]   * tintInv + sc[j] * tint
+        // 테마 계절 색 블렌딩은 테마 모드에서만. 지역 모드는 실제 시각 LUT를 그대로 사용.
+        if (useDefaultSun) {
+            val tint = 0.25f
+            val tintInv = 1f - tint
+            val sh = skyHorizonTheme; val sz = skyZenithTheme; val sc = sunColorTheme
+            for (j in 0..2) {
+                lutHorizon[j] = lutHorizon[j] * tintInv + sh[j] * tint
+                lutZenith[j]  = lutZenith[j]  * tintInv + sz[j] * tint
+                lutLight[j]   = lutLight[j]   * tintInv + sc[j] * tint
+            }
         }
 
-        // Theme 윤슬 color override (e.g. silver moonlight, warm sunset gold)
+        // Theme 윤슬 color override (은빛 달빛/노을 금빛) — 테마 모드에서만.
+        // 지역 모드는 실제 시각 LUT의 광원색을 사용.
         val lco = lightColorOverride
-        if (lco != null) { lutLight[0] = lco[0]; lutLight[1] = lco[1]; lutLight[2] = lco[2] }
+        if (lco != null && useDefaultSun) { lutLight[0] = lco[0]; lutLight[1] = lco[1]; lutLight[2] = lco[2] }
 
         lightUV[0] = (lightDir[0] * 0.4f + 0.5f).coerceIn(0.05f, 0.95f)
         lightUV[1] = (lightDir[1] * 0.4f + 0.72f).coerceIn(0.52f, 0.96f)
