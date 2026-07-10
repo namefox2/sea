@@ -85,8 +85,12 @@ class TideRepositoryImpl @Inject constructor(
         val date = SimpleDateFormat("yyyyMMdd", Locale.KOREA).format(Date())
         Log.d(TAG, "▶ getTideData station=$stationCode date=$date")
 
-        val current = khoaDataApi.getTideRecent(apiKey, stationCode, date)
-        val table   = khoaDataApi.getTideForecast(apiKey, stationCode, date)
+        // 실시간(dtRecent) + 고저조예보(tideFcst)를 병렬 호출해 진입 지연 단축
+        val (current, table) = coroutineScope {
+            val c = async { khoaDataApi.getTideRecent(apiKey, stationCode, date) }
+            val t = async { khoaDataApi.getTideForecast(apiKey, stationCode, date) }
+            c.await() to t.await()
+        }
 
         val dataItems  = current.body?.items?.item ?: emptyList()
         val tableItems = table.body?.items?.item   ?: emptyList()

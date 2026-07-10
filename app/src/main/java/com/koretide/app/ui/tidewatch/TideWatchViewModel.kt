@@ -11,6 +11,8 @@ import com.koretide.app.domain.usecase.GetTideUseCase
 import com.koretide.app.domain.usecase.GetWindUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -77,10 +79,13 @@ class TideWatchViewModel @Inject constructor(
                 if (!isActive) break
                 _isLoading.value = true
                 try {
-                    val tide = getTideUseCase(stationCode)
-                    _tideData.value = tide
-                    val wind = getWindUseCase(lat, lng, stationCode)
-                    _windData.value = wind
+                    // 조위·바람을 병렬 조회하고 준비되는 대로 각각 반영 (진입 지연 단축)
+                    coroutineScope {
+                        val tideDeferred = async { getTideUseCase(stationCode) }
+                        val windDeferred = async { getWindUseCase(lat, lng, stationCode) }
+                        _tideData.value = tideDeferred.await()
+                        _windData.value = windDeferred.await()
+                    }
                     lastPollTime = System.currentTimeMillis()
                 } catch (e: Exception) {
                     Log.w(TAG, "Poll failed for $stationCode", e)
