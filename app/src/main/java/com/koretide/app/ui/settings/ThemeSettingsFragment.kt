@@ -47,7 +47,6 @@ class ThemeSettingsFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         setupThemeCards()
-        setupSupportButtons()
         setupCrashLog()
     }
 
@@ -76,18 +75,6 @@ class ThemeSettingsFragment : Fragment() {
         requireContext()
             .getSharedPreferences(PREFS_THEME, Context.MODE_PRIVATE)
             .edit().putString(KEY_THEME_ID, theme.id).apply()
-    }
-
-    private fun setupSupportButtons() {
-        val dialog by lazy {
-            AlertDialog.Builder(requireContext())
-                .setTitle(getString(R.string.support_thanks_title))
-                .setMessage(getString(R.string.support_thanks_msg))
-                .setPositiveButton(getString(R.string.support_ok), null)
-                .create()
-        }
-        listOf(binding.btnSupport400, binding.btnSupport900, binding.btnSupport1500, binding.btnSupport2000)
-            .forEach { it.setOnClickListener { dialog.show() } }
     }
 
     private fun setupCrashLog() {

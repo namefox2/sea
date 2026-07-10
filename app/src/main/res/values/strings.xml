@@ -12,15 +12,6 @@
 
     <!-- Settings / Themes -->
     <string name="settings_theme_title">테마 선택</string>
-    <string name="settings_support_title">개발자 후원</string>
-    <string name="settings_support_desc">앱 개발을 응원해 주세요 ☕\n후원금은 서버 유지 및 업데이트에 사용됩니다.</string>
-    <string name="support_400">☕ 커피 한 모금  400원</string>
-    <string name="support_900">☕ 아메리카노  900원</string>
-    <string name="support_1500">🥛 카페라떼  1,500원</string>
-    <string name="support_2000">🍰 디저트 세트  2,000원</string>
-    <string name="support_thanks_title">감사합니다!</string>
-    <string name="support_thanks_msg">개발자를 응원해 주셔서 감사합니다. 더 좋은 앱으로 보답하겠습니다 🙏</string>
-    <string name="support_ok">확인</string>
 
     <!-- Ad banner -->
     <string name="ad_label">광고</string>
