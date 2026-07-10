@@ -2,6 +2,7 @@ package com.koretide.app.ui.map
 
 import android.graphics.Color
 import android.os.Bundle
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -14,6 +15,7 @@ import com.google.android.gms.ads.MobileAds
 import com.naver.maps.geometry.LatLng
 import com.naver.maps.map.CameraUpdate
 import com.naver.maps.map.NaverMap
+import com.naver.maps.map.NaverMapSdk
 import com.naver.maps.map.OnMapReadyCallback
 import com.naver.maps.map.overlay.Marker
 import com.naver.maps.map.util.MarkerIcons
@@ -23,6 +25,7 @@ import com.koretide.app.domain.model.ActivitySpot
 import com.koretide.app.domain.model.ActivityType
 import com.koretide.app.domain.model.Station
 import com.koretide.app.ui.main.SharedViewModel
+import com.koretide.app.util.CrashLogger
 import com.koretide.app.util.collectFlow
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -49,6 +52,15 @@ class MapFragment : Fragment(), OnMapReadyCallback {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        // 네이버 지도 인증 실패(예: 800) 시 정확한 코드/메시지를 진단 로그에 남긴다.
+        // 설정 → 오류 진단 로그에서 확인/복사 가능.
+        NaverMapSdk.getInstance(requireContext()).onAuthFailedListener =
+            NaverMapSdk.OnAuthFailedListener { ex ->
+                val msg = "Naver Map 인증 실패: $ex  pkg=${requireContext().packageName}"
+                Log.e("MapFragment", msg)
+                CrashLogger.log(requireContext(), msg)
+            }
+
         binding.mapView.onCreate(savedInstanceState)
         binding.mapView.getMapAsync(this)
         setupTabs()

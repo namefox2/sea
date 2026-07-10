@@ -50,6 +50,19 @@ object CrashLogger {
         }
     }
 
+    /** 임의 진단 메시지를 로그에 append (크래시 외 이벤트: 예) 지도 인증 실패). */
+    fun log(context: Context, message: String) {
+        try {
+            val entry = "[${dateFormat.format(Date())}] $message\n"
+            val file = File(context.applicationContext.filesDir, LOG_FILE)
+            file.appendText(entry)
+            if (file.length() > MAX_BYTES) {
+                val trimmed = file.readText().takeLast(MAX_BYTES)
+                file.writeText(trimmed)
+            }
+        } catch (_: Exception) { /* 진단 로그 실패는 무시 */ }
+    }
+
     fun read(context: Context): String {
         val file = File(context.applicationContext.filesDir, LOG_FILE)
         return if (file.exists()) file.readText().trim() else ""
