@@ -64,6 +64,42 @@
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 
+    <!-- 정보 로딩 표시 (관측소 데이터 가져오는 중) -->
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/cardWatchLoading"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_margin="@dimen/spacing_md"
+        android:visibility="gone"
+        app:cardBackgroundColor="#AA000000"
+        app:cardCornerRadius="@dimen/card_radius"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingHorizontal="@dimen/spacing_md"
+            android:paddingVertical="@dimen/spacing_sm">
+
+            <ProgressBar
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:layout_marginEnd="@dimen/spacing_sm"
+                android:indeterminateTint="@android:color/white" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🌊 정보를 가져오는 중…"
+                android:textColor="@android:color/white"
+                android:textSize="12sp" />
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
+
     <!-- Wind / Tide slider panel -->
     <com.google.android.material.card.MaterialCardView
         android:id="@+id/sliderPanel"

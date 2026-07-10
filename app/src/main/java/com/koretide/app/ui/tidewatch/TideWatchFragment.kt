@@ -299,8 +299,16 @@ class TideWatchFragment : Fragment() {
             }
         }
 
+        // 최초 로딩(아직 데이터 없음)에만 로딩 표시 — 5분 폴링 갱신 땐 조용히
+        collectFlow(viewModel.isLoading) { loading ->
+            val b = _binding ?: return@collectFlow
+            b.cardWatchLoading.visibility =
+                if (loading && viewModel.tideData.value == null) View.VISIBLE else View.GONE
+        }
+
         collectFlow(viewModel.tideData) { data ->
             val b = _binding ?: return@collectFlow
+            if (data != null) b.cardWatchLoading.visibility = View.GONE
             if (data != null && !isImmersivePreset) {
                 applyTideData(b, data)
                 sharedViewModel.updateTideData(data)

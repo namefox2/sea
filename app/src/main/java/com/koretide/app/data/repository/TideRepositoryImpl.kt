@@ -7,6 +7,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import com.koretide.app.data.local.dao.StationDao
 import com.koretide.app.data.local.dao.TideRecordDao
 import com.koretide.app.data.local.entity.TideRecordEntity
+import com.koretide.app.data.remote.DtRecentSource
 import com.koretide.app.data.remote.KhoaDataApiService
 import com.koretide.app.domain.model.RecentTideLevel
 import com.koretide.app.domain.model.TideData
@@ -31,7 +32,8 @@ class TideRepositoryImpl @Inject constructor(
     @ApplicationContext private val context: Context,
     private val stationDao: StationDao,
     private val tideRecordDao: TideRecordDao,
-    private val khoaDataApi: KhoaDataApiService
+    private val khoaDataApi: KhoaDataApiService,
+    private val dtRecentSource: DtRecentSource
 ) : TideRepository {
 
     private val apiKey get() = BuildConfig.KHOA_API_KEY
@@ -85,15 +87,14 @@ class TideRepositoryImpl @Inject constructor(
         val date = SimpleDateFormat("yyyyMMdd", Locale.KOREA).format(Date())
         Log.d(TAG, "▶ getTideData station=$stationCode date=$date")
 
-        // 실시간(dtRecent) + 고저조예보(tideFcst)를 병렬 호출해 진입 지연 단축
-        val (current, table) = coroutineScope {
-            val c = async { khoaDataApi.getTideRecent(apiKey, stationCode, date) }
+        // 실시간(dtRecent, 공유 캐시) + 고저조예보(tideFcst)를 병렬 호출해 진입 지연 단축.
+        // dtRecent는 DtRecentSource로 조회 → 바람 조회와 같은 관측소면 호출 1회로 합쳐짐.
+        val (dataItems, table) = coroutineScope {
+            val c = async { dtRecentSource.items(stationCode, date) }
             val t = async { khoaDataApi.getTideForecast(apiKey, stationCode, date) }
             c.await() to t.await()
         }
-
-        val dataItems  = current.body?.items?.item ?: emptyList()
-        val tableItems = table.body?.items?.item   ?: emptyList()
+        val tableItems = table.body?.items?.item ?: emptyList()
         Log.d(TAG, "  dtRecent items=${dataItems.size}  tideFcst items=${tableItems.size}")
 
         val currentLevel = dataItems.lastOrNull()?.tideLevel?.toInt() ?: 300

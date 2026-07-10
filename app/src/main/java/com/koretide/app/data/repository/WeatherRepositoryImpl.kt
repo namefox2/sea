@@ -3,6 +3,7 @@ package com.koretide.app.data.repository
 import android.util.Log
 import com.koretide.app.BuildConfig
 import com.koretide.app.data.local.dao.StationDao
+import com.koretide.app.data.remote.DtRecentSource
 import com.koretide.app.data.remote.KhoaDataApiService
 import com.koretide.app.data.remote.dto.KhoaWaveItem
 import com.koretide.app.domain.model.WindData
@@ -20,7 +21,8 @@ import kotlin.math.abs
 @Singleton
 class WeatherRepositoryImpl @Inject constructor(
     private val stationDao: StationDao,
-    private val khoaDataApi: KhoaDataApiService
+    private val khoaDataApi: KhoaDataApiService,
+    private val dtRecentSource: DtRecentSource
 ) : WeatherRepository {
 
     private val apiKey get() = BuildConfig.KHOA_API_KEY
@@ -38,14 +40,8 @@ class WeatherRepositoryImpl @Inject constructor(
         return try {
             // 바람(dtRecent)과 파고(noonWave)를 병렬 호출해 진입 지연 단축
             coroutineScope {
-                val windDeferred = async {
-                    khoaDataApi.getTideRecent(
-                        serviceKey = apiKey,
-                        obsCode    = obsCode,
-                        date       = date,
-                        numOfRows  = 1
-                    ).body?.items?.item.orEmpty()
-                }
+                // dtRecent는 공유 캐시로 조회 → 조위 조회와 같은 관측소면 호출이 합쳐짐
+                val windDeferred = async { dtRecentSource.items(obsCode, date) }
                 val waveDeferred = async {
                     runCatching {
                         val waveItems = khoaDataApi.getWave(apiKey, null, date).body?.items?.item.orEmpty()
