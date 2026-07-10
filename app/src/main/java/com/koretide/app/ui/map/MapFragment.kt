@@ -29,6 +29,10 @@ import com.koretide.app.util.CrashLogger
 import com.koretide.app.util.collectFlow
 import dagger.hilt.android.AndroidEntryPoint
 
+// 지도 핀 크기(dp). MarkerIcons 기본 SIZE_AUTO보다 작게. 조절하려면 이 값만 변경.
+private const val PIN_WIDTH_DP  = 20f
+private const val PIN_HEIGHT_DP = 28f
+
 @AndroidEntryPoint
 class MapFragment : Fragment(), OnMapReadyCallback {
 
@@ -109,8 +113,10 @@ class MapFragment : Fragment(), OnMapReadyCallback {
         position = LatLng(lat, lng)
         icon = MarkerIcons.BLACK
         iconTintColor = tintColor
-        width = Marker.SIZE_AUTO
-        height = Marker.SIZE_AUTO
+        // 기본(SIZE_AUTO)은 화면에 너무 큼 → 명시 크기로 축소 (핀 비율 유지)
+        val density = resources.displayMetrics.density
+        width  = (PIN_WIDTH_DP  * density).toInt()
+        height = (PIN_HEIGHT_DP * density).toInt()
         captionText = name
         captionTextSize = 10f
         captionMinZoom = minZoom
