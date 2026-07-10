@@ -64,39 +64,41 @@
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 
-    <!-- 정보 로딩 표시 (관측소 데이터 가져오는 중) -->
+    <!-- 정보 로딩 표시 (관측소 데이터 가져오는 중) — 화면 중앙, 크게 -->
     <com.google.android.material.card.MaterialCardView
         android:id="@+id/cardWatchLoading"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_margin="@dimen/spacing_md"
         android:visibility="gone"
-        app:cardBackgroundColor="#AA000000"
-        app:cardCornerRadius="@dimen/card_radius"
+        app:cardBackgroundColor="#E60288A8"
+        app:cardCornerRadius="20dp"
+        app:cardElevation="12dp"
         app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
 
         <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:paddingHorizontal="@dimen/spacing_md"
-            android:paddingVertical="@dimen/spacing_sm">
+            android:orientation="vertical"
+            android:gravity="center"
+            android:paddingHorizontal="32dp"
+            android:paddingVertical="24dp">
 
             <ProgressBar
-                android:layout_width="16dp"
-                android:layout_height="16dp"
-                android:layout_marginEnd="@dimen/spacing_sm"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_marginBottom="14dp"
                 android:indeterminateTint="@android:color/white" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="🌊 정보를 가져오는 중…"
+                android:text="🌊 정보를 가져오는 중입니다…"
                 android:textColor="@android:color/white"
-                android:textSize="12sp" />
+                android:textStyle="bold"
+                android:textSize="16sp" />
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 
