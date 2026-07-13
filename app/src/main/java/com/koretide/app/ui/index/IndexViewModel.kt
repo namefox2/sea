@@ -79,7 +79,9 @@ class IndexViewModel @Inject constructor(
 
     fun navigateBack(): Boolean {
         if (navStack.size <= 1) return false
-        navStack.removeLast()
+        // API 35(Java 21)의 List.removeLast()와 충돌해 Android 14 이하에서
+        // NoSuchMethodError로 크래시하므로 removeAt(lastIndex)로 대체.
+        navStack.removeAt(navStack.lastIndex)
         when (val screen = navStack.last()) {
             is IndexNav.TypeList   -> _uiState.value = IndexUiState.TypeList
             is IndexNav.RegionList -> _uiState.value = IndexUiState.RegionList(screen.type)
