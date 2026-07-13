@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>오늘바다 개인정보처리방침</title>
+<style>
+  :root {
+    --bg: #f6f8fa; --card: #ffffff; --fg: #1b2733; --muted: #5b6b7b;
+    --line: #e3e8ee; --accent: #0288a8; --accent-weak: #e6f4f8;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e1621; --card: #16212e; --fg: #e6edf3; --muted: #9fb0c0;
+      --line: #24313f; --accent: #4bc6e0; --accent-weak: #13303a;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic",
+                 "Noto Sans KR", Roboto, sans-serif;
+    line-height: 1.7; font-size: 16px; -webkit-text-size-adjust: 100%;
+  }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 28px 20px 72px; }
+  header {
+    background: linear-gradient(135deg, var(--accent), #005f78);
+    color: #fff; border-radius: 18px; padding: 30px 26px; margin-bottom: 26px;
+  }
+  header .app { font-size: 15px; opacity: .9; letter-spacing: .04em; }
+  header h1 { margin: 6px 0 4px; font-size: 26px; }
+  header .eff { font-size: 13px; opacity: .85; }
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+    padding: 20px 22px; margin: 16px 0;
+  }
+  h2 {
+    font-size: 18px; margin: 4px 0 12px; padding-left: 12px;
+    border-left: 4px solid var(--accent);
+  }
+  p, li { color: var(--fg); }
+  .muted { color: var(--muted); font-size: 14px; }
+  ul { padding-left: 20px; margin: 8px 0; }
+  li { margin: 5px 0; }
+  a { color: var(--accent); word-break: break-all; }
+  table { width: 100%; border-collapse: collapse; margin: 6px 0; font-size: 14.5px; }
+  th, td { border: 1px solid var(--line); padding: 9px 11px; text-align: left; vertical-align: top; }
+  th { background: var(--accent-weak); }
+  .notice {
+    background: var(--accent-weak); border: 1px solid var(--line);
+    border-radius: 12px; padding: 14px 16px; font-size: 14.5px;
+  }
+  .k { display:inline-block; min-width: 92px; color: var(--muted); }
+  footer { text-align: center; color: var(--muted); font-size: 13px; margin-top: 28px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="app">🌊 오늘바다 (KoreTide)</div>
+    <h1>개인정보처리방침</h1>
+    <div class="eff">시행일 · 2026년 7월 13일</div>
+  </header>
+
+  <div class="card">
+    <p>‘오늘바다’(이하 “본 앱”)는 이용자의 개인정보를 소중히 여기며, 「개인정보 보호법」 등 관련 법령을
+    준수합니다. 본 방침은 본 앱이 어떤 정보를 다루는지, 제3자 서비스가 어떤 정보를 수집할 수 있는지를
+    투명하게 안내합니다.</p>
+  </div>
+
+  <div class="card">
+    <h2>1. 앱이 직접 수집하는 개인정보</h2>
+    <p><strong>본 앱은 이용자의 개인정보를 직접 수집하지 않습니다.</strong></p>
+    <ul>
+      <li>회원가입·로그인 기능이 <strong>없습니다</strong>. (이름·이메일·전화번호 등 미수집)</li>
+      <li>위치 권한을 <strong>요청하지 않으며</strong>, 이용자의 GPS 위치를 수집하지 않습니다.</li>
+      <li>앱이 사용하는 권한은 <em>인터넷 접속(INTERNET)</em>과 <em>네트워크 상태 확인(ACCESS_NETWORK_STATE)</em>
+      뿐이며, 이는 해양 정보 조회를 위한 통신 목적입니다.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>2. 제3자 서비스를 통한 자동 수집</h2>
+    <p>본 앱은 광고 및 지도 기능을 위해 아래 제3자 SDK를 사용하며, 해당 사업자가 서비스 제공 목적으로
+    일부 정보를 자동 수집할 수 있습니다. 수집·이용은 각 사업자의 개인정보처리방침을 따릅니다.</p>
+    <table>
+      <tr><th>서비스</th><th>목적</th><th>수집될 수 있는 정보</th></tr>
+      <tr>
+        <td>Google AdMob<br>(구글 광고)</td>
+        <td>배너 광고 노출·측정</td>
+        <td>광고 식별자(AAID), 기기정보, IP 주소, 광고 상호작용 데이터 등</td>
+      </tr>
+      <tr>
+        <td>네이버 클라우드 플랫폼 지도<br>(Naver Maps)</td>
+        <td>지도 표시</td>
+        <td>지도 요청에 필요한 기기·네트워크 정보</td>
+      </tr>
+    </table>
+    <p class="muted">각 사업자 정책 · Google:
+      <a href="https://policies.google.com/privacy">policies.google.com/privacy</a> /
+      네이버클라우드:
+      <a href="https://www.ncloud.com/policy/private">ncloud.com/policy/private</a></p>
+  </div>
+
+  <div class="card">
+    <h2>3. 기기 안에만 저장되는 정보</h2>
+    <p>아래 정보는 <strong>이용자 기기 내부에만 저장</strong>되며, 외부 서버로 전송되지 않습니다.</p>
+    <ul>
+      <li>앱 설정(선택한 테마 등)</li>
+      <li>해양·조위·관측소 정보의 임시 캐시(빠른 표시·통신량 절감용)</li>
+      <li>오류 진단 로그(앱 안정성 개선용, 개인 식별 정보 미포함)</li>
+    </ul>
+    <p class="muted">위 정보는 앱을 삭제하면 기기에서 함께 삭제됩니다.</p>
+  </div>
+
+  <div class="card">
+    <h2>4. 보유 및 파기</h2>
+    <ul>
+      <li>기기 내 저장 정보: 앱 삭제 시 파기됩니다.</li>
+      <li>제3자(AdMob·네이버)가 수집한 정보: 각 사업자의 정책에 따라 보관·파기됩니다.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>5. 광고 개인화 및 광고 식별자 제어</h2>
+    <p>이용자는 기기 설정에서 광고 식별자를 재설정하거나 맞춤형 광고를 제한할 수 있습니다.</p>
+    <ul>
+      <li>Android: <em>설정 → Google → 광고</em>에서 ‘광고 ID 삭제’ 또는 ‘맞춤 광고 선택 해제’</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>6. 만 14세 미만 아동</h2>
+    <p>본 앱은 만 14세 미만 아동을 주 대상으로 하지 않으며, 아동의 개인정보를 의도적으로 수집하지 않습니다.</p>
+  </div>
+
+  <div class="card">
+    <h2>7. 이용자의 권리 및 문의</h2>
+    <p>본 앱은 개인정보를 직접 보관하지 않으므로 별도의 계정 정보는 없습니다. 개인정보 처리 관련 문의,
+    제3자 수집 데이터에 대한 열람·삭제 요청은 아래로 연락 주시기 바랍니다.</p>
+    <p class="notice">📮 <span class="k">개발자 문의</span>
+      <a href="mailto:namefox2@naver.com">namefox2@naver.com</a></p>
+  </div>
+
+  <div class="card">
+    <h2>8. 정보 제공처(데이터 출처)</h2>
+    <p>본 앱이 표시하는 해양·천문 정보는 아래 공공·상용 서비스의 데이터를 활용합니다.</p>
+    <ul>
+      <li>국립해양조사원(KHOA) — 조위·조석예보·해양활동지수·실측파랑</li>
+      <li>한국천문연구원(KASI) — 일출·일몰·월출·월몰</li>
+      <li>공공데이터포털(data.go.kr) — 조위관측소 목록 등</li>
+      <li>네이버 지도(NAVER Maps) — 지도</li>
+    </ul>
+    <p class="notice">⚠️ 본 앱의 조석·기상 정보는 <strong>참고용</strong>이며 정확성을 보증하지 않습니다.
+      실제 항해·조업·해양 안전 활동 시에는 반드시 국립해양조사원 등 <strong>공식 기관의 최신 정보</strong>를
+      확인하시기 바랍니다.</p>
+  </div>
+
+  <div class="card">
+    <h2>9. 방침의 변경</h2>
+    <p>본 방침은 법령·서비스 변경에 따라 개정될 수 있으며, 개정 시 본 페이지를 통해 고지합니다.</p>
+  </div>
+
+  <footer>
+    © 2026 오늘바다 · 문의 namefox2@naver.com
+  </footer>
+
+</div>
+</body>
+</html>
