@@ -97,11 +97,6 @@ class MapFragment : Fragment(), OnMapReadyCallback {
         collectFlow(viewModel.activitySpots) { spots ->
             if (naverMap != null) updateSpotMarkers(spots)
         }
-        collectFlow(viewModel.activityFilter) { filter ->
-            val b = _binding ?: return@collectFlow
-            val showIndex = filter != null && filter != ActivityType.HIGH_TIDE
-            b.btnViewIndex.visibility = if (showIndex) View.VISIBLE else View.GONE
-        }
     }
 
     // Creates a Naver map marker with shared defaults
@@ -178,10 +173,6 @@ class MapFragment : Fragment(), OnMapReadyCallback {
             override fun onTabUnselected(tab: com.google.android.material.tabs.TabLayout.Tab) {}
             override fun onTabReselected(tab: com.google.android.material.tabs.TabLayout.Tab) {}
         })
-
-        binding.btnViewIndex.setOnClickListener {
-            sharedViewModel.requestTabNavigation(R.id.navigation_index)
-        }
     }
 
     private fun onPinSelected(station: Station) {

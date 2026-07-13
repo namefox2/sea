@@ -50,20 +50,11 @@ class IndexFragment : Fragment() {
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, backCallback)
 
         binding.btnIndexInfo.setOnClickListener { showIndexInfoDialog() }
-        binding.btnGoWatch.setOnClickListener {
-            viewModel.requestWatchForCurrentRegion()
-        }
         binding.btnBackFromRegion.setOnClickListener { viewModel.navigateBack() }
-        binding.btnBackFromForecast.setOnClickListener { viewModel.navigateBack() }
         binding.btnBackFromBeach.setOnClickListener { viewModel.navigateBack() }
 
         collectFlow(sharedViewModel.selectedStation) {
             if (viewModel.isAtRoot()) viewModel.loadTypeList()
-        }
-
-        collectFlow(viewModel.watchStation) { station ->
-            if (station != null) sharedViewModel.selectStation(station)
-            sharedViewModel.requestTabNavigation(R.id.navigation_watch)
         }
 
         collectFlow(viewModel.uiState) { state ->
@@ -73,8 +64,10 @@ class IndexFragment : Fragment() {
                 is IndexUiState.TypeList   -> showTypeList()
                 is IndexUiState.RegionList -> showRegionList(state)
                 is IndexUiState.BeachList  -> showBeachList(state)
-                is IndexUiState.Forecast   -> showForecast(state)
-                is IndexUiState.Error      -> showError(state.message)
+                is IndexUiState.Error      -> {
+                    android.widget.Toast.makeText(requireContext(), state.message, android.widget.Toast.LENGTH_SHORT).show()
+                    viewModel.navigateBack()   // 지역 목록으로 복귀
+                }
             }
         }
     }
@@ -85,7 +78,6 @@ class IndexFragment : Fragment() {
         binding.screenTypeList.isVisible   = screen == 1
         binding.screenRegionList.isVisible = screen == 2
         binding.screenBeachList.isVisible  = screen == 3
-        binding.screenForecast.isVisible   = screen == 4
     }
 
     private fun showLoading() {
@@ -93,15 +85,6 @@ class IndexFragment : Fragment() {
         binding.progressTypeList.isVisible   = binding.screenTypeList.isVisible
         binding.progressRegionList.isVisible = binding.screenRegionList.isVisible
         binding.progressBeachList.isVisible  = binding.screenBeachList.isVisible
-        binding.progressBar.isVisible        = binding.screenForecast.isVisible
-    }
-
-    private fun showError(msg: String) {
-        showScreen(4)
-        binding.tvError.isVisible = true
-        binding.tvError.text = msg
-        binding.progressBar.isVisible = false
-        binding.containerForecast.removeAllViews()
     }
 
     // ── Screen 1: TypeList ────────────────────────────────────────
@@ -178,34 +161,8 @@ class IndexFragment : Fragment() {
                 tvGrade.background = null
             }
 
-            row.setOnClickListener { viewModel.selectBeach(item, state.type, state.region) }
+            // 레벨(등급)만 표시 — 항목 탭 시 이동 없음(7일 예보 제거)
             binding.containerBeachList.addView(row)
-        }
-    }
-
-    // ── Screen 4: Forecast ────────────────────────────────────────
-
-    private fun showForecast(state: IndexUiState.Forecast) {
-        showScreen(4)
-        binding.progressBar.isVisible = false
-        binding.tvError.isVisible = false
-        val title = if (state.beachName != null) {
-            "${state.beachName} · ${state.type.emoji} 7일 예보"
-        } else {
-            "${state.region.displayName} · ${state.type.emoji} 7일 예보"
-        }
-        val statusSuffix = state.opnStat?.let { "  [$it]" } ?: ""
-        binding.tvForecastHeaderTitle.text = "$title$statusSuffix"
-
-        binding.containerForecast.removeAllViews()
-        val inflater = LayoutInflater.from(requireContext())
-        for (day in state.forecast) {
-            val card = inflater.inflate(R.layout.item_forecast_day, binding.containerForecast, false)
-            card.findViewById<TextView>(R.id.tvDayLabel).text   = day.label
-            card.findViewById<TextView>(R.id.tvWaterTemp).text  = day.waterTemp?.let  { "%.1f°C".format(it) } ?: "-"
-            card.findViewById<TextView>(R.id.tvWaveHeight).text = day.waveHeight?.let { "%.1fm".format(it)  } ?: "-"
-            card.findViewById<TextView>(R.id.tvWindSpeed).text  = day.windSpeed?.let  { "%.1fm/s".format(it)} ?: "-"
-            binding.containerForecast.addView(card)
         }
     }
 

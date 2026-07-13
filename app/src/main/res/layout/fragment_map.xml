@@ -36,16 +36,6 @@
             <com.google.android.material.tabs.TabItem android:text="스킨스쿠버" />
             <com.google.android.material.tabs.TabItem android:text="바다여행" />
         </com.google.android.material.tabs.TabLayout>
-
-        <!-- 지수보기 button — shown when a non-관측소 category is active -->
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnViewIndex"
-            style="@style/Widget.MaterialComponents.Button.TextButton"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="지수보기"
-            android:textSize="13sp"
-            android:visibility="gone" />
     </LinearLayout>
 
     <!-- AdMob 배너 -->
