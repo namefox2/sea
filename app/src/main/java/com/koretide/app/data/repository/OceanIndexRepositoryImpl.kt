@@ -168,17 +168,22 @@ class OceanIndexRepositoryImpl @Inject constructor(
         unavailableIndex(type)
     }
 
-    // 전체 응답 조회 (placeCode=null). 낚시/뱃멀미는 응답에 포함된 좌표로 매칭한다.
+    // 전체 응답 조회. 낚시는 gubun(갯바위/선상)으로, 나머지는 placeCode=null로 조회.
     private suspend fun fetchAllItems(type: IndexType, date: String, rows: Int = 200): List<KhoaIndexItem> =
-        (when (type) {
-            IndexType.BEACH_SWIM   -> api.getBeachForecast(key, null, date, rows)
-            IndexType.SEA_FISHING  -> api.getFishingForecast(key, null, date, rows)
-            IndexType.SEASICKNESS  -> api.getSeasicknessForecast(key, null, date, rows)
-            IndexType.SCUBA_DIVING -> api.getScubaForecast(key, null, date, rows)
-            IndexType.TIDAL_FLAT   -> api.getTidalFlatForecast(key, null, date, rows)
-            IndexType.SURFING      -> api.getSurfingForecast(key, null, date, rows)
-            IndexType.SEA_TRAVEL   -> api.getSeaTravelForecast(key, null, date, rows)
-        }).body?.items?.item ?: emptyList()
+        when (type) {
+            IndexType.SEA_FISHING -> {
+                // 바다낚시는 placeCode가 아니라 gubun으로 조회 → 갯바위·선상 둘 다 합침
+                val rock = api.getFishingForecast(key, gubun = "갯바위", numOfRows = rows).body?.items?.item ?: emptyList()
+                val boat = api.getFishingForecast(key, gubun = "선상",   numOfRows = rows).body?.items?.item ?: emptyList()
+                rock + boat
+            }
+            IndexType.BEACH_SWIM   -> api.getBeachForecast(key, null, date, rows).body?.items?.item ?: emptyList()
+            IndexType.SEASICKNESS  -> api.getSeasicknessForecast(key, null, date, rows).body?.items?.item ?: emptyList()
+            IndexType.SCUBA_DIVING -> api.getScubaForecast(key, null, date, rows).body?.items?.item ?: emptyList()
+            IndexType.TIDAL_FLAT   -> api.getTidalFlatForecast(key, null, date, rows).body?.items?.item ?: emptyList()
+            IndexType.SURFING      -> api.getSurfingForecast(key, null, date, rows).body?.items?.item ?: emptyList()
+            IndexType.SEA_TRAVEL   -> api.getSeaTravelForecast(key, null, date, rows).body?.items?.item ?: emptyList()
+        }
 
     // 좌표로 가장 가까운 지점의 지수 (낚시/뱃멀미 — 전용 placeCode 데이터셋이 없는 유형)
     private suspend fun nearestIndex(date: String, lat: Double?, lon: Double?, type: IndexType): OceanIndex {

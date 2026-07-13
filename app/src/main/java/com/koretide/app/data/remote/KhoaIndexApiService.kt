@@ -18,12 +18,12 @@ interface KhoaIndexApiService {
         @Query("type")       type: String = "json"
     ): KhoaIndexResponse
 
+    // 바다낚시지수: placeCode가 아니라 gubun(갯바위/선상)으로 조회. reqDate 없음.
     @GET("fcstFishingv2/GetFcstFishingApiServicev2")
     suspend fun getFishingForecast(
         @Query("serviceKey") serviceKey: String,
-        @Query("placeCode")  placeCode: String?,
-        @Query("reqDate")    reqDate: String,
-        @Query("numOfRows")  numOfRows: Int = 100,
+        @Query("gubun")      gubun: String,
+        @Query("numOfRows")  numOfRows: Int = 200,
         @Query("pageNo")     pageNo: Int = 1,
         @Query("type")       type: String = "json"
     ): KhoaIndexResponse
