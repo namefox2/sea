@@ -184,7 +184,6 @@ class MapFragment : Fragment(), OnMapReadyCallback {
         b.btnViewDetail.setOnClickListener { safeNavigate { findNavController().navigate(R.id.action_global_to_detail) } }
         b.btnGoWatch.visibility = View.VISIBLE
         b.btnGoWatch.setOnClickListener {
-            CrashLogger.log(requireContext(), "지도 물멍하러가기: 관측소=${station.name}")
             safeNavigate { sharedViewModel.requestTabNavigation(R.id.navigation_watch) }
         }
     }

@@ -16,10 +16,6 @@ import com.koretide.app.domain.model.OceanIndex
 import com.koretide.app.domain.model.StationRegion
 import com.koretide.app.domain.model.TideData
 import com.koretide.app.domain.repository.OceanIndexRepository
-import com.koretide.app.util.CrashLogger
-import android.content.Context
-import android.util.Log
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import java.text.SimpleDateFormat
@@ -30,7 +26,6 @@ import javax.inject.Singleton
 
 @Singleton
 class OceanIndexRepositoryImpl @Inject constructor(
-    @ApplicationContext private val context: Context,
     private val api: KhoaIndexApiService
 ) : OceanIndexRepository {
 
@@ -101,17 +96,7 @@ class OceanIndexRepositoryImpl @Inject constructor(
         // 낚시/뱃멀미: 전용 해수욕장 좌표가 없으므로 API 응답의 좌표(lat/lot)로 지역 분류 후 그대로 나열.
         // 응답에 좌표가 없으면 이름으로 PlaceGazetteer에서 좌표를 빌려온다.
         if (type == IndexType.SEA_FISHING || type == IndexType.SEASICKNESS) {
-            val all = fetchAllItems(type, date)
-            // 진단: 전체 개수 / 좌표 있는 개수 / 지역별 분포
-            run {
-                val withCoords = all.mapNotNull { it.resolvedCoords(type) }
-                val byRegion = withCoords.groupingBy { regionFromCoords(it.first, it.second) }.eachCount()
-                val msg = "지수[${type.displayName}]: 전체=${all.size} 좌표해석=${withCoords.size} " +
-                    "지역분포=$byRegion  요청=${region.displayName}"
-                Log.d("IndexDiag", msg)
-                CrashLogger.log(context, msg)
-            }
-            return all
+            return fetchAllItems(type, date)
                 .mapNotNull { item ->
                     val (la, lo) = item.resolvedCoords(type) ?: return@mapNotNull null
                     if (regionFromCoords(la, lo) != region) return@mapNotNull null

@@ -4,7 +4,6 @@ import android.content.Context
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -17,7 +16,6 @@ import com.koretide.app.domain.model.StationRegion
 import com.koretide.app.domain.model.TideData
 import com.koretide.app.theme.SeasonThemeManager
 import com.koretide.app.ui.main.SharedViewModel
-import com.koretide.app.util.CrashLogger
 import com.koretide.app.util.collectFlow
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
@@ -257,8 +255,6 @@ class TideWatchFragment : Fragment() {
 
         collectFlow(sharedViewModel.selectedStation) { station ->
             val b = _binding ?: return@collectFlow
-            Log.d("TideWatch", "selectedStation → ${station?.name ?: "NULL"}")
-            CrashLogger.log(requireContext(), "물멍 진입: 관측소=${station?.name ?: "NULL"}")
             isImmersivePreset = false
             cachedRegion = station?.region
             b.tideWatchView.setHasStation(station != null)
@@ -312,9 +308,6 @@ class TideWatchFragment : Fragment() {
 
         collectFlow(viewModel.tideData) { data ->
             val b = _binding ?: return@collectFlow
-            Log.d("TideWatch", "tideData → ${data?.let { "${it.currentLevel}cm 조차${it.tidalRangeM}m" } ?: "NULL"}")
-            if (data == null) CrashLogger.log(requireContext(), "물멍 조위데이터: NULL (조회 실패/대기)")
-            else CrashLogger.log(requireContext(), "물멍 조위데이터: ${data.currentLevel}cm 조차${data.tidalRangeM}m")
             if (data != null) b.cardWatchLoading.visibility = View.GONE
             if (data != null && !isImmersivePreset) {
                 applyTideData(b, data)
