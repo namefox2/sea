@@ -141,6 +141,8 @@ class IndexFragment : Fragment() {
                 .inflate(R.layout.item_region_grade_row, binding.containerBeachList, false)
 
             row.findViewById<TextView>(R.id.tvRegionName).text = item.name
+            // 세부지역 목록은 더 이상 이동하지 않으므로 › 화살표 숨김
+            row.findViewById<TextView>(R.id.tvChevron).isVisible = false
 
             val grade = item.index.grade
             val opnStat = item.index.opnStat

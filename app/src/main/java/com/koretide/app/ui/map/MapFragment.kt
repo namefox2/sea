@@ -42,7 +42,6 @@ class MapFragment : Fragment(), OnMapReadyCallback {
     private var naverMap: NaverMap? = null
     private val stationMarkers = mutableListOf<Marker>()
     private val spotMarkers = mutableListOf<Marker>()
-    private var activitySpotNearestStation: Station? = null
 
     private val viewModel: MapViewModel by viewModels()
     private val sharedViewModel: SharedViewModel by activityViewModels()
@@ -176,7 +175,6 @@ class MapFragment : Fragment(), OnMapReadyCallback {
     }
 
     private fun onPinSelected(station: Station) {
-        activitySpotNearestStation = null
         sharedViewModel.selectStation(station)
         val b = _binding ?: return
         b.tooltipCard.visibility = View.VISIBLE
@@ -192,30 +190,13 @@ class MapFragment : Fragment(), OnMapReadyCallback {
     }
 
     private fun onActivityPinSelected(spot: ActivitySpot) {
-        val nearest = viewModel.findNearestStation(spot.lat, spot.lng)
-        activitySpotNearestStation = nearest
-
         val b = _binding ?: return
+        // 관측소가 아닌 활동 지점(낚시/서핑 등)은 정보만 표시 — 물멍하러가기·상세보기 없음
         b.tooltipCard.visibility = View.VISIBLE
         b.tvTooltipName.text = spot.name
-        b.tvTooltipRegion.text = buildString {
-            append(spot.type.displayName)
-            if (nearest != null) append(" · 인근: ${nearest.name}")
-        }
-        if (nearest != null) {
-            b.btnViewDetail.visibility = View.VISIBLE
-            b.btnViewDetail.setOnClickListener {
-                sharedViewModel.selectStation(nearest)
-                safeNavigate { findNavController().navigate(R.id.action_global_to_detail) }
-            }
-        } else {
-            b.btnViewDetail.visibility = View.GONE
-        }
-        b.btnGoWatch.visibility = View.VISIBLE
-        b.btnGoWatch.setOnClickListener {
-            activitySpotNearestStation?.let { sharedViewModel.selectStation(it) }
-            safeNavigate { sharedViewModel.requestTabNavigation(R.id.navigation_watch) }
-        }
+        b.tvTooltipRegion.text = spot.type.displayName
+        b.btnViewDetail.visibility = View.GONE
+        b.btnGoWatch.visibility = View.GONE
     }
 
     // Prevents double-navigation; resets automatically on onResume
@@ -232,7 +213,6 @@ class MapFragment : Fragment(), OnMapReadyCallback {
 
     private fun dismissTooltip() {
         _binding?.tooltipCard?.visibility = View.GONE
-        activitySpotNearestStation = null
         navigating = false
     }
 
