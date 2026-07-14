@@ -162,7 +162,7 @@ class TideRepositoryImpl @Inject constructor(
     }
 
     // 각 관측소 코드로 dtRecent 개별 병렬 호출 (obsCode=null 벌크 호출은 API가 지원하지 않음)
-    // WeatherRepo.getWindData()와 동일한 방식 — numOfRows=1로 최신 1건만 요청
+    // 응답은 시간 오름차순이므로 하루치(numOfRows=100)를 받아 lastOrNull()로 최신 기록을 취한다.
     override suspend fun getBatchRecentLevels(): List<RecentTideLevel> {
         withContext(Dispatchers.IO) { ensureMemoryFromDisk() }
         // Return cache if still fresh
@@ -189,11 +189,15 @@ class TideRepositoryImpl @Inject constructor(
                 stations.map { station ->
                     async {
                         try {
+                            // dtRecent는 시간 오름차순으로 응답하므로 '가장 최근'은 마지막 항목이다.
+                            // 상세보기와 동일하게 numOfRows=100으로 하루치를 받고 lastOrNull()로 최신을 취한다.
+                            // (기존 numOfRows=1은 '그날 첫 기록'을 반환해 검색 목록 수위/바람이
+                            //  현재값과 크게 어긋났다: 예) 만조 558cm vs 현재 42cm)
                             val item = khoaDataApi.getTideRecent(
                                 serviceKey = apiKey,
                                 obsCode    = station.code,
                                 date       = date,
-                                numOfRows  = 1
+                                numOfRows  = 100
                             ).body?.items?.item?.lastOrNull()
                             if (item != null && (item.tideLevel != null || item.windSpeed != null)) {
                                 RecentTideLevel(station.lat, station.lng, item.tideLevel?.toInt(), item.windSpeed)
