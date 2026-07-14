@@ -58,10 +58,12 @@ class TideRepositoryImpl @Inject constructor(
             if (!encoded.isNullOrBlank() && time > 0L) {
                 val list = encoded.split('\n').mapNotNull { line ->
                     val p = line.split(',')
-                    if (p.size < 4) return@mapNotNull null
-                    val lat = p[0].toDoubleOrNull() ?: return@mapNotNull null
-                    val lon = p[1].toDoubleOrNull() ?: return@mapNotNull null
-                    RecentTideLevel(lat, lon, p[2].toIntOrNull(), p[3].toFloatOrNull())
+                    // 형식: code,lat,lon,level,wind (구버전 4필드 캐시는 폐기 후 재조회)
+                    if (p.size < 5) return@mapNotNull null
+                    val code = p[0].ifBlank { return@mapNotNull null }
+                    val lat = p[1].toDoubleOrNull() ?: return@mapNotNull null
+                    val lon = p[2].toDoubleOrNull() ?: return@mapNotNull null
+                    RecentTideLevel(code, lat, lon, p[3].toIntOrNull(), p[4].toFloatOrNull())
                 }
                 if (list.isNotEmpty()) { batchCache = list; batchCacheTime = time }
             }
@@ -71,7 +73,7 @@ class TideRepositoryImpl @Inject constructor(
 
     private fun persistBatch(levels: List<RecentTideLevel>, time: Long) {
         val encoded = levels.joinToString("\n") { l ->
-            "${l.lat},${l.lon},${l.levelCm ?: ""},${l.windSpeedMs ?: ""}"
+            "${l.code},${l.lat},${l.lon},${l.levelCm ?: ""},${l.windSpeedMs ?: ""}"
         }
         batchPrefs.edit().putString(KEY_BATCH_DATA, encoded).putLong(KEY_BATCH_TIME, time).apply()
     }
@@ -200,7 +202,7 @@ class TideRepositoryImpl @Inject constructor(
                                 numOfRows  = 100
                             ).body?.items?.item?.lastOrNull()
                             if (item != null && (item.tideLevel != null || item.windSpeed != null)) {
-                                RecentTideLevel(station.lat, station.lng, item.tideLevel?.toInt(), item.windSpeed)
+                                RecentTideLevel(station.code, station.lat, station.lng, item.tideLevel?.toInt(), item.windSpeed)
                             } else null
                         } catch (e: Exception) {
                             Log.w(TAG, "dtRecent[${station.code}] 실패: ${e.message}")

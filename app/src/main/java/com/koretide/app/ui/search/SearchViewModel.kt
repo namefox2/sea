@@ -53,7 +53,9 @@ class SearchViewModel @Inject constructor(
     val stationItems: StateFlow<List<StationAdapter.StationItem>> =
         combine(stations, _batchLevels) { list, levels ->
             list.map { station ->
-                val match = levels.nearestTo(station.lat, station.lng)
+                // 좌표 최근접이 아닌 '관측소 코드'로 정확히 매칭한다. 코드가 없으면(=배치 조회
+                // 실패) 이웃 값을 붙이지 않고 캐시된 마지막 수위(없으면 null)로 폴백한다.
+                val match = levels.firstOrNull { it.code == station.code }
                 val currentLevel = match?.levelCm ?: station.lastTideLevel
                 val tidePercent = currentLevel?.let { lvl ->
                     ((lvl - 50f) / 550f).coerceIn(0f, 1f)
@@ -77,14 +79,17 @@ class SearchViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     init {
-        refreshStations()
         viewModelScope.launch {
             // 1) 캐시(디스크/메모리)가 있으면 즉시 표시 — 첫 화면 대기시간 제거
             runCatching { getBatchTideStatusUseCase.cached() }
                 .getOrNull()
                 ?.takeIf { it.isNotEmpty() }
                 ?.let { _batchLevels.value = it }
-            // 2) 신선도에 따라 백그라운드 새로고침 (캐시가 신선하면 즉시 반환)
+            // 2) 배치(관측소별 dtRecent)는 관측소 목록이 있어야 조회 가능하므로
+            //    관측소 로드를 먼저 '완료'한 뒤 배치를 갱신한다.
+            //    (이전엔 관측소 로드와 배치가 병렬로 시작돼, 첫 실행 시 배치가 빈 관측소
+            //     목록을 읽어 수위/바람이 표시되지 않았다.)
+            loadStations()
             doRefreshBatch()
         }
     }
@@ -97,18 +102,16 @@ class SearchViewModel @Inject constructor(
         _selectedRegion.value = region
     }
 
-    private fun refreshStations() {
-        viewModelScope.launch {
-            _isLoading.value = true
-            _loadError.value = null
-            try {
-                getAllStationsUseCase.refresh()
-            } catch (e: Exception) {
-                Log.w("SearchViewModel", "station refresh failed", e)
-                _loadError.value = "자료를 가져오는데 실패했습니다"
-            } finally {
-                _isLoading.value = false
-            }
+    private suspend fun loadStations() {
+        _isLoading.value = true
+        _loadError.value = null
+        try {
+            getAllStationsUseCase.refresh()
+        } catch (e: Exception) {
+            Log.w("SearchViewModel", "station refresh failed", e)
+            _loadError.value = "자료를 가져오는데 실패했습니다"
+        } finally {
+            _isLoading.value = false
         }
     }
 
@@ -128,9 +131,6 @@ class SearchViewModel @Inject constructor(
             .onFailure { Log.w("SearchViewModel", "batch tide fetch failed", it) }
         _batchLoading.value = false
     }
-
-    private fun List<RecentTideLevel>.nearestTo(lat: Double, lng: Double): RecentTideLevel? =
-        minByOrNull { (it.lat - lat) * (it.lat - lat) + (it.lon - lng) * (it.lon - lng) }
 
     private fun speedToBeaufort(ms: Float): Int = when {
         ms < 0.3f  -> 0
