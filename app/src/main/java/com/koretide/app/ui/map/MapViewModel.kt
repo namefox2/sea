@@ -5,8 +5,11 @@ import androidx.lifecycle.viewModelScope
 import com.koretide.app.data.MarineActivityData
 import com.koretide.app.domain.model.ActivitySpot
 import com.koretide.app.domain.model.ActivityType
+import com.koretide.app.domain.model.IndexType
+import com.koretide.app.domain.model.OceanIndex
 import com.koretide.app.domain.model.Station
 import com.koretide.app.domain.model.StationRegion
+import com.koretide.app.domain.repository.OceanIndexRepository
 import com.koretide.app.domain.usecase.GetAllStationsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -17,11 +20,15 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import javax.inject.Inject
 
 @HiltViewModel
 class MapViewModel @Inject constructor(
-    getAllStationsUseCase: GetAllStationsUseCase
+    getAllStationsUseCase: GetAllStationsUseCase,
+    private val oceanIndexRepo: OceanIndexRepository
 ) : ViewModel() {
 
     private val _regionFilter = MutableStateFlow<StationRegion?>(null)
@@ -85,4 +92,28 @@ class MapViewModel @Inject constructor(
     fun clearPin() { _selectedPin.value = null }
 
     fun setActivityFilter(type: ActivityType?) { _activityFilter.value = type }
+
+    // 활동 스팟(정적 데이터)에는 지수 등급이 없으므로, 스팟의 타입+지역에 해당하는
+    // 지수 목록을 API에서 받아 스팟 좌표와 가장 가까운 항목의 등급을 반환한다.
+    suspend fun indexFor(spot: ActivitySpot): OceanIndex? {
+        val type = spot.type.toIndexType() ?: return null
+        val region = StationRegion.fromCoords(spot.lat, spot.lng)
+        val date = SimpleDateFormat("yyyyMMdd", Locale.KOREA).format(Date())
+        return runCatching {
+            oceanIndexRepo.getBeachIndicesForRegion(date, type, region)
+                .minByOrNull { d2(it.lat - spot.lat, it.lon - spot.lng) }
+        }.getOrNull()?.index
+    }
+
+    private fun d2(a: Double, b: Double) = a * a + b * b
+
+    private fun ActivityType.toIndexType(): IndexType? = when (this) {
+        ActivityType.FISHING    -> IndexType.SEA_FISHING
+        ActivityType.SURFING    -> IndexType.SURFING
+        ActivityType.TIDAL_FLAT -> IndexType.TIDAL_FLAT
+        ActivityType.SWIMMING   -> IndexType.BEACH_SWIM
+        ActivityType.SCUBA      -> IndexType.SCUBA_DIVING
+        ActivityType.SEA_TRAVEL -> IndexType.SEA_TRAVEL
+        ActivityType.HIGH_TIDE  -> null   // 관측소(물멍) — 지수 대상 아님
+    }
 }

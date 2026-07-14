@@ -9,6 +9,7 @@ import com.koretide.app.domain.model.TideStatus
 import com.koretide.app.domain.usecase.GetAllStationsUseCase
 import com.koretide.app.domain.usecase.GetBatchTideStatusUseCase
 import com.koretide.app.domain.usecase.SearchStationsUseCase
+import com.koretide.app.util.BeaufortConverter
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
@@ -71,7 +72,7 @@ class SearchViewModel @Inject constructor(
                     station      = station,
                     tidePercent  = tidePercent,
                     tideStatus   = tideStatus,
-                    windBft      = match?.windSpeedMs?.let { speedToBeaufort(it) },
+                    windBft      = match?.windSpeedMs?.let { BeaufortConverter.toBft(it) },
                     waterLevelCm = currentLevel
                 )
             }
@@ -130,21 +131,5 @@ class SearchViewModel @Inject constructor(
             }
             .onFailure { Log.w("SearchViewModel", "batch tide fetch failed", it) }
         _batchLoading.value = false
-    }
-
-    private fun speedToBeaufort(ms: Float): Int = when {
-        ms < 0.3f  -> 0
-        ms < 1.5f  -> 1
-        ms < 3.3f  -> 2
-        ms < 5.5f  -> 3
-        ms < 7.9f  -> 4
-        ms < 10.7f -> 5
-        ms < 13.8f -> 6
-        ms < 17.1f -> 7
-        ms < 20.7f -> 8
-        ms < 24.4f -> 9
-        ms < 28.4f -> 10
-        ms < 32.6f -> 11
-        else       -> 12
     }
 }

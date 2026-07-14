@@ -9,7 +9,10 @@ import android.view.ViewGroup
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.fragment.app.viewModels
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.MobileAds
 import com.naver.maps.geometry.LatLng
@@ -41,6 +44,7 @@ class MapFragment : Fragment(), OnMapReadyCallback {
     private var naverMap: NaverMap? = null
     private val stationMarkers = mutableListOf<Marker>()
     private val spotMarkers = mutableListOf<Marker>()
+    private var indexJob: Job? = null
 
     private val viewModel: MapViewModel by viewModels()
     private val sharedViewModel: SharedViewModel by activityViewModels()
@@ -171,6 +175,7 @@ class MapFragment : Fragment(), OnMapReadyCallback {
     }
 
     private fun onPinSelected(station: Station) {
+        indexJob?.cancel()   // 활동 핀 지수 조회가 관측소 정보를 덮어쓰지 않도록 취소
         sharedViewModel.selectStation(station)
         val b = _binding ?: return
         b.tooltipCard.visibility = View.VISIBLE
@@ -186,12 +191,26 @@ class MapFragment : Fragment(), OnMapReadyCallback {
 
     private fun onActivityPinSelected(spot: ActivitySpot) {
         val b = _binding ?: return
-        // 관측소가 아닌 활동 지점(낚시/서핑 등)은 정보만 표시 — 물멍하러가기·상세보기 없음
+        // 관측소가 아닌 활동 지점(낚시/서핑 등)은 물멍하러가기·상세보기 없이
+        // 이름과 해당 지역 지수 레벨만 표시한다.
         b.tooltipCard.visibility = View.VISIBLE
         b.tvTooltipName.text = spot.name
-        b.tvTooltipRegion.text = spot.type.displayName
+        b.tvTooltipRegion.text = "${spot.type.displayName} · 지수 불러오는 중…"
         b.btnViewDetail.visibility = View.GONE
         b.btnGoWatch.visibility = View.GONE
+
+        // 이전 조회는 취소하고(핀 빠르게 바꿀 때 결과 뒤섞임 방지) 새로 조회
+        indexJob?.cancel()
+        indexJob = viewLifecycleOwner.lifecycleScope.launch {
+            val index = viewModel.indexFor(spot)
+            val bb = _binding ?: return@launch
+            val grade = index?.grade
+            bb.tvTooltipRegion.text = if (grade != null) {
+                "${spot.type.displayName} · ${grade.emoji} Lv.${grade.level} ${grade.label}"
+            } else {
+                "${spot.type.displayName} · 지수 정보 없음"
+            }
+        }
     }
 
     // Prevents double-navigation; resets automatically on onResume
@@ -207,6 +226,7 @@ class MapFragment : Fragment(), OnMapReadyCallback {
     }
 
     private fun dismissTooltip() {
+        indexJob?.cancel()
         _binding?.tooltipCard?.visibility = View.GONE
         navigating = false
     }
