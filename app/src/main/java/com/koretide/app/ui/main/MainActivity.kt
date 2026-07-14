@@ -3,6 +3,9 @@ package com.koretide.app.ui.main
 import android.os.Bundle
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.updatePadding
 import androidx.navigation.fragment.NavHostFragment
 import androidx.navigation.ui.NavigationUI
 import androidx.navigation.ui.setupWithNavController
@@ -25,8 +28,22 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        applyEdgeToEdgeInsetsSafetyNet()
         setupNavigation()
         observeTabNavigation()
+    }
+
+    // 테마의 windowOptOutEdgeToEdgeEnforcement 가 정상 적용되면 시스템 바 인셋이 0으로
+    // 전달되어 이 리스너는 아무 것도 하지 않는다(=여백 없음, 기존 레이아웃 유지).
+    // 혹시 특정 기기/빌드에서 Android 15의 edge-to-edge 가 강제되면, 시스템 바(상태바·
+    // 내비게이션 바) 높이만큼 루트에 여백을 줘 광고/탭바 등이 시스템 바와 겹치지 않게 한다.
+    private fun applyEdgeToEdgeInsetsSafetyNet() {
+        ViewCompat.setOnApplyWindowInsetsListener(binding.root) { v, insets ->
+            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            v.updatePadding(top = bars.top, bottom = bars.bottom)
+            insets
+        }
+        ViewCompat.requestApplyInsets(binding.root)
     }
 
     private fun setupNavigation() {
