@@ -58,12 +58,15 @@ class TideRepositoryImpl @Inject constructor(
             if (!encoded.isNullOrBlank() && time > 0L) {
                 val list = encoded.split('\n').mapNotNull { line ->
                     val p = line.split(',')
-                    // 형식: code,lat,lon,level,wind (구버전 4필드 캐시는 폐기 후 재조회)
-                    if (p.size < 5) return@mapNotNull null
+                    // 형식: code,lat,lon,level,wind,dayMin,dayMax (구버전 캐시는 폐기 후 재조회)
+                    if (p.size < 7) return@mapNotNull null
                     val code = p[0].ifBlank { return@mapNotNull null }
                     val lat = p[1].toDoubleOrNull() ?: return@mapNotNull null
                     val lon = p[2].toDoubleOrNull() ?: return@mapNotNull null
-                    RecentTideLevel(code, lat, lon, p[3].toIntOrNull(), p[4].toFloatOrNull())
+                    RecentTideLevel(
+                        code, lat, lon, p[3].toIntOrNull(), p[4].toFloatOrNull(),
+                        p[5].toIntOrNull(), p[6].toIntOrNull()
+                    )
                 }
                 if (list.isNotEmpty()) { batchCache = list; batchCacheTime = time }
             }
@@ -73,7 +76,7 @@ class TideRepositoryImpl @Inject constructor(
 
     private fun persistBatch(levels: List<RecentTideLevel>, time: Long) {
         val encoded = levels.joinToString("\n") { l ->
-            "${l.code},${l.lat},${l.lon},${l.levelCm ?: ""},${l.windSpeedMs ?: ""}"
+            "${l.code},${l.lat},${l.lon},${l.levelCm ?: ""},${l.windSpeedMs ?: ""},${l.dayMinCm ?: ""},${l.dayMaxCm ?: ""}"
         }
         batchPrefs.edit().putString(KEY_BATCH_DATA, encoded).putLong(KEY_BATCH_TIME, time).apply()
     }
@@ -99,7 +102,10 @@ class TideRepositoryImpl @Inject constructor(
         val tableItems = table.body?.items?.item ?: emptyList()
         Log.d(TAG, "  dtRecent items=${dataItems.size}  tideFcst items=${tableItems.size}")
 
-        val currentLevel = dataItems.lastOrNull()?.tideLevel?.toInt() ?: 300
+        // 실시간 조위가 없으면 허구값(300cm)을 실제처럼 보여주지 않고 오류로 처리한다.
+        // (상세: 오류 UI, 물멍: 폴링 catch로 이전 값 유지 — 둘 다 안전)
+        val currentLevel = dataItems.lastOrNull { it.tideLevel != null }?.tideLevel?.toInt()
+            ?: throw IllegalStateException("실시간 조위 데이터를 가져올 수 없습니다")
         Log.d(TAG, "  lastItem obsrvnDt=${dataItems.lastOrNull()?.obsrvnDt}  tideLevel=${dataItems.lastOrNull()?.tideLevel}cm")
 
         // 하루 조석예보(고/저조)에서 고조(extrSe 1,3)·저조(extrSe 2,4)를 모아 일조차 계산.
@@ -192,17 +198,25 @@ class TideRepositoryImpl @Inject constructor(
                     async {
                         try {
                             // dtRecent는 시간 오름차순으로 응답하므로 '가장 최근'은 마지막 항목이다.
-                            // 상세보기와 동일하게 numOfRows=100으로 하루치를 받고 lastOrNull()로 최신을 취한다.
+                            // 상세보기와 동일하게 numOfRows=100으로 하루치를 받는다.
                             // (기존 numOfRows=1은 '그날 첫 기록'을 반환해 검색 목록 수위/바람이
                             //  현재값과 크게 어긋났다: 예) 만조 558cm vs 현재 42cm)
-                            val item = khoaDataApi.getTideRecent(
+                            val items = khoaDataApi.getTideRecent(
                                 serviceKey = apiKey,
                                 obsCode    = station.code,
                                 date       = date,
                                 numOfRows  = 100
-                            ).body?.items?.item?.lastOrNull()
-                            if (item != null && (item.tideLevel != null || item.windSpeed != null)) {
-                                RecentTideLevel(station.code, station.lat, station.lng, item.tideLevel?.toInt(), item.windSpeed)
+                            ).body?.items?.item ?: emptyList()
+                            // 현재 수위=최신 non-null 기록, 바람=최신 기록, 조위%용 min/max=하루치 범위
+                            val levelCm = items.lastOrNull { it.tideLevel != null }?.tideLevel?.toInt()
+                            val windMs  = items.lastOrNull()?.windSpeed
+                            if (levelCm != null || windMs != null) {
+                                val levels = items.mapNotNull { it.tideLevel?.toInt() }
+                                RecentTideLevel(
+                                    station.code, station.lat, station.lng, levelCm, windMs,
+                                    dayMinCm = levels.minOrNull(),
+                                    dayMaxCm = levels.maxOrNull()
+                                )
                             } else null
                         } catch (e: Exception) {
                             Log.w(TAG, "dtRecent[${station.code}] 실패: ${e.message}")

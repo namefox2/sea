@@ -16,6 +16,7 @@ import com.koretide.app.domain.model.OceanIndex
 import com.koretide.app.domain.model.StationRegion
 import com.koretide.app.domain.model.TideData
 import com.koretide.app.domain.repository.OceanIndexRepository
+import com.koretide.app.util.GeoUtils
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import java.text.SimpleDateFormat
@@ -121,13 +122,9 @@ class OceanIndexRepositoryImpl @Inject constructor(
         val allItems: List<KhoaIndexItem> = fetchAllItems(type, date, 100)
         return beaches.map { beach ->
             val item = allItems.minByOrNull { apiItem ->
-                val dLat = (apiItem.lat ?: 999.0) - beach.lat
-                val dLon = (apiItem.lot ?: 999.0) - beach.lon
-                dLat * dLat + dLon * dLon
+                GeoUtils.distSq(apiItem.lat ?: 999.0, apiItem.lot ?: 999.0, beach.lat, beach.lon)
             }?.takeIf { apiItem ->
-                val dLat = (apiItem.lat ?: 999.0) - beach.lat
-                val dLon = (apiItem.lot ?: 999.0) - beach.lon
-                dLat * dLat + dLon * dLon < 0.01
+                GeoUtils.distSq(apiItem.lat ?: 999.0, apiItem.lot ?: 999.0, beach.lat, beach.lon) < 0.01
             }
             BeachIndexItem(
                 code   = beach.code,

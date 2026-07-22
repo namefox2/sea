@@ -11,6 +11,7 @@ import com.koretide.app.domain.model.Station
 import com.koretide.app.domain.model.StationRegion
 import com.koretide.app.domain.repository.OceanIndexRepository
 import com.koretide.app.domain.usecase.GetAllStationsUseCase
+import com.koretide.app.util.GeoUtils
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -63,11 +64,9 @@ class MapViewModel @Inject constructor(
         val date = SimpleDateFormat("yyyyMMdd", Locale.KOREA).format(Date())
         return runCatching {
             oceanIndexRepo.getBeachIndicesForRegion(date, type, region)
-                .minByOrNull { d2(it.lat - spot.lat, it.lon - spot.lng) }
+                .minByOrNull { GeoUtils.distSq(it.lat, it.lon, spot.lat, spot.lng) }
         }.getOrNull()?.index
     }
-
-    private fun d2(a: Double, b: Double) = a * a + b * b
 
     private fun ActivityType.toIndexType(): IndexType? = when (this) {
         ActivityType.FISHING    -> IndexType.SEA_FISHING

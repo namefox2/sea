@@ -58,9 +58,14 @@ class SearchViewModel @Inject constructor(
                 // 실패) 이웃 값을 붙이지 않고 캐시된 마지막 수위(없으면 null)로 폴백한다.
                 val match = levels.firstOrNull { it.code == station.code }
                 val currentLevel = match?.levelCm ?: station.lastTideLevel
-                val tidePercent = currentLevel?.let { lvl ->
-                    ((lvl - 50f) / 550f).coerceIn(0f, 1f)
-                }
+                // 관측소마다 조차가 다르므로(동해안 ~30cm vs 서해안 ~600cm) 고정 척도 대신
+                // 그날 관측된 min~max 범위 안에서의 상대 위치로 조위%를 구한다. 범위 정보가
+                // 없거나 무의미하면(min==max) 조위%/간조·만조 라벨을 표시하지 않는다(null).
+                val min = match?.dayMinCm
+                val max = match?.dayMaxCm
+                val tidePercent = if (currentLevel != null && min != null && max != null && max > min)
+                    ((currentLevel - min).toFloat() / (max - min)).coerceIn(0f, 1f)
+                else null
                 val tideStatus = tidePercent?.let {
                     when {
                         it > 0.88f -> TideStatus.HIGH_TIDE

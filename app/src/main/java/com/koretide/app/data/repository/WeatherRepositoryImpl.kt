@@ -9,6 +9,7 @@ import com.koretide.app.data.remote.dto.KhoaWaveItem
 import com.koretide.app.domain.model.WindData
 import com.koretide.app.domain.repository.WeatherRepository
 import com.koretide.app.util.BeaufortConverter
+import com.koretide.app.util.GeoUtils
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import java.text.SimpleDateFormat
@@ -31,9 +32,9 @@ class WeatherRepositoryImpl @Inject constructor(
         val date = SimpleDateFormat("yyyyMMdd", Locale.KOREA).format(Date())
         Log.d(TAG, "▶ getWindData station=$stationCode lat=$lat lng=$lng date=$date")
 
-        // 가장 가까운 조위관측소 찾기 (DB 기준)
+        // 가장 가까운 조위관측소 찾기 (DB 기준, 경도 보정 거리)
         val nearest = stationDao.getAllStationsSnapshot()
-            .minByOrNull { (it.lat - lat) * (it.lat - lat) + (it.lng - lng) * (it.lng - lng) }
+            .minByOrNull { GeoUtils.distSq(it.lat, it.lng, lat, lng) }
         val obsCode = nearest?.code ?: stationCode
         Log.d(TAG, "  nearest 조위관측소: ${nearest?.name}($obsCode)  거리=${nearest?.let { "%.3f°".format(Math.sqrt((it.lat - lat) * (it.lat - lat) + (it.lng - lng) * (it.lng - lng))) } ?: "-"}")
 
