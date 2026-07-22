@@ -247,6 +247,9 @@ class MapFragment : Fragment(), OnMapReadyCallback {
     }
 
     override fun onDestroyView() {
+        indexJob?.cancel()
+        // 프로세스 전역 SDK 싱글톤에 남은 프래그먼트 캡처 리스너 해제 (누수/뷰 파괴 후 크래시 방지)
+        NaverMapSdk.getInstance(requireContext()).onAuthFailedListener = null
         stationMarkers.forEach { it.map = null }
         stationMarkers.clear()
         spotMarkers.forEach { it.map = null }

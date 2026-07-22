@@ -20,22 +20,6 @@ object BeaufortConverter {
         else                -> 12
     }
 
-    fun waveHeight(bft: Int): Float = when (bft) {
-        0 -> 0.0f
-        1 -> 0.1f
-        2 -> 0.2f
-        3 -> 0.6f
-        4 -> 1.0f
-        5 -> 2.0f
-        6 -> 3.0f
-        7 -> 4.0f
-        8 -> 5.5f
-        9 -> 7.0f
-        10 -> 9.0f
-        11 -> 11.5f
-        else -> 14.0f
-    }
-
     fun name(bft: Int): String = when (bft) {
         0 -> "고요"
         1 -> "실바람"

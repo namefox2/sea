@@ -12,11 +12,9 @@ import com.koretide.app.domain.model.StationRegion
 import com.koretide.app.domain.repository.OceanIndexRepository
 import com.koretide.app.domain.usecase.GetAllStationsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -31,35 +29,19 @@ class MapViewModel @Inject constructor(
     private val oceanIndexRepo: OceanIndexRepository
 ) : ViewModel() {
 
-    private val _regionFilter = MutableStateFlow<StationRegion?>(null)
-    val regionFilter: StateFlow<StationRegion?> = _regionFilter.asStateFlow()
-
-    private val _selectedPin = MutableStateFlow<Station?>(null)
-    val selectedPin: StateFlow<Station?> = _selectedPin.asStateFlow()
-
     private val _activityFilter = MutableStateFlow<ActivityType?>(null)
-    val activityFilter: StateFlow<ActivityType?> = _activityFilter.asStateFlow()
 
+    // 활동 탭 필터에 따라 관측소 목록을 노출. 전체/물멍일 때만 관측소를 보여주고,
+    // 낚시·서핑 등 활동 필터에선 관측소 대신 활동 스팟만 표시한다.
     val stations: StateFlow<List<Station>> = combine(
         getAllStationsUseCase(),
-        _regionFilter,
         _activityFilter
-    ) { all, region, activity ->
-
-        val regionFiltered =
-            if (region == null) all
-            else all.filter { it.region == region }
-
+    ) { all, activity ->
         when (activity) {
-            null -> regionFiltered                   // 전체
-            ActivityType.HIGH_TIDE -> regionFiltered // 물멍
-            else -> emptyList()                      // 낚시/서핑/해수욕 등
+            null, ActivityType.HIGH_TIDE -> all   // 전체 / 물멍
+            else -> emptyList()                   // 낚시/서핑/해수욕 등
         }
-    }.stateIn(
-        viewModelScope,
-        SharingStarted.WhileSubscribed(5000),
-        emptyList()
-    )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val activitySpots: StateFlow<List<ActivitySpot>> = _activityFilter
         .map { type ->
@@ -69,27 +51,7 @@ class MapViewModel @Inject constructor(
                 else -> MarineActivityData.getSpots(type)
             }
         }
-        .stateIn(
-            viewModelScope,
-            SharingStarted.WhileSubscribed(5000),
-            emptyList()
-        )
-
-    // 필터링되지 않은 전체 관측소 (액티비티 스팟 → 인근 관측소 연결용)
-    private val _allStations: StateFlow<List<Station>> = getAllStationsUseCase()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
-    fun findNearestStation(lat: Double, lng: Double): Station? =
-        _allStations.value.minByOrNull { s ->
-            val dlat = s.lat - lat; val dlng = s.lng - lng
-            dlat * dlat + dlng * dlng
-        }
-
-    fun setRegionFilter(region: StationRegion?) { _regionFilter.value = region }
-
-    fun selectPin(station: Station) { _selectedPin.value = station }
-
-    fun clearPin() { _selectedPin.value = null }
 
     fun setActivityFilter(type: ActivityType?) { _activityFilter.value = type }
 

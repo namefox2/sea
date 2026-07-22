@@ -20,7 +20,10 @@ data class StationEntity(
     fun toDomain() = Station(
         code = code,
         name = name,
-        region = StationRegion.valueOf(region),
+        // 저장된 region 문자열이 enum 이름과 다를 경우(예: 구버전/손상 데이터)
+        // valueOf 가 크래시하므로, 좌표 기반 재분류로 안전하게 폴백한다.
+        region = runCatching { StationRegion.valueOf(region) }
+            .getOrElse { StationRegion.fromCoords(lat, lng) },
         lat = lat,
         lng = lng,
         lastTideLevel = lastTideLevel,

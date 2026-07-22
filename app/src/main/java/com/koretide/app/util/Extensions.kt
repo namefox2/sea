@@ -10,7 +10,6 @@ import kotlinx.coroutines.launch
 
 fun View.visible() { visibility = View.VISIBLE }
 fun View.gone() { visibility = View.GONE }
-fun View.invisible() { visibility = View.INVISIBLE }
 
 fun <T> LifecycleOwner.collectFlow(
     flow: Flow<T>,
@@ -22,6 +21,3 @@ fun <T> LifecycleOwner.collectFlow(
         }
     }
 }
-
-fun Int.toCm(): String = "${this}cm"
-fun Float.toPercent(): String = "${(this * 100).toInt()}%"

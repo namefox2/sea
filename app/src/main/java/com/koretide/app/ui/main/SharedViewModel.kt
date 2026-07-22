@@ -1,7 +1,6 @@
 package com.koretide.app.ui.main
 
 import androidx.lifecycle.ViewModel
-import com.koretide.app.R
 import com.koretide.app.domain.model.Station
 import com.koretide.app.domain.model.TideData
 import com.koretide.app.domain.model.WindData
@@ -70,10 +69,5 @@ class SharedViewModel @Inject constructor() : ViewModel() {
         _selectedThemeId.value = themeId
         // 테마를 바꾸면 선택된 관측소를 비워 물멍 화면이 기본값으로 초기화되게 한다.
         if (changed) clearSelectedStation()
-    }
-
-    fun openIndexForStation(station: Station) {
-        _selectedStation.value = station
-        requestTabNavigation(R.id.navigation_index)
     }
 }

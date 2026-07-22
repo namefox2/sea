@@ -5,7 +5,6 @@ import androidx.lifecycle.viewModelScope
 import com.koretide.app.domain.model.Station
 import com.koretide.app.domain.model.TideData
 import com.koretide.app.domain.model.WindData
-import com.koretide.app.domain.usecase.GetTideHistoryUseCase
 import com.koretide.app.domain.usecase.GetTideUseCase
 import com.koretide.app.domain.usecase.GetWindUseCase
 import com.koretide.app.util.Result
@@ -19,8 +18,7 @@ import javax.inject.Inject
 @HiltViewModel
 class DetailViewModel @Inject constructor(
     private val getTideUseCase: GetTideUseCase,
-    private val getWindUseCase: GetWindUseCase,
-    private val getTideHistoryUseCase: GetTideHistoryUseCase
+    private val getWindUseCase: GetWindUseCase
 ) : ViewModel() {
 
     private val _tideResult = MutableStateFlow<Result<TideData>>(Result.Loading)

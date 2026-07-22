@@ -70,11 +70,19 @@ class WeatherRepositoryImpl @Inject constructor(
     }
 
     private fun List<KhoaWaveItem>.nearestWaveTo(lat: Double, lng: Double): KhoaWaveItem? {
-        val latest = groupBy { it.obsrvnDt }.maxByOrNull { it.key.orEmpty() }?.value ?: return firstOrNull()
-        return latest.minByOrNull { abs((it.lat ?: 0.0) - lat) + abs((it.lon ?: 0.0) - lng) }
+        val latest = groupBy { it.obsrvnDt }.maxByOrNull { it.key.orEmpty() }?.value ?: this
+        val nearest = latest.minByOrNull {
+            abs((it.lat ?: 0.0) - lat) + abs((it.lon ?: 0.0) - lng)
+        } ?: return null
+        // 파고 부이는 드문드문 분포하므로, 관측소에서 너무 먼 부이의 파고를 잘못 가져오지
+        // 않도록 거리 상한(약 100km)을 둔다. 초과하면 파고 없음으로 처리.
+        val dist = abs((nearest.lat ?: 0.0) - lat) + abs((nearest.lon ?: 0.0) - lng)
+        return if (dist <= MAX_WAVE_MATCH_DEG) nearest else null
     }
 
     companion object {
         private const val TAG = "WeatherRepo"
+        // 위경도 절대차 합(도). 약 1도 ≈ 90~110km. 이보다 먼 파고 부이는 매칭하지 않음.
+        private const val MAX_WAVE_MATCH_DEG = 1.0
     }
 }
