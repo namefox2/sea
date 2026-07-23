@@ -93,27 +93,34 @@ class TideRepositoryImpl @Inject constructor(
         Log.d(TAG, "▶ getTideData station=$stationCode date=$date")
 
         // 실시간(dtRecent, 공유 캐시) + 고저조예보(tideFcst)를 병렬 호출해 진입 지연 단축.
-        // dtRecent는 DtRecentSource로 조회 → 바람 조회와 같은 관측소면 호출 1회로 합쳐짐.
+        // 한쪽 호출이 실패해도 다른 쪽으로 상세보기가 뜨도록 각각 runCatching 으로 격리한다.
+        // (예전엔 예보 호출이 실패하면 coroutineScope 전체가 터져 실시간이 성공해도 상세가 깨졌다.)
         val (dataItems, table) = coroutineScope {
-            val c = async { dtRecentSource.items(stationCode, date) }
-            val t = async { khoaDataApi.getTideForecast(apiKey, stationCode, date) }
+            val c = async { runCatching { dtRecentSource.items(stationCode, date) }.getOrDefault(emptyList()) }
+            val t = async { runCatching { khoaDataApi.getTideForecast(apiKey, stationCode, date) }.getOrNull() }
             c.await() to t.await()
         }
-        val tableItems = table.body?.items?.item ?: emptyList()
+        val tableItems = table?.body?.items?.item ?: emptyList()
         Log.d(TAG, "  dtRecent items=${dataItems.size}  tideFcst items=${tableItems.size}")
 
-        // 실시간 조위가 없으면 허구값(300cm)을 실제처럼 보여주지 않고 오류로 처리한다.
-        // (상세: 오류 UI, 물멍: 폴링 catch로 이전 값 유지 — 둘 다 안전)
-        val currentLevel = dataItems.lastOrNull { it.tideLevel != null }?.tideLevel?.toInt()
-            ?: throw IllegalStateException("실시간 조위 데이터를 가져올 수 없습니다")
+        val realtimeLevel = dataItems.lastOrNull { it.tideLevel != null }?.tideLevel?.toInt()
         Log.d(TAG, "  lastItem obsrvnDt=${dataItems.lastOrNull()?.obsrvnDt}  tideLevel=${dataItems.lastOrNull()?.tideLevel}cm")
 
         // 하루 조석예보(고/저조)에서 고조(extrSe 1,3)·저조(extrSe 2,4)를 모아 일조차 계산.
-        // 예보가 없으면 허구값(600/50, =조차 5.5)을 실제처럼 보이면 안 되므로 현재 수위로 폴백.
         val allHigh  = tableItems.filter { it.extrSe == 1 || it.extrSe == 3 }
         val allLow   = tableItems.filter { it.extrSe == 2 || it.extrSe == 4 }
-        val maxLevel = allHigh.mapNotNull { it.predcTdlvVl?.toInt() }.maxOrNull() ?: currentLevel
-        val minLevel = allLow.mapNotNull  { it.predcTdlvVl?.toInt() }.minOrNull() ?: currentLevel
+        val fcMax = allHigh.mapNotNull { it.predcTdlvVl?.toInt() }.maxOrNull()
+        val fcMin = allLow.mapNotNull  { it.predcTdlvVl?.toInt() }.minOrNull()
+
+        // 현재 수위: ① 실시간 우선 ② 없으면 조석예보(고+저)/2로 추정(실제 예보 기반)
+        // ③ 실시간·예보 둘 다 없을 때만 오류. 허구값(300cm)은 쓰지 않는다.
+        val currentLevel = realtimeLevel
+            ?: (if (fcMax != null && fcMin != null) (fcMax + fcMin) / 2 else null)
+            ?: throw IllegalStateException("조위 데이터를 가져올 수 없습니다")
+
+        // 예보가 없으면 조차를 알 수 없으므로 현재 수위로 폴백(허구 조차 방지).
+        val maxLevel = fcMax ?: currentLevel
+        val minLevel = fcMin ?: currentLevel
         val range    = (maxLevel - minLevel).coerceAtLeast(0).toFloat()
         Log.d(TAG, "  조석예보 items=${tableItems.size}  고조=${allHigh.size} 저조=${allLow.size}  조차=${range}cm")
         val tidePercent = if (range > 0f)
