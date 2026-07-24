@@ -15,6 +15,7 @@ import com.koretide.app.domain.model.TideRecord
 import com.koretide.app.domain.model.TideStatus
 import com.koretide.app.domain.repository.TideRepository
 import com.koretide.app.util.CrashLogger
+import com.koretide.app.util.DateUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -219,12 +220,21 @@ class TideRepositoryImpl @Inject constructor(
                             // 상세보기와 동일하게 numOfRows=100으로 하루치를 받는다.
                             // (기존 numOfRows=1은 '그날 첫 기록'을 반환해 검색 목록 수위/바람이
                             //  현재값과 크게 어긋났다: 예) 만조 558cm vs 현재 42cm)
-                            val items = khoaDataApi.getTideRecent(
+                            // 오늘 실시간 자료가 없으면(NODATA) 전날로 폴백
+                            var items = khoaDataApi.getTideRecent(
                                 serviceKey = apiKey,
                                 obsCode    = station.code,
                                 date       = date,
                                 numOfRows  = 100
                             ).body?.items?.item ?: emptyList()
+                            if (items.isEmpty()) {
+                                items = khoaDataApi.getTideRecent(
+                                    serviceKey = apiKey,
+                                    obsCode    = station.code,
+                                    date       = DateUtils.previousDay(date),
+                                    numOfRows  = 100
+                                ).body?.items?.item ?: emptyList()
+                            }
                             // 현재 수위=최신 non-null 기록, 바람=최신 기록, 조위%용 min/max=하루치 범위
                             val levelCm = items.lastOrNull { it.tideLevel != null }?.tideLevel?.toInt()
                             val windMs  = items.lastOrNull()?.windSpeed

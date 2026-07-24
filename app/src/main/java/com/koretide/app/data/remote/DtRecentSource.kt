@@ -2,6 +2,7 @@ package com.koretide.app.data.remote
 
 import com.koretide.app.BuildConfig
 import com.koretide.app.data.remote.dto.KhoaTideRecentItem
+import com.koretide.app.util.DateUtils
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
@@ -29,6 +30,14 @@ class DtRecentSource @Inject constructor(
     private val cache = HashMap<String, Entry>()
 
     suspend fun items(obsCode: String, date: String): List<KhoaTideRecentItem> {
+        // dtRecent는 '오늘' 실시간 자료가 아직 없으면 NODATA를 반환한다(빈 목록).
+        // 그 경우 전날로 폴백해 가장 최근 관측을 가져온다.
+        val today = fetchCached(obsCode, date)
+        if (today.isNotEmpty()) return today
+        return fetchCached(obsCode, DateUtils.previousDay(date))
+    }
+
+    private suspend fun fetchCached(obsCode: String, date: String): List<KhoaTideRecentItem> {
         val k = "$obsCode|$date"
         cacheHit(k)?.let { return it }
         return mutex.withLock {
