@@ -14,6 +14,7 @@ import com.koretide.app.domain.model.TideData
 import com.koretide.app.domain.model.TideRecord
 import com.koretide.app.domain.model.TideStatus
 import com.koretide.app.domain.repository.TideRepository
+import com.koretide.app.util.CrashLogger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -96,12 +97,21 @@ class TideRepositoryImpl @Inject constructor(
         // 한쪽 호출이 실패해도 다른 쪽으로 상세보기가 뜨도록 각각 runCatching 으로 격리한다.
         // (예전엔 예보 호출이 실패하면 coroutineScope 전체가 터져 실시간이 성공해도 상세가 깨졌다.)
         val (dataItems, table) = coroutineScope {
-            val c = async { runCatching { dtRecentSource.items(stationCode, date) }.getOrDefault(emptyList()) }
-            val t = async { runCatching { khoaDataApi.getTideForecast(apiKey, stationCode, date) }.getOrNull() }
+            val c = async {
+                runCatching { dtRecentSource.items(stationCode, date) }
+                    .onFailure { CrashLogger.log("상세 실시간(dtRecent)[$stationCode] 실패: ${it.message}") }
+                    .getOrDefault(emptyList())
+            }
+            val t = async {
+                runCatching { khoaDataApi.getTideForecast(apiKey, stationCode, date) }
+                    .onFailure { CrashLogger.log("상세 예보(tideFcst)[$stationCode] 실패: ${it.message}") }
+                    .getOrNull()
+            }
             c.await() to t.await()
         }
         val tableItems = table?.body?.items?.item ?: emptyList()
         Log.d(TAG, "  dtRecent items=${dataItems.size}  tideFcst items=${tableItems.size}")
+        CrashLogger.log("상세[$stationCode]: 실시간=${dataItems.size}건 예보=${tableItems.size}건")
 
         val realtimeLevel = dataItems.lastOrNull { it.tideLevel != null }?.tideLevel?.toInt()
         Log.d(TAG, "  lastItem obsrvnDt=${dataItems.lastOrNull()?.obsrvnDt}  tideLevel=${dataItems.lastOrNull()?.tideLevel}cm")
@@ -200,6 +210,7 @@ class TideRepositoryImpl @Inject constructor(
             Log.d(TAG, "▶ getBatchRecentLevels 병렬 호출 stations=${stations.size}  date=$date")
             val t0 = System.currentTimeMillis()
 
+            val errors = java.util.Collections.synchronizedList(mutableListOf<String>())
             val result = coroutineScope {
                 stations.map { station ->
                     async {
@@ -227,6 +238,7 @@ class TideRepositoryImpl @Inject constructor(
                             } else null
                         } catch (e: Exception) {
                             Log.w(TAG, "dtRecent[${station.code}] 실패: ${e.message}")
+                            errors.add(e.message ?: e.javaClass.simpleName)
                             null
                         }
                     }
@@ -234,6 +246,11 @@ class TideRepositoryImpl @Inject constructor(
             }
 
             Log.d(TAG, "  완료 ${System.currentTimeMillis() - t0}ms  valid=${result.size}/${stations.size}")
+            // 진단: 유효=0인데 오류=0이면 API가 빈 데이터를 준 것, 오류>0이면 호출 자체가 실패
+            CrashLogger.log(
+                "검색 배치(dtRecent): 관측소=${stations.size} 유효=${result.size} " +
+                "호출오류=${errors.size} 오류샘플=${errors.distinct().take(3)}"
+            )
 
             if (result.isNotEmpty()) {
                 batchCache = result

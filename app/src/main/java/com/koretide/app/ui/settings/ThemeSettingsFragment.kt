@@ -1,19 +1,26 @@
 package com.koretide.app.ui.settings
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ScrollView
+import android.widget.TextView
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.recyclerview.widget.GridLayoutManager
+import com.koretide.app.R
 import com.koretide.app.databinding.FragmentThemeSettingsBinding
 import com.koretide.app.theme.SeasonThemeManager
 import com.koretide.app.theme.tagline
 import com.koretide.app.theme.ThemeConfig
 import com.koretide.app.ui.main.SharedViewModel
+import com.koretide.app.util.CrashLogger
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 
@@ -40,6 +47,7 @@ class ThemeSettingsFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         setupThemeCards()
+        setupCrashLog()
     }
 
     private fun setupThemeCards() {
@@ -67,6 +75,41 @@ class ThemeSettingsFragment : Fragment() {
         requireContext()
             .getSharedPreferences(PREFS_THEME, Context.MODE_PRIVATE)
             .edit().putString(KEY_THEME_ID, theme.id).apply()
+    }
+
+    private fun setupCrashLog() {
+        binding.btnViewCrashLog.setOnClickListener { showCrashLogDialog() }
+        binding.btnClearCrashLog.setOnClickListener {
+            CrashLogger.clear(requireContext())
+            Toast.makeText(requireContext(), "오류 로그가 삭제됐습니다", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun showCrashLogDialog() {
+        val log = CrashLogger.read(requireContext())
+        val content = if (log.isBlank()) "기록된 오류 로그가 없습니다." else log
+
+        val tv = TextView(requireContext()).apply {
+            text = content
+            textSize = 11f
+            typeface = android.graphics.Typeface.MONOSPACE
+            setPadding(40, 32, 40, 32)
+        }
+        val scroll = ScrollView(requireContext()).apply { addView(tv) }
+
+        val builder = AlertDialog.Builder(requireContext())
+            .setTitle("오류 진단 로그")
+            .setView(scroll)
+            .setPositiveButton("닫기", null)
+
+        if (log.isNotBlank()) {
+            builder.setNeutralButton("클립보드 복사") { _, _ ->
+                val cm = requireContext().getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                cm.setPrimaryClip(ClipData.newPlainText("crash_log", log))
+                Toast.makeText(requireContext(), "클립보드에 복사됐습니다", Toast.LENGTH_SHORT).show()
+            }
+        }
+        builder.show()
     }
 
     override fun onDestroyView() {
