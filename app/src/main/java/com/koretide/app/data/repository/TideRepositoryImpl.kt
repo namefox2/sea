@@ -21,7 +21,9 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -212,44 +214,48 @@ class TideRepositoryImpl @Inject constructor(
             val t0 = System.currentTimeMillis()
 
             val errors = java.util.Collections.synchronizedList(mutableListOf<String>())
+            // 관측소가 많아(수십 개) 한꺼번에 호출하면 rate-limit/타임아웃 위험이 있어 동시 호출 수 제한.
+            val gate = Semaphore(8)
             val result = coroutineScope {
                 stations.map { station ->
                     async {
-                        try {
-                            // dtRecent는 시간 오름차순으로 응답하므로 '가장 최근'은 마지막 항목이다.
-                            // 상세보기와 동일하게 numOfRows=100으로 하루치를 받는다.
-                            // (기존 numOfRows=1은 '그날 첫 기록'을 반환해 검색 목록 수위/바람이
-                            //  현재값과 크게 어긋났다: 예) 만조 558cm vs 현재 42cm)
-                            // 오늘 실시간 자료가 없으면(NODATA) 전날로 폴백
-                            var items = khoaDataApi.getTideRecent(
-                                serviceKey = apiKey,
-                                obsCode    = station.code,
-                                date       = date,
-                                numOfRows  = 100
-                            ).body?.items?.item ?: emptyList()
-                            if (items.isEmpty()) {
-                                items = khoaDataApi.getTideRecent(
-                                    serviceKey = apiKey,
-                                    obsCode    = station.code,
-                                    date       = DateUtils.previousDay(date),
-                                    numOfRows  = 100
+                        gate.withPermit {
+                            try {
+                                // 실시간(수위·바람): 오늘 자료가 없으면(NODATA) 전날로 폴백.
+                                // dtRecent는 시간 오름차순이라 최신은 마지막 항목.
+                                var items = khoaDataApi.getTideRecent(
+                                    serviceKey = apiKey, obsCode = station.code, date = date, numOfRows = 100
                                 ).body?.items?.item ?: emptyList()
+                                if (items.isEmpty()) {
+                                    items = khoaDataApi.getTideRecent(
+                                        serviceKey = apiKey, obsCode = station.code,
+                                        date = DateUtils.previousDay(date), numOfRows = 100
+                                    ).body?.items?.item ?: emptyList()
+                                }
+                                val levelCm = items.lastOrNull { it.tideLevel != null }?.tideLevel?.toInt()
+                                val windMs  = items.lastOrNull()?.windSpeed
+
+                                // 조위%용 저조/고조는 '조석예보'에서 (상세보기와 동일 기준).
+                                // 관측 범위는 아침엔 좁아 부정확하므로 예보의 하루 고/저조를 쓴다.
+                                val fc = runCatching {
+                                    khoaDataApi.getTideForecast(apiKey, station.code, date).body?.items?.item ?: emptyList()
+                                }.getOrDefault(emptyList())
+                                val fcMax = fc.filter { it.extrSe == 1 || it.extrSe == 3 }
+                                    .mapNotNull { it.predcTdlvVl?.toInt() }.maxOrNull()
+                                val fcMin = fc.filter { it.extrSe == 2 || it.extrSe == 4 }
+                                    .mapNotNull { it.predcTdlvVl?.toInt() }.minOrNull()
+
+                                if (levelCm != null || windMs != null) {
+                                    RecentTideLevel(
+                                        station.code, station.lat, station.lng, levelCm, windMs,
+                                        dayMinCm = fcMin, dayMaxCm = fcMax
+                                    )
+                                } else null
+                            } catch (e: Exception) {
+                                Log.w(TAG, "batch[${station.code}] 실패: ${e.message}")
+                                errors.add(e.message ?: e.javaClass.simpleName)
+                                null
                             }
-                            // 현재 수위=최신 non-null 기록, 바람=최신 기록, 조위%용 min/max=하루치 범위
-                            val levelCm = items.lastOrNull { it.tideLevel != null }?.tideLevel?.toInt()
-                            val windMs  = items.lastOrNull()?.windSpeed
-                            if (levelCm != null || windMs != null) {
-                                val levels = items.mapNotNull { it.tideLevel?.toInt() }
-                                RecentTideLevel(
-                                    station.code, station.lat, station.lng, levelCm, windMs,
-                                    dayMinCm = levels.minOrNull(),
-                                    dayMaxCm = levels.maxOrNull()
-                                )
-                            } else null
-                        } catch (e: Exception) {
-                            Log.w(TAG, "dtRecent[${station.code}] 실패: ${e.message}")
-                            errors.add(e.message ?: e.javaClass.simpleName)
-                            null
                         }
                     }
                 }.awaitAll().filterNotNull()
