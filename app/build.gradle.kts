@@ -21,8 +21,8 @@ android {
         applicationId = "com.koretide.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 14
-        versionName = "1.0.13"
+        versionCode = 15
+        versionName = "1.0.14"
 
         testInstrumentationRunner = "com.koretide.app.HiltTestRunner"
 
@@ -63,6 +63,14 @@ android {
     buildFeatures {
         viewBinding = true
         buildConfig = true
+    }
+
+    // 네이티브 라이브러리(.so)를 압축하지 않고 그대로 담아, AGP 8.5.1+ 가 16KB 경계에
+    // 정렬하도록 한다(Android 15의 16KB 페이지 기기 지원 요건).
+    packaging {
+        jniLibs {
+            useLegacyPackaging = false
+        }
     }
 
     testOptions {
