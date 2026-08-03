@@ -36,7 +36,7 @@ class WeatherRepositoryImpl @Inject constructor(
         val nearest = stationDao.getAllStationsSnapshot()
             .minByOrNull { GeoUtils.distSq(it.lat, it.lng, lat, lng) }
         val obsCode = nearest?.code ?: stationCode
-        Log.d(TAG, "  nearest 조위관측소: ${nearest?.name}($obsCode)  거리=${nearest?.let { "%.3f°".format(Math.sqrt((it.lat - lat) * (it.lat - lat) + (it.lng - lng) * (it.lng - lng))) } ?: "-"}")
+        Log.d(TAG, "  nearest 조위관측소: ${nearest?.name}($obsCode)")
 
         return try {
             // 바람(dtRecent)과 파고(noonWave)를 병렬 호출해 진입 지연 단축
@@ -71,14 +71,12 @@ class WeatherRepositoryImpl @Inject constructor(
     }
 
     private fun List<KhoaWaveItem>.nearestWaveTo(lat: Double, lng: Double): KhoaWaveItem? {
+        fun dist(w: KhoaWaveItem) = abs((w.lat ?: 0.0) - lat) + abs((w.lon ?: 0.0) - lng)
         val latest = groupBy { it.obsrvnDt }.maxByOrNull { it.key.orEmpty() }?.value ?: this
-        val nearest = latest.minByOrNull {
-            abs((it.lat ?: 0.0) - lat) + abs((it.lon ?: 0.0) - lng)
-        } ?: return null
+        val nearest = latest.minByOrNull { dist(it) } ?: return null
         // 파고 부이는 드문드문 분포하므로, 관측소에서 너무 먼 부이의 파고를 잘못 가져오지
         // 않도록 거리 상한(약 100km)을 둔다. 초과하면 파고 없음으로 처리.
-        val dist = abs((nearest.lat ?: 0.0) - lat) + abs((nearest.lon ?: 0.0) - lng)
-        return if (dist <= MAX_WAVE_MATCH_DEG) nearest else null
+        return if (dist(nearest) <= MAX_WAVE_MATCH_DEG) nearest else null
     }
 
     companion object {

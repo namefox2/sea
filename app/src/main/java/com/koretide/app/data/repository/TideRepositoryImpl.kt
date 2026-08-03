@@ -11,10 +11,8 @@ import com.koretide.app.data.remote.DtRecentSource
 import com.koretide.app.data.remote.KhoaDataApiService
 import com.koretide.app.domain.model.RecentTideLevel
 import com.koretide.app.domain.model.TideData
-import com.koretide.app.domain.model.TideRecord
 import com.koretide.app.domain.model.TideStatus
 import com.koretide.app.domain.repository.TideRepository
-import com.koretide.app.util.CrashLogger
 import com.koretide.app.util.DateUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -101,20 +99,15 @@ class TideRepositoryImpl @Inject constructor(
         // (예전엔 예보 호출이 실패하면 coroutineScope 전체가 터져 실시간이 성공해도 상세가 깨졌다.)
         val (dataItems, table) = coroutineScope {
             val c = async {
-                runCatching { dtRecentSource.items(stationCode, date) }
-                    .onFailure { CrashLogger.log("상세 실시간(dtRecent)[$stationCode] 실패: ${it.message}") }
-                    .getOrDefault(emptyList())
+                runCatching { dtRecentSource.items(stationCode, date) }.getOrDefault(emptyList())
             }
             val t = async {
-                runCatching { khoaDataApi.getTideForecast(apiKey, stationCode, date) }
-                    .onFailure { CrashLogger.log("상세 예보(tideFcst)[$stationCode] 실패: ${it.message}") }
-                    .getOrNull()
+                runCatching { khoaDataApi.getTideForecast(apiKey, stationCode, date) }.getOrNull()
             }
             c.await() to t.await()
         }
         val tableItems = table?.body?.items?.item ?: emptyList()
         Log.d(TAG, "  dtRecent items=${dataItems.size}  tideFcst items=${tableItems.size}")
-        CrashLogger.log("상세[$stationCode]: 실시간=${dataItems.size}건 예보=${tableItems.size}건")
 
         val realtimeLevel = dataItems.lastOrNull { it.tideLevel != null }?.tideLevel?.toInt()
         Log.d(TAG, "  lastItem obsrvnDt=${dataItems.lastOrNull()?.obsrvnDt}  tideLevel=${dataItems.lastOrNull()?.tideLevel}cm")
@@ -159,8 +152,11 @@ class TideRepositoryImpl @Inject constructor(
         val lowItem  = allLow.firstOrNull  { it.hm() >= nowTime } ?: allLow.lastOrNull()
         Log.d(TAG, "  tideStatus=${tideStatus.displayName}  nextHigh=${highItem?.hm()}(${highItem?.predcTdlvVl}cm)  nextLow=${lowItem?.hm()}(${lowItem?.predcTdlvVl}cm)")
 
+        // 포맷터는 항목마다가 아니라 이 호출에서 한 번만 만든다(SimpleDateFormat은 스레드
+        // 안전하지 않으므로 인스턴스 필드로 공유하지 않고 호출 로컬로 둔다).
+        val tsFormats = DATE_TIME_PATTERNS.map { SimpleDateFormat(it, Locale.KOREA) }
         val records = dataItems.map { item ->
-            val ts = parseDateToMillis(item.obsrvnDt ?: date)
+            val ts = parseDateToMillis(tsFormats, item.obsrvnDt ?: date)
             TideRecordEntity(stationCode = stationCode, timestamp = ts, waterLevel = item.tideLevel?.toInt() ?: 0)
         }
 
@@ -178,15 +174,6 @@ class TideRepositoryImpl @Inject constructor(
             lowTideTime  = lowItem?.hm(),
             records      = records.map { it.toDomain() }
         )
-    }
-
-    override suspend fun getTideHistory(stationCode: String, date: String): List<TideRecord> {
-        val since = System.currentTimeMillis() - 24 * 3_600_000L
-        val cached = tideRecordDao.getRecords(stationCode, since)
-        Log.d(TAG, "▶ getTideHistory station=$stationCode  cached=${cached.size}")
-        if (cached.isNotEmpty()) return cached.map { it.toDomain() }
-        val data = getTideData(stationCode)
-        return data.records
     }
 
     // 각 관측소 코드로 dtRecent 개별 병렬 호출 (obsCode=null 벌크 호출은 API가 지원하지 않음)
@@ -213,7 +200,6 @@ class TideRepositoryImpl @Inject constructor(
             Log.d(TAG, "▶ getBatchRecentLevels 병렬 호출 stations=${stations.size}  date=$date")
             val t0 = System.currentTimeMillis()
 
-            val errors = java.util.Collections.synchronizedList(mutableListOf<String>())
             // 관측소가 많아(수십 개) 한꺼번에 호출하면 rate-limit/타임아웃 위험이 있어 동시 호출 수 제한.
             val gate = Semaphore(8)
             val result = coroutineScope {
@@ -253,7 +239,6 @@ class TideRepositoryImpl @Inject constructor(
                                 } else null
                             } catch (e: Exception) {
                                 Log.w(TAG, "batch[${station.code}] 실패: ${e.message}")
-                                errors.add(e.message ?: e.javaClass.simpleName)
                                 null
                             }
                         }
@@ -262,11 +247,6 @@ class TideRepositoryImpl @Inject constructor(
             }
 
             Log.d(TAG, "  완료 ${System.currentTimeMillis() - t0}ms  valid=${result.size}/${stations.size}")
-            // 진단: 유효=0인데 오류=0이면 API가 빈 데이터를 준 것, 오류>0이면 호출 자체가 실패
-            CrashLogger.log(
-                "검색 배치(dtRecent): 관측소=${stations.size} 유효=${result.size} " +
-                "호출오류=${errors.size} 오류샘플=${errors.distinct().take(3)}"
-            )
 
             if (result.isNotEmpty()) {
                 batchCache = result
@@ -278,11 +258,9 @@ class TideRepositoryImpl @Inject constructor(
         }
     }
 
-    private fun parseDateToMillis(dateStr: String): Long {
-        val formats = listOf("yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd HH:mm", "yyyyMMdd HHmm")
+    private fun parseDateToMillis(formats: List<SimpleDateFormat>, dateStr: String): Long {
         for (fmt in formats) {
-            runCatching { SimpleDateFormat(fmt, Locale.KOREA).parse(dateStr)?.time }
-                .getOrNull()?.let { return it }
+            runCatching { fmt.parse(dateStr)?.time }.getOrNull()?.let { return it }
         }
         return System.currentTimeMillis()
     }
@@ -291,5 +269,6 @@ class TideRepositoryImpl @Inject constructor(
         private const val TAG = "TideRepo"
         private const val KEY_BATCH_DATA = "batch_data"
         private const val KEY_BATCH_TIME = "batch_time"
+        private val DATE_TIME_PATTERNS = listOf("yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd HH:mm", "yyyyMMdd HHmm")
     }
 }

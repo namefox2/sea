@@ -8,14 +8,6 @@ import com.koretide.app.data.local.entity.TideRecordEntity
 
 @Dao
 interface TideRecordDao {
-    @Query("""
-        SELECT * FROM tide_records
-        WHERE station_code = :stationCode
-          AND timestamp >= :since
-        ORDER BY timestamp ASC
-    """)
-    suspend fun getRecords(stationCode: String, since: Long): List<TideRecordEntity>
-
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(records: List<TideRecordEntity>)
 

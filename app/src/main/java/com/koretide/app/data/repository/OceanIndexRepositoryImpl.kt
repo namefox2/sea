@@ -3,10 +3,6 @@ package com.koretide.app.data.repository
 import com.koretide.app.BuildConfig
 import com.koretide.app.data.BeachPlaceData
 import com.koretide.app.data.PlaceGazetteer
-import com.koretide.app.data.ScubaPlaceData
-import com.koretide.app.data.SeaTravelPlaceData
-import com.koretide.app.data.SurfingPlaceData
-import com.koretide.app.data.TidalFlatPlaceData
 import com.koretide.app.data.remote.KhoaIndexApiService
 import com.koretide.app.data.remote.dto.KhoaIndexItem
 import com.koretide.app.domain.model.BeachIndexItem
@@ -14,13 +10,9 @@ import com.koretide.app.domain.model.IndexGrade
 import com.koretide.app.domain.model.IndexType
 import com.koretide.app.domain.model.OceanIndex
 import com.koretide.app.domain.model.StationRegion
-import com.koretide.app.domain.model.TideData
 import com.koretide.app.domain.repository.OceanIndexRepository
 import com.koretide.app.util.GeoUtils
-import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
 import java.text.SimpleDateFormat
-import java.util.Date
 import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -31,61 +23,6 @@ class OceanIndexRepositoryImpl @Inject constructor(
 ) : OceanIndexRepository {
 
     private val key get() = BuildConfig.KHOA_API_KEY
-
-    override suspend fun getAllIndices(
-        date: String,
-        region: String?,
-        stationCode: String?,
-        lat: Double?,
-        lon: Double?,
-        tideData: TideData?
-    ): List<OceanIndex> {
-        if (key.isBlank()) throw IllegalStateException("API 키가 설정되지 않았습니다")
-
-        // 지수 유형별 가장 가까운 placeCode 결정
-        val hsCode = if (lat != null && lon != null) BeachPlaceData.nearest(lat, lon)?.code else null
-        val baCode = if (lat != null && lon != null) SeaTravelPlaceData.nearest(lat, lon)?.code else null
-        val ssCode = if (lat != null && lon != null) ScubaPlaceData.nearest(lat, lon)?.code else null
-        val srCode = if (lat != null && lon != null) SurfingPlaceData.nearest(lat, lon)?.code else null
-        val tlCode = if (lat != null && lon != null) TidalFlatPlaceData.nearest(lat, lon)?.code else null
-
-        return coroutineScope {
-            val beach   = async { fetch(date, hsCode, IndexType.BEACH_SWIM)   { api.getBeachForecast(key, it, date) } }
-            // 낚시/뱃멀미는 전용 placeCode 데이터셋이 없어 전체 응답에서 좌표로 가장 가까운 지점 선택
-            val fishing = async { nearestIndex(date, lat, lon, IndexType.SEA_FISHING) }
-            val sick    = async { nearestIndex(date, lat, lon, IndexType.SEASICKNESS) }
-            val scuba   = async { fetch(date, ssCode, IndexType.SCUBA_DIVING) { api.getScubaForecast(key, it, date) } }
-            val tidal   = async { tidalFlatIndex(date, tlCode, tideData) }
-            val surf    = async { fetch(date, srCode, IndexType.SURFING)      { api.getSurfingForecast(key, it, date) } }
-            val travel  = async { fetch(date, baCode, IndexType.SEA_TRAVEL)   { api.getSeaTravelForecast(key, it, date) } }
-            listOf(beach, fishing, sick, scuba, tidal, surf, travel).map { it.await() }
-        }
-    }
-
-    private suspend fun tidalFlatIndex(date: String, placeCode: String?, tideData: TideData?): OceanIndex {
-        val range = tideData?.let { it.maxLevel - it.minLevel } ?: 0
-        if (tideData != null && range > 100) {
-            val exposure = (tideData.maxLevel - tideData.currentLevel).toFloat() / range.toFloat()
-            val (grade, gradeLabel) = when {
-                exposure >= 0.67f -> IndexGrade.VERY_GOOD to "노출 매우 많음"
-                exposure >= 0.33f -> IndexGrade.GOOD      to "노출 보통"
-                else              -> IndexGrade.FAIR       to "노출 적음"
-            }
-            return OceanIndex(
-                type        = IndexType.TIDAL_FLAT,
-                grade       = grade,
-                gradeLabel  = gradeLabel,
-                stats       = listOf(
-                    "노출도" to "${(exposure * 100).toInt()}%",
-                    "수위"  to "${tideData.currentLevel}cm"
-                ),
-                beachName   = null,
-                date        = SimpleDateFormat("M월 d일", Locale.KOREA).format(Date()),
-                isAvailable = true
-            )
-        }
-        return fetch(date, placeCode, IndexType.TIDAL_FLAT) { api.getTidalFlatForecast(key, it, date) }
-    }
 
     override suspend fun getBeachIndicesForRegion(
         date: String,
@@ -137,19 +74,6 @@ class OceanIndexRepositoryImpl @Inject constructor(
         }
     }
 
-    private suspend fun fetch(
-        date: String,
-        placeCode: String?,
-        type: IndexType,
-        call: suspend (String?) -> com.koretide.app.data.remote.dto.KhoaIndexResponse
-    ): OceanIndex = try {
-        val items = call(placeCode).body?.items?.item ?: emptyList()
-        val item  = items.firstOrNull()
-        item?.toDomain(type) ?: unavailableIndex(type)
-    } catch (e: Exception) {
-        unavailableIndex(type)
-    }
-
     // 전체 응답 조회. 낚시는 gubun(갯바위/선상)으로, 나머지는 placeCode=null로 조회.
     private suspend fun fetchAllItems(type: IndexType, date: String, rows: Int = 200): List<KhoaIndexItem> =
         when (type) {
@@ -166,20 +90,6 @@ class OceanIndexRepositoryImpl @Inject constructor(
             IndexType.SURFING      -> api.getSurfingForecast(key, null, date, rows).body?.items?.item ?: emptyList()
             IndexType.SEA_TRAVEL   -> api.getSeaTravelForecast(key, null, date, rows).body?.items?.item ?: emptyList()
         }
-
-    // 좌표로 가장 가까운 지점의 지수 (낚시/뱃멀미 — 전용 placeCode 데이터셋이 없는 유형)
-    private suspend fun nearestIndex(date: String, lat: Double?, lon: Double?, type: IndexType): OceanIndex {
-        if (lat == null || lon == null) return unavailableIndex(type)
-        return try {
-            val item = fetchAllItems(type, date)
-                .mapNotNull { it.resolvedCoords(type)?.let { c -> it to c } }
-                .minByOrNull { (_, c) -> val dLat = c.first - lat; val dLon = c.second - lon; dLat * dLat + dLon * dLon }
-                ?.first
-            item?.toDomain(type) ?: unavailableIndex(type)
-        } catch (e: Exception) {
-            unavailableIndex(type)
-        }
-    }
 
     private fun KhoaIndexItem.toDomain(type: IndexType) = OceanIndex(
         type        = type,

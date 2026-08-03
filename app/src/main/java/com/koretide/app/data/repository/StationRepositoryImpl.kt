@@ -62,14 +62,6 @@ class StationRepositoryImpl @Inject constructor(
         stationDao.upsertAll(entities)
     }
 
-    override suspend fun getStation(code: String): Station? =
-        stationDao.getStation(code)?.toDomain()
-
-    override suspend fun getNearestStation(lat: Double, lon: Double): Station? =
-        stationDao.getAllStationsSnapshot()
-            .minByOrNull { (it.lat - lat) * (it.lat - lat) + (it.lng - lon) * (it.lng - lon) }
-            ?.toDomain()
-
     // 저장된 관측소의 지역을 좌표로 재분류해, 분류 기준이 바뀐 경우 갱신
     private suspend fun reclassifyRegions() {
         val existing = stationDao.getAllStationsSnapshot()
