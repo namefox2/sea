@@ -28,11 +28,7 @@ class TideWatchView @JvmOverloads constructor(
                 fun Int.g() = Color.green(this) / 255f
                 fun Int.b() = Color.blue(this) / 255f
                 // Hour that best represents this theme's time-of-day for the default (no-station) view
-                val themeHour = when (theme.id) {
-                    "AUTUMN_LIGHT" -> 18.0f  // 노을해안 → sunset
-                    "SUMMER_DARK"  -> 22.0f  // 밤바다 → night
-                    else           -> 12.0f  // 맑은 낮바다 → noon
-                }
+                val themeHour = themeDefaultHour(theme)
                 // Centred sun/moon + 윤슬 color for themed presets
                 val centre = theme.id == "AUTUMN_LIGHT" || theme.id == "SUMMER_DARK"
                 // Silver moonlight for 밤바다; warm gold for 노을해안; null = LUT-driven
@@ -78,12 +74,21 @@ class TideWatchView @JvmOverloads constructor(
         }
     }
 
-    // Reset preset: noon sun, bft-2 wind, 35% tide, clean sandy beach (no mudflat).
+    // 테마별 대표 시간대(무-관측소 기본 뷰용). 밤바다는 밤, 노을해안은 일몰, 그 외 정오.
+    private fun themeDefaultHour(theme: ThemeConfig?): Float = when (theme?.id) {
+        "AUTUMN_LIGHT" -> 18.0f  // 노을해안 → sunset
+        "SUMMER_DARK"  -> 22.0f  // 밤바다 → night
+        else           -> 12.0f  // 맑은 낮바다 → noon
+    }
+
+    // Reset preset: bft-2 wind, 35% tide, clean sandy beach (no mudflat).
+    // 시간대는 현재 테마를 따른다(밤바다 초기화 시 정오 해가 뜨던 버그 수정).
     // Does NOT override calibVisualMinZ/MaxZ so regional range stays correct.
     fun applyImmersivePreset() {
+        val hour = themeDefaultHour(themeConfig)
         queueEvent {
             renderer.useDefaultSun   = true
-            renderer.defaultHour     = 12.0f
+            renderer.defaultHour     = hour
             renderer.tidePercent     = 0.35f
             renderer.windAmp         = 2f / 12f
             renderer.mudflatExposure = 0f    // always clean beach regardless of region

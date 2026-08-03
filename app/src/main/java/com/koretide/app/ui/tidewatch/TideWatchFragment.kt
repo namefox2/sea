@@ -167,7 +167,7 @@ class TideWatchFragment : Fragment() {
         binding.btnImmersive.setOnClickListener { resetToImmersiveDefault() }
     }
 
-    // 기본 상태로 초기화: 지역정보 삭제 + 바람2/물때35/조차5.5 + 해 가운데(정오).
+    // 기본 상태로 초기화: 지역정보 삭제 + 바람2/물때35/조차5.5 + 현재 테마 시간대(밤바다=밤).
     // 초기화 버튼과 테마 변경 시 공용 사용.
     // Note: isImmersivePreset 는 일부러 건드리지 않음 — 더블탭 시 restoreStationView()가
     // 슬라이더 값을 바꾸는 것을 막기 위함.
